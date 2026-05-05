@@ -45,13 +45,8 @@ def fetch_news(query, start_date, end_date):
             st.text(res.text[:300])
             return None
 
-        try:
-            json_data = res.json()
-        except:
-            st.error("Invalid JSON response")
-            return None
-
-        articles = json_data.get("articles", [])
+        data_json = res.json()
+        articles = data_json.get("articles", [])
 
         if not articles:
             return None
@@ -77,9 +72,14 @@ def fetch_news(query, start_date, end_date):
             })
 
         df = pd.DataFrame(data)
-        df.drop_duplicates(subset="Title", inplace=True)
 
+        # Clean + Fix datetime
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+        # 🔥 FIX: Remove timezone
+        df["Date"] = df["Date"].dt.tz_localize(None)
+
+        df.drop_duplicates(subset="Title", inplace=True)
         df = df.sort_values(by="Date", ascending=False)
 
         return df
@@ -150,7 +150,6 @@ def main():
     st.title("🏢 US Data Center Investment Tracker")
 
     st.sidebar.header("🔍 Filters")
-
     state = st.sidebar.selectbox("Select State", US_STATES)
 
     tab1, tab2, tab3 = st.tabs(["Latest", "Past 10 Days", "Past 30 Days"])
@@ -174,7 +173,6 @@ def main():
 
                 if df is not None:
                     st.success(f"{len(df)} Articles Found")
-
                     st.dataframe(df, use_container_width=True)
 
                     excel = to_excel(df)
