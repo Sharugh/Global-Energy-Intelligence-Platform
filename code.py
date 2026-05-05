@@ -8,7 +8,7 @@ from io import BytesIO
 # =========================
 # CONFIG
 # =========================
-API_KEY = "pub_d281bb91f7f5441db91ff6d538b3bbb7"
+API_KEY = "c3fd1ae889b305ab837a3a344d890e3f"
 
 BASE_QUERY = '''
 ("data center" OR hyperscale OR "AI infrastructure")
@@ -29,7 +29,7 @@ COMPANIES = [
 # FETCH FUNCTION
 # =========================
 def fetch_news(query, start_date):
-    url = "https://newsdata.io/api/1/news"
+    url = "https://gnews.io/"
 
     params = {
         "apikey": API_KEY,
