@@ -8,9 +8,10 @@ from io import BytesIO
 # =========================
 # CONFIG
 # =========================
-API_KEY = "c3fd1ae889b305ab837a3a344d890e3f"
+NEWSAPI_KEY = "3087034a13564f75bfc769c0046e729c"
+NEWSAPI_URL = "https://newsapi.org/v2/everything"
 
-BASE_QUERY = "data center OR hyperscale OR AI infrastructure USA investment expansion"
+BASE_QUERY = "data center OR hyperscale OR AI infrastructure investment expansion"
 
 US_STATES = [
     "All USA", "Texas", "Virginia", "California", "Arizona",
@@ -25,20 +26,19 @@ COMPANIES = [
 # =========================
 # FETCH FUNCTION
 # =========================
-def fetch_news(query, start_date):
-    url = "https://gnews.io/api/v4/search"
-
+def fetch_news(query, start_date, end_date):
     params = {
         "q": query,
-        "lang": "en",
-        "country": "us",
         "from": start_date,
-        "max": 50,
-        "apikey": API_KEY
+        "to": end_date,
+        "language": "en",
+        "sortBy": "publishedAt",
+        "pageSize": 100,
+        "apiKey": NEWSAPI_KEY
     }
 
     try:
-        res = requests.get(url, params=params, timeout=10)
+        res = requests.get(NEWSAPI_URL, params=params, timeout=10)
 
         if res.status_code != 200:
             st.error(f"API Error {res.status_code}")
@@ -66,6 +66,7 @@ def fetch_news(query, start_date):
                 "URL": a.get("url"),
                 "Date": a.get("publishedAt"),
                 "Description": a.get("description"),
+                "Source": a.get("source", {}).get("name"),
                 "Company": extract_company(text),
                 "State": extract_location(text),
                 "MW": extract_mw(text),
@@ -154,17 +155,22 @@ def main():
 
     tab1, tab2, tab3 = st.tabs(["Latest", "Past 10 Days", "Past 30 Days"])
 
-    def run_tab(days):
-        start_date = (datetime.today() - timedelta(days=days)).strftime("%Y-%m-%d")
+    def run_tab(days, label):
+        end_date = datetime.today()
+        start_date = end_date - timedelta(days=days)
 
         if state != "All USA":
             query = f"{BASE_QUERY} {state}"
         else:
             query = f"{BASE_QUERY} USA"
 
-        if st.button(f"Fetch {days}-day data"):
+        if st.button(f"Fetch {label}"):
             with st.spinner("Fetching news..."):
-                df = fetch_news(query, start_date)
+                df = fetch_news(
+                    query,
+                    start_date.strftime("%Y-%m-%d"),
+                    end_date.strftime("%Y-%m-%d")
+                )
 
                 if df is not None:
                     st.success(f"{len(df)} Articles Found")
@@ -176,19 +182,19 @@ def main():
                     st.download_button(
                         "📥 Download Excel",
                         excel,
-                        f"data_center_{days}days.xlsx"
+                        f"data_center_{label}.xlsx"
                     )
                 else:
                     st.warning("No data found")
 
     with tab1:
-        run_tab(1)
+        run_tab(1, "latest")
 
     with tab2:
-        run_tab(10)
+        run_tab(10, "10_days")
 
     with tab3:
-        run_tab(30)
+        run_tab(30, "30_days")
 
 if __name__ == "__main__":
     main()
