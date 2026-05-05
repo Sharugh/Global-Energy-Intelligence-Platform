@@ -11,7 +11,16 @@ from io import BytesIO
 NEWSAPI_KEY = "3087034a13564f75bfc769c0046e729c"
 NEWSAPI_URL = "https://newsapi.org/v2/everything"
 
-BASE_QUERY = "data center OR hyperscale OR AI infrastructure investment expansion"
+# 🔥 HIGH-PRECISION QUERY
+BASE_QUERY = '"data center" OR "data centre" OR hyperscale OR colocation'
+
+# 🔥 TRUSTED SOURCES
+TRUSTED_SOURCES = [
+    "datacenterdynamics.com",
+    "datacenterknowledge.com",
+    "reuters.com",
+    "bloomberg.com"
+]
 
 US_STATES = [
     "All USA", "Texas", "Virginia", "California", "Arizona",
@@ -24,6 +33,31 @@ COMPANIES = [
 ]
 
 # =========================
+# RELEVANCE FILTER
+# =========================
+def is_relevant(article):
+    text = f"{article.get('title','')} {article.get('description','')}".lower()
+    url = article.get("url", "")
+
+    keywords = ["data center", "data centre", "hyperscale", "colocation"]
+
+    if not any(k in text for k in keywords):
+        return False
+
+    if not any(domain in url for domain in TRUSTED_SOURCES):
+        return False
+
+    return True
+
+def relevance_score(text):
+    text = text.lower()
+    keywords = [
+        "data center", "hyperscale", "colocation",
+        "mw", "campus", "facility", "server"
+    ]
+    return sum(1 for k in keywords if k in text)
+
+# =========================
 # FETCH FUNCTION
 # =========================
 def fetch_news(query, start_date, end_date):
@@ -34,6 +68,7 @@ def fetch_news(query, start_date, end_date):
         "language": "en",
         "sortBy": "publishedAt",
         "pageSize": 100,
+        "domains": ",".join(TRUSTED_SOURCES),
         "apiKey": NEWSAPI_KEY
     }
 
@@ -47,6 +82,9 @@ def fetch_news(query, start_date, end_date):
 
         data_json = res.json()
         articles = data_json.get("articles", [])
+
+        # 🔥 STRICT FILTER
+        articles = [a for a in articles if is_relevant(a)]
 
         if not articles:
             return None
@@ -68,15 +106,17 @@ def fetch_news(query, start_date, end_date):
                 "Acre": extract_acre(text),
                 "Cost": extract_cost(text),
                 "Project Type": classify_project(text),
-                "Signal": extract_signal(text)
+                "Signal": extract_signal(text),
+                "Score": relevance_score(text)
             })
 
         df = pd.DataFrame(data)
 
-        # Clean + Fix datetime
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        # 🔥 Keep only strong matches
+        df = df[df["Score"] >= 2]
 
-        # 🔥 FIX: Remove timezone
+        # Fix datetime
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
         df["Date"] = df["Date"].dt.tz_localize(None)
 
         df.drop_duplicates(subset="Title", inplace=True)
@@ -164,15 +204,15 @@ def main():
             query = f"{BASE_QUERY} USA"
 
         if st.button(f"Fetch {label}"):
-            with st.spinner("Fetching news..."):
+            with st.spinner("Fetching high-quality data center news..."):
                 df = fetch_news(
                     query,
                     start_date.strftime("%Y-%m-%d"),
                     end_date.strftime("%Y-%m-%d")
                 )
 
-                if df is not None:
-                    st.success(f"{len(df)} Articles Found")
+                if df is not None and not df.empty:
+                    st.success(f"{len(df)} High-Quality Articles Found")
                     st.dataframe(df, use_container_width=True)
 
                     excel = to_excel(df)
@@ -183,7 +223,7 @@ def main():
                         f"data_center_{label}.xlsx"
                     )
                 else:
-                    st.warning("No data found")
+                    st.warning("No high-quality data center articles found")
 
     with tab1:
         run_tab(1, "latest")
