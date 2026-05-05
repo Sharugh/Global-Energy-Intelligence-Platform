@@ -2,174 +2,184 @@ import streamlit as st
 import requests
 import pandas as pd
 import re
-from datetime import datetime
-import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+from io import BytesIO
 
 # =========================
 # CONFIG
 # =========================
-GDELT_API = "https://api.gdeltproject.org/api/v2/doc/doc"
+API_KEY = "pub_d281bb91f7f5441db91ff6d538b3bbb7"
+
+BASE_QUERY = '''
+("data center" OR hyperscale OR "AI infrastructure")
+AND (investment OR expansion OR construction OR acquisition)
+'''
+
+US_STATES = [
+    "All USA", "Texas", "Virginia", "California", "Arizona",
+    "Ohio", "Georgia", "Illinois", "New York"
+]
 
 COMPANIES = [
     "Amazon", "AWS", "Microsoft", "Google", "Meta",
     "Equinix", "Digital Realty", "QTS", "CyrusOne"
 ]
 
-KEYWORDS_BASE = [
-    "data center", "hyperscale", "AI infrastructure",
-    "cloud", "server farm"
-]
+# =========================
+# FETCH FUNCTION
+# =========================
+def fetch_news(query, start_date):
+    url = "https://newsdata.io/api/1/news"
 
-# =========================
-# AUTO KEYWORD GENERATOR
-# =========================
-def generate_query():
-    return (
-        "(" + " OR ".join(KEYWORDS_BASE) + ") AND "
-        "(investment OR expansion OR construction OR acquisition OR power)"
-        " AND (USA OR 'United States' OR Texas OR Virginia OR California)"
-    )
-
-# =========================
-# FETCH FROM GDELT
-# =========================
-def fetch_gdelt(query):
     params = {
-        "query": query,
-        "format": "json",
-        "maxrecords": 100,
-        "sort": "DateDesc"
+        "apikey": API_KEY,
+        "q": query,
+        "language": "en",
+        "country": "us",
+        "from_date": start_date,
+        "size": 50
     }
 
-    res = requests.get(GDELT_API, params=params)
+    res = requests.get(url, params=params)
 
     if res.status_code != 200:
-        st.error("GDELT fetch failed")
+        st.error("API Error")
         return None
 
-    data = res.json().get("articles", [])
+    articles = res.json().get("results", [])
 
-    if not data:
+    if not articles:
         return None
 
-    df = pd.DataFrame(data)[["title", "sourceCommonName", "seendate", "url"]]
-    df.columns = ["Title", "Source", "Date", "URL"]
+    data = []
+    for a in articles:
+        text = f"{a.get('title','')} {a.get('description','')}"
+
+        data.append({
+            "Title": a.get("title"),
+            "URL": a.get("link"),
+            "Date": a.get("pubDate"),
+            "Description": a.get("description"),
+            "Company": extract_company(text),
+            "Location": extract_location(text),
+            "MW": extract_mw(text),
+            "Acre": extract_acre(text),
+            "Cost": extract_cost(text),
+            "Project Type": classify_project(text),
+            "Signal": extract_signal(text)
+        })
+
+    df = pd.DataFrame(data)
+    df.drop_duplicates(subset="Title", inplace=True)
 
     return df
 
 # =========================
-# TAG COMPANIES
+# EXTRACTION FUNCTIONS
 # =========================
-def tag_companies(text):
-    found = []
+def extract_company(text):
     for c in COMPANIES:
-        if c.lower() in str(text).lower():
-            found.append(c)
-    return ", ".join(found) if found else "Other"
+        if c.lower() in text.lower():
+            return c
+    return "Unknown"
 
-# =========================
-# CLASSIFY TYPE
-# =========================
-def classify_article(title):
-    title = title.lower()
+def extract_location(text):
+    for s in US_STATES:
+        if s.lower() in text.lower():
+            return s
+    return "USA"
 
-    if "investment" in title or "funding" in title:
+def extract_mw(text):
+    match = re.search(r"\d+\s?MW", text, re.IGNORECASE)
+    return match.group(0) if match else "N/A"
+
+def extract_acre(text):
+    match = re.search(r"\d+\s?(acre|acres)", text, re.IGNORECASE)
+    return match.group(0) if match else "N/A"
+
+def extract_cost(text):
+    match = re.search(r"\$[\d\.]+\s?(billion|million)", text, re.IGNORECASE)
+    return match.group(0) if match else "N/A"
+
+def classify_project(text):
+    text = text.lower()
+    if "investment" in text:
         return "Investment"
-    elif "construction" in title or "build" in title:
+    elif "construction" in text or "build" in text:
         return "Construction"
-    elif "power" in title or "energy" in title:
-        return "Energy"
-    elif "ai" in title:
-        return "AI Infra"
+    elif "expansion" in text:
+        return "Expansion"
     else:
         return "General"
 
-# =========================
-# EXTRACT CAPEX (SIMPLE)
-# =========================
-def extract_capex(text):
-    match = re.search(r"\$[0-9]+(\.[0-9]+)?\s?(billion|million)", str(text).lower())
-    return match.group(0) if match else "N/A"
+def extract_signal(text):
+    keywords = ["approval", "permit", "announced", "planned"]
+    for k in keywords:
+        if k in text.lower():
+            return k
+    return "N/A"
 
 # =========================
-# MAIN APP
+# EXCEL EXPORT
+# =========================
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    return output.getvalue()
+
+# =========================
+# UI
 # =========================
 def main():
     st.set_page_config(layout="wide")
-
     st.title("🏢 US Data Center Investment Tracker")
 
-    st.sidebar.header("Controls")
+    st.sidebar.header("Filters")
 
-    if st.sidebar.button("🔄 Auto Generate Query"):
-        query = generate_query()
+    state = st.sidebar.selectbox("Select State", US_STATES)
+
+    # Time selection
+    time_option = st.sidebar.radio(
+        "Select Time Range",
+        ["Latest", "Past 10 Days", "Past 30 Days"]
+    )
+
+    if time_option == "Latest":
+        start_date = datetime.today() - timedelta(days=1)
+    elif time_option == "Past 10 Days":
+        start_date = datetime.today() - timedelta(days=10)
     else:
-        query = st.sidebar.text_area(
-            "Edit Query",
-            value=generate_query()
-        )
+        start_date = datetime.today() - timedelta(days=30)
+
+    # Build query
+    if state != "All USA":
+        query = BASE_QUERY + f" AND {state}"
+    else:
+        query = BASE_QUERY + " AND USA"
+
+    # Tabs
+    tab1, tab2, tab3 = st.tabs(["Latest", "Past 10 Days", "Past 30 Days"])
 
     if st.sidebar.button("🚀 Fetch Data"):
-        with st.spinner("Fetching from GDELT..."):
-            df = fetch_gdelt(query)
+        with st.spinner("Fetching Data..."):
+            df = fetch_news(query, start_date.strftime("%Y-%m-%d"))
 
             if df is not None:
 
-                # Tagging
-                df["Company"] = df["Title"].apply(tag_companies)
-                df["Category"] = df["Title"].apply(classify_article)
-                df["Capex"] = df["Title"].apply(extract_capex)
-
-                st.success(f"{len(df)} Articles Loaded")
-
-                # =====================
-                # METRICS
-                # =====================
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Articles", len(df))
-                col2.metric("Companies", df["Company"].nunique())
-                col3.metric("Categories", df["Category"].nunique())
-
-                # =====================
-                # CHARTS (Power BI Style)
-                # =====================
-                st.subheader("📊 Trends")
-
-                # Category Chart
-                cat_counts = df["Category"].value_counts()
-
-                fig1, ax1 = plt.subplots()
-                cat_counts.plot(kind="bar", ax=ax1)
-                st.pyplot(fig1)
-
-                # Company Chart
-                comp_counts = df["Company"].value_counts().head(10)
-
-                fig2, ax2 = plt.subplots()
-                comp_counts.plot(kind="bar", ax=ax2)
-                st.pyplot(fig2)
-
-                # =====================
-                # TABLE
-                # =====================
-                st.subheader("📄 Articles")
+                st.success(f"{len(df)} Articles Found")
 
                 st.dataframe(df, use_container_width=True)
 
-                # =====================
-                # DOWNLOAD
-                # =====================
-                csv = df.to_csv(index=False)
+                excel = to_excel(df)
 
                 st.download_button(
-                    "📥 Download CSV",
-                    csv,
-                    "data_center_tracker.csv"
+                    "📥 Download Excel",
+                    excel,
+                    "data_center_tracker.xlsx"
                 )
-
             else:
                 st.warning("No data found")
-
 
 if __name__ == "__main__":
     main()
