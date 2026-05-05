@@ -4,6 +4,7 @@ import pandas as pd
 import re
 from datetime import datetime, timedelta
 from io import BytesIO
+from bs4 import BeautifulSoup
 
 # =========================
 # CONFIG
@@ -11,16 +12,7 @@ from io import BytesIO
 NEWSAPI_KEY = "3087034a13564f75bfc769c0046e729c"
 NEWSAPI_URL = "https://newsapi.org/v2/everything"
 
-# 🔥 HIGH-PRECISION QUERY
-BASE_QUERY = '"data center" OR "data centre" OR hyperscale OR colocation'
-
-# 🔥 TRUSTED SOURCES
-TRUSTED_SOURCES = [
-    "datacenterdynamics.com",
-    "datacenterknowledge.com",
-    "reuters.com",
-    "bloomberg.com"
-]
+BASE_QUERY = '"data center" OR hyperscale OR colocation OR campus'
 
 US_STATES = [
     "All USA", "Texas", "Virginia", "California", "Arizona",
@@ -33,32 +25,38 @@ COMPANIES = [
 ]
 
 # =========================
-# RELEVANCE FILTER
+# SCRAPER: DataCenterDynamics
 # =========================
-def is_relevant(article):
-    text = f"{article.get('title','')} {article.get('description','')}".lower()
-    url = article.get("url", "")
+def scrape_dcd():
+    url = "https://www.datacenterdynamics.com/en/news/"
+    
+    try:
+        res = requests.get(url, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
 
-    keywords = ["data center", "data centre", "hyperscale", "colocation"]
+        articles = []
+        cards = soup.find_all("a", class_="card__link")
 
-    if not any(k in text for k in keywords):
-        return False
+        for c in cards[:20]:
+            title = c.get_text(strip=True)
+            link = "https://www.datacenterdynamics.com" + c.get("href")
 
-    if not any(domain in url for domain in TRUSTED_SOURCES):
-        return False
+            articles.append({
+                "Title": title,
+                "URL": link,
+                "Date": datetime.now(),
+                "Description": "From DataCenterDynamics",
+                "Source": "DataCenterDynamics"
+            })
 
-    return True
+        return pd.DataFrame(articles)
 
-def relevance_score(text):
-    text = text.lower()
-    keywords = [
-        "data center", "hyperscale", "colocation",
-        "mw", "campus", "facility", "server"
-    ]
-    return sum(1 for k in keywords if k in text)
+    except Exception as e:
+        st.warning("DCD scraping failed")
+        return pd.DataFrame()
 
 # =========================
-# FETCH FUNCTION
+# NEWS API FETCH
 # =========================
 def fetch_news(query, start_date, end_date):
     params = {
@@ -68,26 +66,12 @@ def fetch_news(query, start_date, end_date):
         "language": "en",
         "sortBy": "publishedAt",
         "pageSize": 100,
-        "domains": ",".join(TRUSTED_SOURCES),
         "apiKey": NEWSAPI_KEY
     }
 
     try:
         res = requests.get(NEWSAPI_URL, params=params, timeout=10)
-
-        if res.status_code != 200:
-            st.error(f"API Error {res.status_code}")
-            st.text(res.text[:300])
-            return None
-
-        data_json = res.json()
-        articles = data_json.get("articles", [])
-
-        # 🔥 STRICT FILTER
-        articles = [a for a in articles if is_relevant(a)]
-
-        if not articles:
-            return None
+        articles = res.json().get("articles", [])
 
         data = []
 
@@ -99,37 +83,22 @@ def fetch_news(query, start_date, end_date):
                 "URL": a.get("url"),
                 "Date": a.get("publishedAt"),
                 "Description": a.get("description"),
-                "Source": a.get("source", {}).get("name"),
-                "Company": extract_company(text),
-                "State": extract_location(text),
-                "MW": extract_mw(text),
-                "Acre": extract_acre(text),
-                "Cost": extract_cost(text),
-                "Project Type": classify_project(text),
-                "Signal": extract_signal(text),
-                "Score": relevance_score(text)
+                "Source": a.get("source", {}).get("name")
             })
 
         df = pd.DataFrame(data)
 
-        # 🔥 Keep only strong matches
-        df = df[df["Score"] >= 2]
-
-        # Fix datetime
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-        df["Date"] = df["Date"].dt.tz_localize(None)
-
-        df.drop_duplicates(subset="Title", inplace=True)
-        df = df.sort_values(by="Date", ascending=False)
+        if not df.empty:
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+            df["Date"] = df["Date"].dt.tz_localize(None)
 
         return df
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"Request failed: {e}")
-        return None
+    except:
+        return pd.DataFrame()
 
 # =========================
-# EXTRACTION FUNCTIONS
+# EXTRACTION
 # =========================
 def extract_company(text):
     for c in COMPANIES:
@@ -147,34 +116,27 @@ def extract_mw(text):
     match = re.search(r"\d+\s?MW", text, re.IGNORECASE)
     return match.group(0) if match else "N/A"
 
-def extract_acre(text):
-    match = re.search(r"\d+\s?(acre|acres)", text, re.IGNORECASE)
-    return match.group(0) if match else "N/A"
-
 def extract_cost(text):
     match = re.search(r"\$[\d\.]+\s?(billion|million)", text, re.IGNORECASE)
     return match.group(0) if match else "N/A"
 
-def classify_project(text):
-    text = text.lower()
-    if "investment" in text:
-        return "Investment"
-    elif "construction" in text or "build" in text:
-        return "Construction"
-    elif "expansion" in text:
-        return "Expansion"
-    else:
-        return "General"
+# =========================
+# PROCESS DATA
+# =========================
+def process_df(df):
+    if df.empty:
+        return df
 
-def extract_signal(text):
-    keywords = ["approval", "permit", "announced", "planned"]
-    for k in keywords:
-        if k in text.lower():
-            return k
-    return "N/A"
+    df["Company"] = df["Title"].apply(extract_company)
+    df["State"] = df["Title"].apply(extract_location)
+    df["MW"] = df["Title"].apply(extract_mw)
+    df["Cost"] = df["Title"].apply(extract_cost)
+
+    df.drop_duplicates(subset="Title", inplace=True)
+    return df
 
 # =========================
-# EXCEL EXPORT
+# EXPORT
 # =========================
 def to_excel(df):
     output = BytesIO()
@@ -187,9 +149,8 @@ def to_excel(df):
 # =========================
 def main():
     st.set_page_config(layout="wide")
-    st.title("🏢 US Data Center Investment Tracker")
+    st.title("🏢 US Data Center Intelligence Tracker")
 
-    st.sidebar.header("🔍 Filters")
     state = st.sidebar.selectbox("Select State", US_STATES)
 
     tab1, tab2, tab3 = st.tabs(["Latest", "Past 10 Days", "Past 30 Days"])
@@ -198,21 +159,28 @@ def main():
         end_date = datetime.today()
         start_date = end_date - timedelta(days=days)
 
-        if state != "All USA":
-            query = f"{BASE_QUERY} {state}"
-        else:
-            query = f"{BASE_QUERY} USA"
+        query = BASE_QUERY if state == "All USA" else f"{BASE_QUERY} {state}"
 
         if st.button(f"Fetch {label}"):
-            with st.spinner("Fetching high-quality data center news..."):
-                df = fetch_news(
+            with st.spinner("Fetching data..."):
+
+                # API Data
+                df_api = fetch_news(
                     query,
                     start_date.strftime("%Y-%m-%d"),
                     end_date.strftime("%Y-%m-%d")
                 )
 
-                if df is not None and not df.empty:
-                    st.success(f"{len(df)} High-Quality Articles Found")
+                # Scraped Data
+                df_scrape = scrape_dcd()
+
+                # Combine
+                df = pd.concat([df_api, df_scrape], ignore_index=True)
+
+                df = process_df(df)
+
+                if not df.empty:
+                    st.success(f"{len(df)} Articles Found")
                     st.dataframe(df, use_container_width=True)
 
                     excel = to_excel(df)
@@ -223,7 +191,7 @@ def main():
                         f"data_center_{label}.xlsx"
                     )
                 else:
-                    st.warning("No high-quality data center articles found")
+                    st.warning("No data found")
 
     with tab1:
         run_tab(1, "latest")
