@@ -1,321 +1,338 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from datetime import datetime, timedelta
 import re
 import io
+import time
+from datetime import datetime, timedelta
+
+import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ─── US States for filtering ───────────────────────────────────────────────
-US_STATES = [
-    "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
-    "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
-    "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
-    "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
-    "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
-    "New Hampshire", "New Jersey", "New Mexico", "New York",
-    "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
-    "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-    "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
-    "West Virginia", "Wisconsin", "Wyoming",
-    # Common abbreviations
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-    # US cities often seen in data center news
-    "Silicon Valley", "Northern Virginia", "NoVA", "Loudoun County",
-    "Dallas", "Chicago", "Phoenix", "Atlanta", "Seattle", "Denver",
-    "San Jose", "San Francisco", "Los Angeles", "Houston", "Miami",
-    "New York City", "NYC", "Boston", "Portland", "Las Vegas",
-    "Reno", "Quincy", "Ashburn", "Sterling", "Manassas",
-    "United States", "U.S.", "US "
+# ── optional cloudscraper (bypasses Cloudflare) ────────────────────────────
+try:
+    import cloudscraper
+    _SCRAPER = cloudscraper.create_scraper()
+    _USE_CLOUDSCRAPER = True
+except ImportError:
+    import requests
+    _SCRAPER = requests.Session()
+    _USE_CLOUDSCRAPER = False
+
+from bs4 import BeautifulSoup
+
+# ─── US geography keywords ─────────────────────────────────────────────────
+_US_WORDS = [
+    "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
+    "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
+    "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
+    "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
+    "New Hampshire","New Jersey","New Mexico","New York","North Carolina",
+    "North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island",
+    "South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+    "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
+    "United States",
+    # Data center hubs
+    "Silicon Valley","Northern Virginia","NoVA","Loudoun","Ashburn","Sterling",
+    "Manassas","Dallas","Chicago","Phoenix","Atlanta","Seattle","Denver",
+    "San Jose","San Francisco","Los Angeles","Houston","Miami","Boston",
+    "Portland","Las Vegas","Reno","Quincy","Salt Lake",
+    "New York City","NYC","San Antonio","Austin","Columbus","Kansas City",
+    "Nashville","Charlotte","Raleigh","Richmond","Sacramento","Boise",
+    "Indianapolis","Baltimore","San Diego","Oakland","Pittsburgh","Newark",
+    "Memphis","Louisville","Detroit","Minneapolis","Cleveland","Cincinnati",
+    "Tampa","Orlando","Jacksonville","Spokane","Tacoma","Bellevue","Mesa",
+    "Tucson","Chandler","Scottsdale","Henderson","El Paso","Fort Worth",
+    "Garland","Lubbock","Amarillo","Midland","Killeen","Waco",
+    "Perry County","Loudoun County","Prince William","Fairfax",
+    "Guadalupe County","Tyrone","Sweetwater","Beacon Point",
 ]
+_ABBREVS = [
+    "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN",
+    "IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV",
+    "NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN",
+    "TX","UT","VT","VA","WA","WV","WI","WY","DC",
+]
+_parts = [r"\b" + re.escape(w) + r"\b" for w in _US_WORDS]
+_parts += [r"\b" + a + r"\b" for a in _ABBREVS]
+_parts += [r"\bU\.S\.\b", r"\bUS\b"]
+US_RE = re.compile("|".join(_parts), re.IGNORECASE)
 
-US_PATTERN = re.compile(
-    r'\b(' + '|'.join(re.escape(s) for s in US_STATES) + r')\b',
-    re.IGNORECASE
-)
+BASE_URL   = "https://www.datacenterdynamics.com"
+CHAN_TERM  = "the-data-center-construction-channel"
+NA_TERM    = "north-america"
+MONTHS = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+          "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
 
-BASE_URL = "https://www.datacenterdynamics.com"
-CHANNEL_URL = f"{BASE_URL}/en/news/?term=the-data-center-construction-channel"
-
-HEADERS = {
+_HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.datacenterdynamics.com/",
 }
 
 
-# ─── Scraping helpers ───────────────────────────────────────────────────────
-
-def parse_date(date_str: str) -> datetime | None:
-    """Try multiple date formats and return a datetime or None."""
-    date_str = date_str.strip()
-    for fmt in ("%B %d, %Y", "%d %B %Y", "%Y-%m-%d", "%b %d, %Y"):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            continue
+def parse_date(raw: str):
+    raw = raw.strip()
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        pass
+    for pat in (r"(\d{1,2})\s+(\w+)\s+(\d{4})", r"(\w+)\s+(\d{1,2}),?\s+(\d{4})"):
+        m = re.match(pat, raw)
+        if m:
+            g = m.groups()
+            try:
+                if g[0].isdigit():
+                    day, mon, yr = int(g[0]), g[1].lower()[:3], int(g[2])
+                else:
+                    mon, day, yr = g[0].lower()[:3], int(g[1]), int(g[2])
+                if mon in MONTHS:
+                    return datetime(yr, MONTHS[mon], day)
+            except Exception:
+                pass
     return None
 
 
-def fetch_page(url: str) -> BeautifulSoup | None:
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-        return BeautifulSoup(r.text, "html.parser")
-    except Exception as e:
-        st.warning(f"Failed to fetch {url}: {e}")
-        return None
+def fetch(url: str):
+    """Fetch with cloudscraper (if available) or requests, retrying once."""
+    for attempt in range(2):
+        try:
+            if _USE_CLOUDSCRAPER:
+                resp = _SCRAPER.get(url, timeout=20)
+            else:
+                resp = _SCRAPER.get(url, headers=_HEADERS, timeout=20)
+            resp.raise_for_status()
+            return BeautifulSoup(resp.text, "html.parser")
+        except Exception as e:
+            if attempt == 0:
+                time.sleep(2)
+            else:
+                st.warning(f"⚠️ Could not fetch page: {e}")
+    return None
 
 
-def scrape_articles(cutoff: datetime, max_pages: int = 10) -> list[dict]:
-    """Scrape DCD construction channel up to cutoff date."""
+def parse_articles(soup: BeautifulSoup) -> list:
     articles = []
-    page = 1
-
-    while page <= max_pages:
-        url = CHANNEL_URL if page == 1 else f"{CHANNEL_URL}&page={page}"
-        soup = fetch_page(url)
-        if not soup:
-            break
-
-        cards = soup.select("article, .article-card, [data-component='article-card']")
-
-        # Fallback: broader selector
-        if not cards:
-            cards = soup.select("a[href*='/en/news/']")
-
-        if not cards:
-            break
-
-        found_any = False
-        stop_early = False
-
-        for card in cards:
-            # ── headline ──
-            headline_tag = card.select_one("h2, h3, h4, .headline, .title")
-            if not headline_tag:
-                if card.name == "a":
-                    headline_tag = card
-                else:
-                    continue
-            headline = headline_tag.get_text(strip=True)
-            if not headline:
-                continue
-
-            # ── url ──
-            link_tag = card.select_one("a") or (card if card.name == "a" else None)
-            if not link_tag:
-                continue
-            href = link_tag.get("href", "")
-            if not href.startswith("http"):
-                href = BASE_URL + href
-
-            # ── date ──
-            date_tag = card.select_one("time, .date, [class*='date'], [class*='time']")
-            article_date = None
-            if date_tag:
-                raw = date_tag.get("datetime") or date_tag.get_text(strip=True)
-                article_date = parse_date(raw)
-
-            if article_date and article_date < cutoff:
-                stop_early = True
+    seen = set()
+    for a in soup.find_all("a", href=re.compile(r"^/en/news/[^?#]+/$")):
+        href = a["href"]
+        if href in seen:
+            continue
+        seen.add(href)
+        h_tag   = a.find(["h1", "h2", "h3", "h4"])
+        headline = h_tag.get_text(strip=True) if h_tag else a.get_text(strip=True)
+        if not headline or len(headline) < 10:
+            continue
+        date_obj = None
+        node = a.parent
+        for _ in range(8):
+            if node is None:
                 break
-
-            found_any = True
-            articles.append({
-                "Headline": headline,
-                "Date": article_date.strftime("%Y-%m-%d") if article_date else "Unknown",
-                "URL": href,
-                "_date_obj": article_date,
-            })
-
-        if stop_early or not found_any:
-            break
-        page += 1
-
+            text = node.get_text(" ", strip=True)
+            m = re.search(
+                r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
+                text, re.I
+            )
+            if m:
+                date_obj = parse_date(m.group(0))
+                break
+            node = node.parent
+        articles.append({
+            "Headline": headline,
+            "Date":     date_obj.strftime("%Y-%m-%d") if date_obj else "Unknown",
+            "URL":      BASE_URL + href,
+            "_date_obj": date_obj,
+        })
     return articles
 
 
-def is_us_related(headline: str) -> bool:
-    return bool(US_PATTERN.search(headline))
+def scrape(cutoff, max_pages: int, use_na: bool, pbar) -> list:
+    all_articles = []
+    # warm-up: visit homepage to get session cookies
+    fetch(BASE_URL + "/en/")
+    for page in range(1, max_pages + 1):
+        params = f"?term={CHAN_TERM}"
+        if use_na:
+            params += f"&term={NA_TERM}"
+        if page > 1:
+            params += f"&page={page}"
+        url = f"{BASE_URL}/en/news/{params}"
+        pbar.progress(page / max_pages, text=f"Fetching page {page}/{max_pages}…")
+        soup = fetch(url)
+        if not soup:
+            break
+        page_arts = parse_articles(soup)
+        if not page_arts:
+            break
+        stop = False
+        for art in page_arts:
+            d = art["_date_obj"]
+            if d and d < cutoff:
+                stop = True
+                break
+            all_articles.append(art)
+        if stop:
+            break
+        time.sleep(0.6)
+    return all_articles
 
 
-def filter_articles(articles: list[dict], days: int | None) -> list[dict]:
-    """Filter by date window and US-only headlines."""
-    now = datetime.now()
-    result = []
-    for a in articles:
-        d = a.get("_date_obj")
-        if days is not None and d:
-            if (now - d).days > days:
-                continue
-        if not is_us_related(a["Headline"]):
-            continue
-        result.append(a)
-    return result
+def is_us(text: str) -> bool:
+    return bool(US_RE.search(text))
 
-
-# ─── Excel export ────────────────────────────────────────────────────────────
 
 def build_excel(df: pd.DataFrame) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "DCD US Construction News"
-
-    # Header style
-    header_fill = PatternFill("solid", fgColor="1F4E79")
-    header_font = Font(bold=True, color="FFFFFF", name="Arial", size=11)
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    thin = Side(border_style="thin", color="AAAAAA")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    cols = ["Headline", "Date", "URL"]
-    col_widths = [70, 15, 60]
-
-    for ci, (col, width) in enumerate(zip(cols, col_widths), start=1):
-        cell = ws.cell(row=1, column=ci, value=col)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-        cell.border = border
-        ws.column_dimensions[get_column_letter(ci)].width = width
-
-    ws.row_dimensions[1].height = 28
-
-    # Alternating row colours
-    fill_even = PatternFill("solid", fgColor="DCE6F1")
-    fill_odd  = PatternFill("solid", fgColor="FFFFFF")
-    link_font = Font(name="Arial", size=10, color="0563C1", underline="single")
-    normal_font = Font(name="Arial", size=10)
-
+    thin = Side(border_style="thin", color="CCCCCC")
+    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    cols, widths = ["#", "Headline", "Date", "URL"], [5, 72, 14, 65]
+    h_fill = PatternFill("solid", fgColor="1F4E79")
+    h_font = Font(bold=True, color="FFFFFF", name="Calibri", size=11)
+    for ci, (col, w) in enumerate(zip(cols, widths), 1):
+        c = ws.cell(row=1, column=ci, value=col)
+        c.font, c.fill = h_font, h_fill
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = brd
+        ws.column_dimensions[get_column_letter(ci)].width = w
+    ws.row_dimensions[1].height = 26
+    ev = PatternFill("solid", fgColor="DCE6F1")
+    od = PatternFill("solid", fgColor="FFFFFF")
+    nf = Font(name="Calibri", size=10)
+    lf = Font(name="Calibri", size=10, color="0563C1", underline="single")
     for ri, row in enumerate(df.itertuples(index=False), start=2):
-        fill = fill_even if ri % 2 == 0 else fill_odd
-        for ci, col in enumerate(cols, start=1):
-            val = getattr(row, col)
-            cell = ws.cell(row=ri, column=ci, value=val)
-            cell.fill = fill
-            cell.border = border
-            cell.alignment = Alignment(vertical="center", wrap_text=(ci == 1))
-            if ci == 3:  # URL column — make it a hyperlink
-                cell.hyperlink = val
-                cell.font = link_font
+        fill = ev if ri % 2 == 0 else od
+        for ci, val in enumerate([ri-1, row.Headline, row.Date, row.URL], 1):
+            c = ws.cell(row=ri, column=ci, value=val)
+            c.fill, c.border = fill, brd
+            if ci == 4:
+                c.hyperlink = val; c.font = lf
+                c.alignment = Alignment(horizontal="center", vertical="center")
+            elif ci == 2:
+                c.font = nf
+                c.alignment = Alignment(vertical="center", wrap_text=True)
             else:
-                cell.font = normal_font
-
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:C{len(df)+1}"
-
+                c.font = nf
+                c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.freeze_panes = "B2"
+    ws.auto_filter.ref = f"A1:D{len(df)+1}"
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     return buf.read()
 
 
-# ─── Streamlit UI ────────────────────────────────────────────────────────────
-
+# ─── App ───────────────────────────────────────────────────────────────────
 def main():
-    st.set_page_config(
-        page_title="DCD US Construction News Scraper",
-        page_icon="🏗️",
-        layout="wide",
-    )
-
-    st.title("🏗️ Data Center Dynamics — US Construction News")
+    st.set_page_config(page_title="DCD US Construction News", page_icon="🏗️", layout="wide")
+    st.title("🏗️ Data Center Dynamics — US Construction News Scraper")
     st.caption(
-        "Scrapes the [DCD Construction Channel]("
-        "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel"
-        ") and filters for **American state** mentions."
+        "Scrapes the [DCD Construction Channel]"
+        "(https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel)"
+        " and filters for **US-based** articles only."
     )
+    if not _USE_CLOUDSCRAPER:
+        st.warning(
+            "💡 **Tip:** Install `cloudscraper` for better Cloudflare bypass: "
+            "`pip install cloudscraper`",
+            icon="⚠️",
+        )
 
-    # ── Sidebar controls ────────────────────────────────────────────────────
     with st.sidebar:
-        st.header("⚙️ Filters")
-        time_option = st.radio(
+        st.header("⚙️ Settings")
+        time_opt = st.radio(
             "Date range",
-            ["Latest (no limit)", "Past 30 days", "Past 10 days"],
+            ["Latest (all available)", "Past 30 days", "Past 10 days"],
             index=0,
         )
-        days_map = {
-            "Latest (no limit)": None,
-            "Past 30 days": 30,
-            "Past 10 days": 10,
-        }
-        selected_days = days_map[time_option]
-
-        max_pages = st.slider("Max pages to scrape", 1, 20, 5)
-
-        scrape_btn = st.button("🔍 Scrape Now", use_container_width=True, type="primary")
-
-    # ── Main area ────────────────────────────────────────────────────────────
-    if scrape_btn:
-        cutoff = (
-            datetime.min
-            if selected_days is None
-            else datetime.now() - timedelta(days=selected_days)
+        days_map = {"Latest (all available)": None, "Past 30 days": 30, "Past 10 days": 10}
+        sel_days = days_map[time_opt]
+        max_pages = st.slider("Pages to scrape", 1, 30, 5,
+                               help="~28 articles per page. 5 pages ≈ 140 articles.")
+        use_na = st.checkbox(
+            "Pre-filter: North America region",
+            value=True,
+            help="Adds &term=north-america to the DCD URL for better relevance.",
         )
+        go = st.button("🔍 Scrape Now", use_container_width=True, type="primary")
 
-        with st.spinner("Fetching articles from datacenterdynamics.com …"):
-            raw = scrape_articles(cutoff, max_pages=max_pages)
+    if not go:
+        st.info("👈 Set filters in the sidebar and click **Scrape Now**.")
+        st.markdown("""
+**How it works**
+1. Visits the DCD Construction Channel (server-rendered HTML)
+2. Parses article headlines, dates, and URLs from anchor tags
+3. Optionally pre-limits results to the North America tag
+4. Post-filters using 50 US states + abbreviations + ~80 major data center cities/counties
+5. Exports a formatted `.xlsx` with auto-filter, frozen headers, and clickable URL links
 
-        with st.spinner("Filtering for US-related headlines …"):
-            filtered = filter_articles(raw, days=selected_days)
+**Requirements** — add to `requirements.txt`:
+```
+streamlit>=1.35.0
+requests>=2.31.0
+cloudscraper>=1.2.71
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+pandas>=2.2.0
+openpyxl>=3.1.2
+```
+        """)
+        return
 
-        st.success(
-            f"Found **{len(raw)}** total articles → **{len(filtered)}** US-related"
+    cutoff = datetime.min if sel_days is None else datetime.now() - timedelta(days=sel_days)
+    pbar = st.progress(0, text="Starting…")
+    raw = scrape(cutoff, max_pages, use_na, pbar)
+    pbar.empty()
+
+    if not raw:
+        st.error(
+            "No articles were fetched.\n\n"
+            "**Most likely cause:** Cloudflare is blocking automated requests from this host.\n\n"
+            "**Fix:** Make sure `cloudscraper` is installed (`pip install cloudscraper`) "
+            "and re-deploy. If the issue persists, try running locally."
         )
+        return
 
-        if not filtered:
-            st.info(
-                "No US-related articles found for the selected range. "
-                "Try increasing the date range or page limit."
-            )
-            return
+    us_arts = [a for a in raw if is_us(a["Headline"])]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Pages scraped", max_pages)
+    c2.metric("Total articles", len(raw))
+    c3.metric("US-related articles", len(us_arts))
 
-        # Clean display DF
-        df = pd.DataFrame(filtered)[["Headline", "Date", "URL"]]
-        df = df.sort_values("Date", ascending=False).reset_index(drop=True)
+    if not us_arts:
+        st.warning("No US-related articles matched. Showing raw results for inspection:")
+        with st.expander("Raw articles"):
+            for a in raw[:15]:
+                st.write(f"**{a['Headline']}** — {a['Date']}")
+        return
 
-        st.dataframe(
-            df,
-            use_container_width=True,
-            height=500,
-            column_config={
-                "URL": st.column_config.LinkColumn("URL"),
-            },
-        )
+    df = (
+        pd.DataFrame(us_arts)[["Headline", "Date", "URL"]]
+        .sort_values("Date", ascending=False)
+        .reset_index(drop=True)
+    )
 
-        # Excel download
-        excel_bytes = build_excel(df)
-        ts = datetime.now().strftime("%Y%m%d_%H%M")
-        label = time_option.replace(" ", "_").replace("(", "").replace(")", "")
-        filename = f"DCD_US_Construction_{label}_{ts}.xlsx"
+    st.dataframe(
+        df, use_container_width=True, height=520,
+        column_config={"URL": st.column_config.LinkColumn("URL", display_text="🔗 Open")},
+    )
 
-        st.download_button(
-            label="📥 Download Excel",
-            data=excel_bytes,
-            file_name=filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-
-        with st.expander("📊 Quick stats"):
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Total articles", len(raw))
-            col2.metric("US-related", len(filtered))
-            col3.metric("Pages scraped", min(max_pages, (len(raw) // 10) + 1))
-
-    else:
-        st.info("👈 Configure filters in the sidebar and click **Scrape Now**.")
+    ts    = datetime.now().strftime("%Y%m%d_%H%M")
+    label = re.sub(r"[^a-zA-Z0-9]", "_", time_opt)
+    st.download_button(
+        label="📥 Download Excel (.xlsx)",
+        data=build_excel(df),
+        file_name=f"DCD_US_Construction_{label}_{ts}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        type="primary",
+    )
 
 
 if __name__ == "__main__":
