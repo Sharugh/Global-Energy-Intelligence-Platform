@@ -1,358 +1,350 @@
 import streamlit as st
 import requests
 import pandas as pd
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from io import BytesIO
-from bs4 import BeautifulSoup
+import time
+
+# ==========================================================
+# PAGE CONFIG
+# ==========================================================
+st.set_page_config(
+    page_title="US Data Center Development Tracker",
+    layout="wide"
+)
 
 # ==========================================================
 # CONFIG
 # ==========================================================
-NEWSAPI_KEY = "3087034a13564f75bfc769c0046e729c"
-NEWSAPI_URL = "https://newsapi.org/v2/everything"
+BASE_URL = "https://www.datacenterdynamics.com"
+
+DCD_CONSTRUCTION_URL = (
+    "https://www.datacenterdynamics.com/en/news/"
+    "?term=the-data-center-construction-channel"
+)
 
 # ==========================================================
-# DEVELOPMENT-FOCUSED SEARCH QUERIES
+# US FILTER KEYWORDS
 # ==========================================================
-SEARCH_QUERIES = [
+US_KEYWORDS = [
 
-    '"data center" construction USA',
-    '"data center" investment USA',
-    '"data center" expansion USA',
-    '"data center campus" USA',
-    '"hyperscale campus" USA',
-    '"data center" approved USA',
-    '"data center" permit USA',
-    '"data center" planning USA',
-    '"data center" groundbreaking USA',
-    '"data center" proposed USA',
-    '"data center" zoning USA',
-    '"data center" land acquisition USA',
-    '"AI data center campus" USA',
-    '"colocation facility" expansion USA',
-    '"cloud campus" USA',
-    '"digital infrastructure campus" USA',
-    '"compute campus" USA',
-    '"data center development" USA',
-    '"server farm" construction USA',
-    '"utility infrastructure" data center USA',
-    '"substation" data center USA',
-    '"gigawatt campus" USA',
-    '"data center" utility approval USA',
-    '"data center" power agreement USA',
-    '"data center" site selection USA',
-    '"data center" new facility USA',
-    '"data center" campus expansion USA',
-    '"data center" build USA',
-    '"data center" construction permit USA',
-    '"data center" infrastructure investment USA'
+    "usa",
+    "united states",
+
+    "texas",
+    "virginia",
+    "california",
+    "arizona",
+    "ohio",
+    "georgia",
+    "illinois",
+    "new york",
+    "oregon",
+    "washington",
+    "utah",
+    "north carolina",
+    "nevada",
+    "florida",
+    "tennessee",
+    "indiana",
+    "louisiana",
+    "new mexico",
+    "mississippi",
+    "iowa",
+    "wisconsin",
+    "pennsylvania",
+    "new jersey",
+    "massachusetts",
+    "maryland",
+    "south carolina",
+    "alabama",
+    "kentucky"
 ]
 
 # ==========================================================
-# TRUSTED SOURCES
+# DEVELOPMENT SIGNALS
 # ==========================================================
-SCRAPE_SOURCES = {
+DEVELOPMENT_KEYWORDS = [
 
-    "DataCenterDynamics":
-        "https://www.datacenterdynamics.com/en/news/",
-
-    "DataCenterKnowledge":
-        "https://www.datacenterknowledge.com/",
-
-    "DataCentreMagazine":
-        "https://datacentremagazine.com/",
-
-    "DataCenterFrontier":
-        "https://datacenterfrontier.com/",
-
-    "CapacityMedia":
-        "https://www.capacitymedia.com/",
-
-    "TechTarget":
-        "https://www.techtarget.com/searchdatacenter/",
-
-    "TheRegister":
-        "https://www.theregister.com/data_centre/",
-
-    "CRN":
-        "https://www.crn.com/news/data-center",
-
-    "NetworkWorld":
-        "https://www.networkworld.com/",
-
-    "BizJournal":
-        "https://www.bizjournals.com/",
-
-    "Reuters":
-        "https://www.reuters.com/",
-
-    "Bloomberg":
-        "https://www.bloomberg.com/"
-}
+    "construction",
+    "investment",
+    "expansion",
+    "campus",
+    "approved",
+    "approval",
+    "permit",
+    "planning",
+    "planned",
+    "groundbreaking",
+    "development",
+    "proposal",
+    "proposed",
+    "land acquisition",
+    "site selection",
+    "build",
+    "built",
+    "new facility",
+    "substation",
+    "utility infrastructure",
+    "power agreement",
+    "utility approval",
+    "infrastructure",
+    "announces",
+    "acquires land",
+    "construction starts",
+    "opening",
+    "zoning",
+    "site plan"
+]
 
 # ==========================================================
-# DEVELOPMENT FILTER
+# DATA CENTER TERMS
+# ==========================================================
+DC_TERMS = [
+
+    "data center",
+    "data centre",
+    "hyperscale",
+    "colocation",
+    "ai infrastructure",
+    "cloud campus",
+    "compute campus",
+    "server farm"
+]
+
+# ==========================================================
+# FILTER FUNCTION
 # ==========================================================
 def is_relevant_article(text):
 
     text = str(text).lower()
 
-    # MUST HAVE DATA CENTER TERMS
-    dc_terms = [
-
-        "data center",
-        "data centre",
-        "hyperscale",
-        "colocation",
-        "server farm",
-        "compute campus",
-        "cloud campus",
-        "ai infrastructure"
-    ]
-
-    if not any(k in text for k in dc_terms):
+    # MUST HAVE DATA CENTER TERM
+    if not any(k in text for k in DC_TERMS):
         return False
 
-    # MUST HAVE DEVELOPMENT SIGNAL
-    development_terms = [
-
-        "investment",
-        "construction",
-        "expansion",
-        "approved",
-        "approval",
-        "permit",
-        "planned",
-        "planning",
-        "campus",
-        "groundbreaking",
-        "development",
-        "proposal",
-        "proposed",
-        "zoning",
-        "site plan",
-        "land acquisition",
-        "build",
-        "built",
-        "new facility",
-        "substation",
-        "power infrastructure",
-        "opening",
-        "launches",
-        "announces",
-        "acquires land",
-        "utility agreement",
-        "power agreement",
-        "utility approval",
-        "infrastructure expansion",
-        "site selection"
-    ]
-
-    if not any(d in text for d in development_terms):
+    # MUST HAVE DEVELOPMENT TERM
+    if not any(k in text for k in DEVELOPMENT_KEYWORDS):
         return False
 
-    # REMOVE GENERIC TECH NEWS
+    # MUST HAVE US TERM
+    if not any(k in text for k in US_KEYWORDS):
+        return False
+
+    # REMOVE IRRELEVANT NEWS
     blacklist = [
 
-        "gpu launch",
         "earnings",
         "financial results",
-        "quarterly results",
-        "software update",
-        "cpu",
-        "processor",
-        "gaming",
         "sports",
         "movie",
+        "gaming",
         "celebrity",
-        "stock market",
-        "share price",
-        "advertisement",
-        "cloud revenue",
-        "phone launch",
+        "processor",
+        "gpu launch",
+        "software update",
+        "smartphone",
         "laptop",
-        "smartphone"
+        "cpu"
     ]
 
-    if any(b in text for b in blacklist):
+    if any(k in text for k in blacklist):
         return False
 
     return True
 
 # ==========================================================
-# FETCH FROM NEWSAPI
+# EXTRACT ARTICLE DATE
 # ==========================================================
-def fetch_newsapi_articles(start_date, end_date):
-
-    all_articles = []
-
-    for query in SEARCH_QUERIES:
-
-        for page in range(1, 6):
-
-            params = {
-
-                "q": query,
-                "from": start_date,
-                "to": end_date,
-                "language": "en",
-                "sortBy": "publishedAt",
-                "pageSize": 100,
-                "page": page,
-                "searchIn": "title,description",
-                "apiKey": NEWSAPI_KEY
-            }
-
-            try:
-
-                res = requests.get(
-                    NEWSAPI_URL,
-                    params=params,
-                    timeout=20
-                )
-
-                if res.status_code != 200:
-                    continue
-
-                data = res.json()
-
-                articles = data.get("articles", [])
-
-                if not articles:
-                    break
-
-                for a in articles:
-
-                    title = a.get("title", "")
-                    desc = a.get("description", "")
-
-                    combined_text = f"{title} {desc}"
-
-                    if not is_relevant_article(combined_text):
-                        continue
-
-                    date_value = a.get("publishedAt")
-
-                    try:
-
-                        date_value = pd.to_datetime(
-                            date_value
-                        ).strftime("%Y-%m-%d")
-
-                    except:
-                        pass
-
-                    all_articles.append({
-
-                        "Title": title,
-                        "Link": a.get("url"),
-                        "Source": a.get(
-                            "source",
-                            {}
-                        ).get("name"),
-                        "Published Date": date_value
-                    })
-
-            except:
-                continue
-
-    return pd.DataFrame(all_articles)
-
-# ==========================================================
-# SCRAPER
-# ==========================================================
-def scrape_website(source_name, url):
+def extract_date(date_text):
 
     try:
 
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-
-        res = requests.get(
-            url,
-            headers=headers,
-            timeout=20
+        parsed_date = pd.to_datetime(
+            date_text,
+            errors="coerce"
         )
 
-        soup = BeautifulSoup(
-            res.text,
-            "html.parser"
-        )
+        if pd.isna(parsed_date):
+            return None
 
-        articles = []
-
-        links = soup.find_all("a")
-
-        seen = set()
-
-        for link in links:
-
-            title = link.get_text(strip=True)
-
-            href = link.get("href")
-
-            if not href:
-                continue
-
-            if len(title) < 25:
-                continue
-
-            if not is_relevant_article(title):
-                continue
-
-            if href in seen:
-                continue
-
-            seen.add(href)
-
-            if href.startswith("/"):
-
-                base = "/".join(
-                    url.split("/")[:3]
-                )
-
-                href = base + href
-
-            articles.append({
-
-                "Title": title,
-                "Link": href,
-                "Source": source_name,
-                "Published Date":
-                    datetime.now().strftime("%Y-%m-%d")
-            })
-
-        return pd.DataFrame(articles)
+        return parsed_date
 
     except:
-        return pd.DataFrame()
+        return None
 
 # ==========================================================
-# SCRAPE ALL SOURCES
+# SCRAPE DCD MULTIPLE PAGES
 # ==========================================================
-def scrape_all_sources():
+def scrape_dcd(max_pages=15, days_limit=30):
 
-    dfs = []
+    all_articles = []
 
-    for source_name, url in SCRAPE_SOURCES.items():
+    cutoff_date = datetime.now() - timedelta(days=days_limit)
 
-        df = scrape_website(
-            source_name,
-            url
-        )
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
 
-        if not df.empty:
-            dfs.append(df)
+    progress_bar = st.progress(0)
 
-    if dfs:
+    for page in range(1, max_pages + 1):
 
-        return pd.concat(
-            dfs,
-            ignore_index=True
-        )
+        try:
 
-    return pd.DataFrame()
+            progress_bar.progress(
+                page / max_pages
+            )
+
+            page_url = (
+                f"{DCD_CONSTRUCTION_URL}&page={page}"
+            )
+
+            response = requests.get(
+
+                page_url,
+                headers=headers,
+                timeout=20
+            )
+
+            if response.status_code != 200:
+                continue
+
+            soup = BeautifulSoup(
+                response.text,
+                "html.parser"
+            )
+
+            articles = soup.find_all("article")
+
+            if not articles:
+                continue
+
+            for article in articles:
+
+                try:
+
+                    # ==================================
+                    # TITLE
+                    # ==================================
+                    title_tag = article.find("h3")
+
+                    if not title_tag:
+                        continue
+
+                    title = title_tag.get_text(
+                        strip=True
+                    )
+
+                    # ==================================
+                    # LINK
+                    # ==================================
+                    link_tag = article.find("a")
+
+                    if not link_tag:
+                        continue
+
+                    href = link_tag.get("href")
+
+                    if not href:
+                        continue
+
+                    if href.startswith("/"):
+
+                        full_link = (
+                            BASE_URL + href
+                        )
+
+                    else:
+
+                        full_link = href
+
+                    # ==================================
+                    # DATE
+                    # ==================================
+                    time_tag = article.find("time")
+
+                    if time_tag:
+
+                        date_text = (
+                            time_tag.get_text(
+                                strip=True
+                            )
+                        )
+
+                        parsed_date = extract_date(
+                            date_text
+                        )
+
+                    else:
+
+                        parsed_date = datetime.now()
+
+                    # ==================================
+                    # DATE FILTER
+                    # ==================================
+                    if parsed_date:
+
+                        if parsed_date < cutoff_date:
+                            continue
+
+                    # ==================================
+                    # DESCRIPTION
+                    # ==================================
+                    desc_tag = article.find("p")
+
+                    description = ""
+
+                    if desc_tag:
+                        description = desc_tag.get_text(
+                            strip=True
+                        )
+
+                    # ==================================
+                    # COMBINED TEXT
+                    # ==================================
+                    combined_text = (
+                        f"{title} {description}"
+                    )
+
+                    # ==================================
+                    # FILTER
+                    # ==================================
+                    if not is_relevant_article(
+                        combined_text
+                    ):
+                        continue
+
+                    # ==================================
+                    # ADD ARTICLE
+                    # ==================================
+                    all_articles.append({
+
+                        "Title": title,
+
+                        "Link": full_link,
+
+                        "Source":
+                            "DataCenterDynamics",
+
+                        "Published Date":
+                            parsed_date.strftime(
+                                "%Y-%m-%d"
+                            )
+                    })
+
+                except:
+                    continue
+
+            time.sleep(1)
+
+        except:
+            continue
+
+    progress_bar.empty()
+
+    return pd.DataFrame(all_articles)
 
 # ==========================================================
 # CLEAN DATAFRAME
@@ -362,36 +354,29 @@ def clean_dataframe(df):
     if df.empty:
         return df
 
-    # REMOVE DUPLICATES
     df.drop_duplicates(
         subset="Title",
         inplace=True
     )
 
-    # REMOVE VERY SHORT TITLES
     df = df[
         df["Title"].str.len() > 20
     ]
 
-    # SORT BY DATE
-    try:
+    df["Published Date"] = pd.to_datetime(
+        df["Published Date"],
+        errors="coerce"
+    )
 
-        df["Published Date"] = pd.to_datetime(
-            df["Published Date"],
-            errors="coerce"
-        )
+    df = df.sort_values(
 
-        df = df.sort_values(
-            by="Published Date",
-            ascending=False
-        )
+        by="Published Date",
+        ascending=False
+    )
 
-        df["Published Date"] = df[
-            "Published Date"
-        ].dt.strftime("%Y-%m-%d")
-
-    except:
-        pass
+    df["Published Date"] = df[
+        "Published Date"
+    ].dt.strftime("%Y-%m-%d")
 
     return df
 
@@ -415,30 +400,24 @@ def to_excel(df):
     return output.getvalue()
 
 # ==========================================================
-# STREAMLIT UI
+# UI
 # ==========================================================
 def main():
-
-    st.set_page_config(
-        page_title=
-            "US Data Center Development Tracker",
-        layout="wide"
-    )
 
     st.title(
         "🏗️ US Data Center Development Tracker"
     )
 
     st.markdown("""
-    ### Tracks:
-    - Data center campus developments
-    - Hyperscale construction
-    - AI infrastructure investments
-    - Colocation expansions
+    ### Tracks ONLY:
+    - US data center construction
+    - Hyperscale campus developments
+    - AI infrastructure projects
     - Planning approvals
-    - Land acquisitions
+    - Investments
     - Groundbreaking announcements
     - Utility + power infrastructure
+    - Campus expansions
     """)
 
     # ======================================================
@@ -446,7 +425,7 @@ def main():
     # ======================================================
     st.sidebar.header("Filters")
 
-    time_filter = st.sidebar.radio(
+    time_range = st.sidebar.radio(
 
         "Select Time Range",
 
@@ -457,84 +436,61 @@ def main():
         ]
     )
 
-    # ======================================================
-    # DATE LOGIC
-    # ======================================================
-    end_date = datetime.today()
+    if time_range == "Latest":
+        days_limit = 1
 
-    if time_filter == "Latest":
-
-        start_date = end_date - timedelta(days=1)
-
-    elif time_filter == "Past 10 Days":
-
-        start_date = end_date - timedelta(days=10)
+    elif time_range == "Past 10 Days":
+        days_limit = 10
 
     else:
+        days_limit = 30
 
-        start_date = end_date - timedelta(days=30)
+    max_pages = st.sidebar.slider(
+
+        "Pages to Scan",
+
+        min_value=5,
+        max_value=50,
+        value=20
+    )
 
     # ======================================================
     # FETCH BUTTON
     # ======================================================
     if st.button(
-        "🚀 Fetch Development Articles"
+        "🚀 Fetch US Development Articles"
     ):
 
         with st.spinner(
-            "Collecting US Data Center Development Intelligence..."
+            "Scanning DataCenterDynamics..."
         ):
 
-            # ==============================================
-            # NEWS API
-            # ==============================================
-            df_news = fetch_newsapi_articles(
+            df = scrape_dcd(
 
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
+                max_pages=max_pages,
+                days_limit=days_limit
             )
 
-            # ==============================================
-            # SCRAPED DATA
-            # ==============================================
-            df_scraped = scrape_all_sources()
-
-            # ==============================================
-            # COMBINE
-            # ==============================================
-            final_df = pd.concat(
-
-                [df_news, df_scraped],
-                ignore_index=True
-            )
-
-            # ==============================================
-            # CLEAN
-            # ==============================================
-            final_df = clean_dataframe(
-                final_df
-            )
+            df = clean_dataframe(df)
 
             # ==============================================
             # OUTPUT
             # ==============================================
-            if not final_df.empty:
+            if not df.empty:
 
                 st.success(
-                    f"{len(final_df)} Development Articles Found"
+                    f"{len(df)} US Development Articles Found"
                 )
 
                 st.dataframe(
-                    final_df,
+                    df,
                     use_container_width=True
                 )
 
                 # ==========================================
                 # DOWNLOAD
                 # ==========================================
-                excel = to_excel(
-                    final_df
-                )
+                excel = to_excel(df)
 
                 st.download_button(
 
@@ -542,13 +498,13 @@ def main():
 
                     excel,
 
-                    "us_data_center_development_tracker.xlsx"
+                    "us_data_center_developments.xlsx"
                 )
 
             else:
 
                 st.warning(
-                    "No development-related articles found"
+                    "No US development-related articles found"
                 )
 
 # ==========================================================
