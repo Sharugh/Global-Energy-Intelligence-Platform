@@ -12,32 +12,47 @@ NEWSAPI_KEY = "3087034a13564f75bfc769c0046e729c"
 NEWSAPI_URL = "https://newsapi.org/v2/everything"
 
 # ==========================================================
-# MULTIPLE QUERIES
+# DEVELOPMENT-FOCUSED SEARCH QUERIES
 # ==========================================================
 SEARCH_QUERIES = [
 
-    '"data center" USA',
-    '"hyperscale" USA',
-    '"colocation" USA',
-    '"AI infrastructure" USA',
+    '"data center" construction USA',
+    '"data center" investment USA',
+    '"data center" expansion USA',
     '"data center campus" USA',
-    '"server farm" USA',
+    '"hyperscale campus" USA',
+    '"data center" approved USA',
+    '"data center" permit USA',
+    '"data center" planning USA',
+    '"data center" groundbreaking USA',
+    '"data center" proposed USA',
+    '"data center" zoning USA',
+    '"data center" land acquisition USA',
+    '"AI data center campus" USA',
+    '"colocation facility" expansion USA',
     '"cloud campus" USA',
-    '"digital infrastructure" USA',
+    '"digital infrastructure campus" USA',
     '"compute campus" USA',
-    '"AI data center" USA',
-    '"GPU cluster" USA',
-    '"data center expansion" USA',
     '"data center development" USA',
-    '"data center construction" USA',
-    '"data center investment" USA',
-    '"cloud infrastructure" USA'
+    '"server farm" construction USA',
+    '"utility infrastructure" data center USA',
+    '"substation" data center USA',
+    '"gigawatt campus" USA',
+    '"data center" utility approval USA',
+    '"data center" power agreement USA',
+    '"data center" site selection USA',
+    '"data center" new facility USA',
+    '"data center" campus expansion USA',
+    '"data center" build USA',
+    '"data center" construction permit USA',
+    '"data center" infrastructure investment USA'
 ]
 
 # ==========================================================
 # TRUSTED SOURCES
 # ==========================================================
 SCRAPE_SOURCES = {
+
     "DataCenterDynamics":
         "https://www.datacenterdynamics.com/en/news/",
 
@@ -66,35 +81,108 @@ SCRAPE_SOURCES = {
         "https://www.networkworld.com/",
 
     "BizJournal":
-        "https://www.bizjournals.com/"
+        "https://www.bizjournals.com/",
+
+    "Reuters":
+        "https://www.reuters.com/",
+
+    "Bloomberg":
+        "https://www.bloomberg.com/"
 }
 
 # ==========================================================
-# DATA CENTER FILTER
+# DEVELOPMENT FILTER
 # ==========================================================
-def is_data_center_article(text):
+def is_relevant_article(text):
 
     text = str(text).lower()
 
-    keywords = [
+    # MUST HAVE DATA CENTER TERMS
+    dc_terms = [
+
         "data center",
         "data centre",
         "hyperscale",
         "colocation",
         "server farm",
-        "campus",
-        "cloud infrastructure",
-        "compute",
-        "gpu cluster",
+        "compute campus",
+        "cloud campus",
         "ai infrastructure"
     ]
 
-    return any(k in text for k in keywords)
+    if not any(k in text for k in dc_terms):
+        return False
+
+    # MUST HAVE DEVELOPMENT SIGNAL
+    development_terms = [
+
+        "investment",
+        "construction",
+        "expansion",
+        "approved",
+        "approval",
+        "permit",
+        "planned",
+        "planning",
+        "campus",
+        "groundbreaking",
+        "development",
+        "proposal",
+        "proposed",
+        "zoning",
+        "site plan",
+        "land acquisition",
+        "build",
+        "built",
+        "new facility",
+        "substation",
+        "power infrastructure",
+        "opening",
+        "launches",
+        "announces",
+        "acquires land",
+        "utility agreement",
+        "power agreement",
+        "utility approval",
+        "infrastructure expansion",
+        "site selection"
+    ]
+
+    if not any(d in text for d in development_terms):
+        return False
+
+    # REMOVE GENERIC TECH NEWS
+    blacklist = [
+
+        "gpu launch",
+        "earnings",
+        "financial results",
+        "quarterly results",
+        "software update",
+        "cpu",
+        "processor",
+        "gaming",
+        "sports",
+        "movie",
+        "celebrity",
+        "stock market",
+        "share price",
+        "advertisement",
+        "cloud revenue",
+        "phone launch",
+        "laptop",
+        "smartphone"
+    ]
+
+    if any(b in text for b in blacklist):
+        return False
+
+    return True
 
 # ==========================================================
-# NEWSAPI FETCH
+# FETCH FROM NEWSAPI
 # ==========================================================
-def fetch_newsapi(start_date, end_date):
+def fetch_newsapi_articles(start_date, end_date):
 
     all_articles = []
 
@@ -103,6 +191,7 @@ def fetch_newsapi(start_date, end_date):
         for page in range(1, 6):
 
             params = {
+
                 "q": query,
                 "from": start_date,
                 "to": end_date,
@@ -110,7 +199,7 @@ def fetch_newsapi(start_date, end_date):
                 "sortBy": "publishedAt",
                 "pageSize": 100,
                 "page": page,
-                "searchIn": "title",
+                "searchIn": "title,description",
                 "apiKey": NEWSAPI_KEY
             }
 
@@ -135,24 +224,31 @@ def fetch_newsapi(start_date, end_date):
                 for a in articles:
 
                     title = a.get("title", "")
+                    desc = a.get("description", "")
 
-                    if not is_data_center_article(title):
+                    combined_text = f"{title} {desc}"
+
+                    if not is_relevant_article(combined_text):
                         continue
 
                     date_value = a.get("publishedAt")
 
                     try:
+
                         date_value = pd.to_datetime(
                             date_value
                         ).strftime("%Y-%m-%d")
+
                     except:
                         pass
 
                     all_articles.append({
+
                         "Title": title,
                         "Link": a.get("url"),
                         "Source": a.get(
-                            "source", {}
+                            "source",
+                            {}
                         ).get("name"),
                         "Published Date": date_value
                     })
@@ -199,10 +295,10 @@ def scrape_website(source_name, url):
             if not href:
                 continue
 
-            if len(title) < 20:
+            if len(title) < 25:
                 continue
 
-            if not is_data_center_article(title):
+            if not is_relevant_article(title):
                 continue
 
             if href in seen:
@@ -211,6 +307,7 @@ def scrape_website(source_name, url):
             seen.add(href)
 
             if href.startswith("/"):
+
                 base = "/".join(
                     url.split("/")[:3]
                 )
@@ -218,6 +315,7 @@ def scrape_website(source_name, url):
                 href = base + href
 
             articles.append({
+
                 "Title": title,
                 "Link": href,
                 "Source": source_name,
@@ -231,7 +329,7 @@ def scrape_website(source_name, url):
         return pd.DataFrame()
 
 # ==========================================================
-# SCRAPE ALL
+# SCRAPE ALL SOURCES
 # ==========================================================
 def scrape_all_sources():
 
@@ -248,6 +346,7 @@ def scrape_all_sources():
             dfs.append(df)
 
     if dfs:
+
         return pd.concat(
             dfs,
             ignore_index=True
@@ -256,22 +355,25 @@ def scrape_all_sources():
     return pd.DataFrame()
 
 # ==========================================================
-# CLEAN
+# CLEAN DATAFRAME
 # ==========================================================
 def clean_dataframe(df):
 
     if df.empty:
         return df
 
+    # REMOVE DUPLICATES
     df.drop_duplicates(
         subset="Title",
         inplace=True
     )
 
+    # REMOVE VERY SHORT TITLES
     df = df[
         df["Title"].str.len() > 20
     ]
 
+    # SORT BY DATE
     try:
 
         df["Published Date"] = pd.to_datetime(
@@ -294,7 +396,7 @@ def clean_dataframe(df):
     return df
 
 # ==========================================================
-# EXPORT
+# EXPORT TO EXCEL
 # ==========================================================
 def to_excel(df):
 
@@ -313,33 +415,41 @@ def to_excel(df):
     return output.getvalue()
 
 # ==========================================================
-# UI
+# STREAMLIT UI
 # ==========================================================
 def main():
 
     st.set_page_config(
         page_title=
-            "US Data Center Intelligence",
+            "US Data Center Development Tracker",
         layout="wide"
     )
 
     st.title(
-        "🏢 US Data Center Intelligence Tracker"
+        "🏗️ US Data Center Development Tracker"
     )
 
     st.markdown("""
-    Track:
-    - Hyperscale developments
-    - AI infrastructure
-    - Data center campuses
+    ### Tracks:
+    - Data center campus developments
+    - Hyperscale construction
+    - AI infrastructure investments
     - Colocation expansions
-    - Compute infrastructure
+    - Planning approvals
+    - Land acquisitions
+    - Groundbreaking announcements
+    - Utility + power infrastructure
     """)
 
+    # ======================================================
+    # SIDEBAR
+    # ======================================================
     st.sidebar.header("Filters")
 
     time_filter = st.sidebar.radio(
+
         "Select Time Range",
+
         [
             "Latest",
             "Past 10 Days",
@@ -347,49 +457,71 @@ def main():
         ]
     )
 
+    # ======================================================
+    # DATE LOGIC
+    # ======================================================
     end_date = datetime.today()
 
     if time_filter == "Latest":
+
         start_date = end_date - timedelta(days=1)
 
     elif time_filter == "Past 10 Days":
+
         start_date = end_date - timedelta(days=10)
 
     else:
+
         start_date = end_date - timedelta(days=30)
 
+    # ======================================================
+    # FETCH BUTTON
+    # ======================================================
     if st.button(
-        "🚀 Fetch Maximum Articles"
+        "🚀 Fetch Development Articles"
     ):
 
         with st.spinner(
-            "Collecting Data Center Intelligence..."
+            "Collecting US Data Center Development Intelligence..."
         ):
 
-            # NEWSAPI
-            df_news = fetch_newsapi(
+            # ==============================================
+            # NEWS API
+            # ==============================================
+            df_news = fetch_newsapi_articles(
+
                 start_date.strftime("%Y-%m-%d"),
                 end_date.strftime("%Y-%m-%d")
             )
 
-            # SCRAPERS
+            # ==============================================
+            # SCRAPED DATA
+            # ==============================================
             df_scraped = scrape_all_sources()
 
+            # ==============================================
             # COMBINE
+            # ==============================================
             final_df = pd.concat(
+
                 [df_news, df_scraped],
                 ignore_index=True
             )
 
+            # ==============================================
             # CLEAN
+            # ==============================================
             final_df = clean_dataframe(
                 final_df
             )
 
+            # ==============================================
+            # OUTPUT
+            # ==============================================
             if not final_df.empty:
 
                 st.success(
-                    f"{len(final_df)} Articles Found"
+                    f"{len(final_df)} Development Articles Found"
                 )
 
                 st.dataframe(
@@ -397,20 +529,26 @@ def main():
                     use_container_width=True
                 )
 
+                # ==========================================
+                # DOWNLOAD
+                # ==========================================
                 excel = to_excel(
                     final_df
                 )
 
                 st.download_button(
+
                     "📥 Download Excel",
+
                     excel,
-                    "us_data_center_articles.xlsx"
+
+                    "us_data_center_development_tracker.xlsx"
                 )
 
             else:
 
                 st.warning(
-                    "No articles found"
+                    "No development-related articles found"
                 )
 
 # ==========================================================
