@@ -5,77 +5,70 @@ import time
 from datetime import datetime, timedelta
 
 import pandas as pd
-import plotly.express as px
-
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 # =========================================================
-# REQUEST ENGINE
+# OPTIONAL CLOUDSCRAPER (Cloudflare bypass)
 # =========================================================
 try:
     import cloudscraper
-
-    scraper = cloudscraper.create_scraper(
+    _SCRAPER = cloudscraper.create_scraper(
         browser={
             "browser": "chrome",
             "platform": "windows",
             "mobile": False
         }
     )
+    _USE_CLOUDSCRAPER = True
 
-except:
+except ImportError:
     import requests
-    scraper = requests.Session()
+    _SCRAPER = requests.Session()
+    _USE_CLOUDSCRAPER = False
 
 from bs4 import BeautifulSoup
 
 # =========================================================
-# PAGE CONFIG
+# CONFIG
 # =========================================================
-st.set_page_config(
-    page_title="US Data Center Intelligence Tracker",
-    page_icon="🏗️",
-    layout="wide"
-)
+BASE_URL = "https://www.datacenterdynamics.com"
 
-# =========================================================
-# SOURCES
-# =========================================================
-SOURCES = {
+SEARCH_TERMS = [
+    "the-data-center-construction-channel",
+    "north-america"
+]
 
-    "DCD Construction":
-    "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel&page={}",
-
-    "DCD North America":
-    "https://www.datacenterdynamics.com/en/news/?term=north-america&page={}",
-
-    "DataCenterKnowledge":
-    "https://www.datacenterknowledge.com/search?search_api_fulltext=data+center&page={}",
-
-    "DataCenterFrontier":
-    "https://datacenterfrontier.com/page/{}/",
-
-    "DataCentreMagazine":
-    "https://datacentremagazine.com/search?search=data+center&page={}"
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0 Safari/537.36"
+    )
 }
 
 # =========================================================
-# KEYWORDS
+# ALL US STATES
 # =========================================================
-DC_TERMS = [
-    "data center",
-    "data centre",
-    "hyperscale",
-    "colocation",
-    "ai infrastructure",
-    "server farm",
-    "digital infrastructure",
-    "cloud campus"
+US_STATES = [
+    "All USA",
+    "Alabama","Alaska","Arizona","Arkansas","California","Colorado",
+    "Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho",
+    "Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana",
+    "Maine","Maryland","Massachusetts","Michigan","Minnesota",
+    "Mississippi","Missouri","Montana","Nebraska","Nevada",
+    "New Hampshire","New Jersey","New Mexico","New York",
+    "North Carolina","North Dakota","Ohio","Oklahoma","Oregon",
+    "Pennsylvania","Rhode Island","South Carolina","South Dakota",
+    "Tennessee","Texas","Utah","Vermont","Virginia","Washington",
+    "West Virginia","Wisconsin","Wyoming"
 ]
 
-PROJECT_TERMS = [
+# =========================================================
+# DISCLOSURE / CONSTRUCTION KEYWORDS
+# =========================================================
+PROJECT_KEYWORDS = [
     "construction",
     "investment",
     "expansion",
@@ -98,256 +91,92 @@ PROJECT_TERMS = [
     "utility infrastructure",
     "power agreement",
     "utility approval",
+    "infrastructure",
+    "announces",
+    "acquires land",
     "construction starts",
     "opening",
     "zoning",
     "site plan",
-    "announced",
-    "pipeline"
-]
-
-COMPANIES = [
-    "AWS",
-    "Amazon",
-    "Microsoft",
-    "Google",
-    "Meta",
-    "Oracle",
-    "Equinix",
-    "Digital Realty",
-    "QTS",
-    "CyrusOne",
-    "Aligned",
-    "CoreSite",
-    "Compass Datacenters",
-    "Stack Infrastructure",
-    "NTT",
-    "Vantage",
-    "Switch",
-    "Apple"
-]
-
-US_STATES = [
-    "Texas","Virginia","California","Arizona","Ohio",
-    "Georgia","Illinois","New York","Nevada",
-    "North Carolina","Washington","Oregon",
-    "Florida","Utah","Indiana","Tennessee",
-    "Pennsylvania","New Jersey","Maryland"
+    "disclosed"
 ]
 
 # =========================================================
-# REGEX
+# DATE PARSER
 # =========================================================
-MW_RE = re.compile(r"\b\d+(\.\d+)?\s?(MW|GW)\b", re.I)
-
-COST_RE = re.compile(
-    r"\$[\d\.]+\s?(million|billion|bn|m)",
-    re.I
-)
-
-# =========================================================
-# HEADERS
-# =========================================================
-HEADERS = {
-    "User-Agent":
-    "Mozilla/5.0"
+MONTHS = {
+    "jan": 1, "feb": 2, "mar": 3,
+    "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9,
+    "oct": 10, "nov": 11, "dec": 12
 }
 
+def parse_date(raw):
+    raw = raw.strip()
+
+    # Example: 2026-05-08
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d")
+    except:
+        pass
+
+    # Example: 8 May 2026
+    m = re.search(r"(\d{1,2})\s+(\w+)\s+(\d{4})", raw, re.I)
+
+    if m:
+        day = int(m.group(1))
+        mon = m.group(2).lower()[:3]
+        year = int(m.group(3))
+
+        if mon in MONTHS:
+            return datetime(year, MONTHS[mon], day)
+
+    return None
+
 # =========================================================
-# FETCH URL
+# FETCH HTML
 # =========================================================
-@st.cache_data(ttl=3600)
-def fetch_url(url):
+def fetch_page(url):
 
     try:
 
-        response = scraper.get(
-            url,
-            headers=HEADERS,
-            timeout=30
-        )
+        if _USE_CLOUDSCRAPER:
+            response = _SCRAPER.get(url, timeout=25)
 
-        if response.status_code == 200:
-
-            return BeautifulSoup(
-                response.text,
-                "html.parser"
+        else:
+            response = _SCRAPER.get(
+                url,
+                headers=HEADERS,
+                timeout=25
             )
 
-    except:
+        response.raise_for_status()
+
+        return BeautifulSoup(response.text, "html.parser")
+
+    except Exception as e:
+        st.warning(f"Error fetching: {url}")
+        st.warning(str(e))
         return None
 
-    return None
-
 # =========================================================
-# PARSE DATE
+# ARTICLE PARSER
 # =========================================================
-def parse_date(text):
-
-    patterns = [
-
-        "%Y-%m-%d",
-        "%d %B %Y",
-        "%B %d %Y",
-        "%d %b %Y"
-    ]
-
-    for p in patterns:
-
-        try:
-            return datetime.strptime(text, p)
-        except:
-            pass
-
-    return None
-
-# =========================================================
-# EXTRACT COMPANY
-# =========================================================
-def extract_company(text):
-
-    found = []
-
-    for c in COMPANIES:
-
-        if c.lower() in text.lower():
-            found.append(c)
-
-    return ", ".join(found) if found else "Unknown"
-
-# =========================================================
-# EXTRACT STATE
-# =========================================================
-def extract_state(text):
-
-    found = []
-
-    for s in US_STATES:
-
-        if s.lower() in text.lower():
-            found.append(s)
-
-    return ", ".join(found) if found else "Unknown"
-
-# =========================================================
-# EXTRACT MW
-# =========================================================
-def extract_mw(text):
-
-    match = MW_RE.search(text)
-
-    return match.group(0) if match else "N/A"
-
-# =========================================================
-# EXTRACT COST
-# =========================================================
-def extract_cost(text):
-
-    match = COST_RE.search(text)
-
-    return match.group(0) if match else "N/A"
-
-# =========================================================
-# PROJECT STAGE
-# =========================================================
-def classify_stage(text):
-
-    text = text.lower()
-
-    if "approved" in text:
-        return "Approved"
-
-    if "permit" in text:
-        return "Permitting"
-
-    if "construction" in text:
-        return "Construction"
-
-    if "groundbreaking" in text:
-        return "Groundbreaking"
-
-    if "expansion" in text:
-        return "Expansion"
-
-    if "planning" in text:
-        return "Planning"
-
-    if "investment" in text:
-        return "Investment"
-
-    return "General"
-
-# =========================================================
-# QUALITY SCORE
-# =========================================================
-def quality_score(text):
-
-    score = 0
-
-    if any(
-        x.lower() in text.lower()
-        for x in DC_TERMS
-    ):
-        score += 2
-
-    if any(
-        x.lower() in text.lower()
-        for x in PROJECT_TERMS
-    ):
-        score += 2
-
-    if extract_company(text) != "Unknown":
-        score += 2
-
-    if extract_state(text) != "Unknown":
-        score += 2
-
-    if extract_mw(text) != "N/A":
-        score += 1
-
-    if extract_cost(text) != "N/A":
-        score += 1
-
-    return score
-
-# =========================================================
-# SCRAPE ARTICLE PAGE
-# =========================================================
-def scrape_article_page(url):
-
-    soup = fetch_url(url)
-
-    if not soup:
-        return ""
-
-    return soup.get_text(
-        " ",
-        strip=True
-    )
-
-# =========================================================
-# PARSE ARTICLES
-# =========================================================
-def parse_articles(soup, source):
+def extract_articles(soup):
 
     articles = []
+    seen = set()
 
     links = soup.find_all(
         "a",
-        href=True
+        href=re.compile(r"^/en/news/")
     )
 
-    seen = set()
+    for link in links:
 
-    for a in links:
+        href = link.get("href")
 
-        href = a["href"]
-
-        title = a.get_text(
-            strip=True
-        )
-
-        if len(title) < 20:
+        if not href:
             continue
 
         if href in seen:
@@ -355,166 +184,108 @@ def parse_articles(soup, source):
 
         seen.add(href)
 
-        if href.startswith("/"):
+        full_url = BASE_URL + href
 
-            if "datacenterdynamics" in source:
+        headline = link.get_text(strip=True)
 
-                href = (
-                    "https://www.datacenterdynamics.com"
-                    + href
-                )
-
-        elif not href.startswith("http"):
+        if len(headline) < 20:
             continue
 
+        headline_lower = headline.lower()
+
+        # Must contain disclosure / construction signals
+        if not any(k in headline_lower for k in PROJECT_KEYWORDS):
+            continue
+
+        # Extract nearby text for date
+        parent_text = link.parent.get_text(" ", strip=True)
+
+        date_match = re.search(
+            r"(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})",
+            parent_text,
+            re.I
+        )
+
+        if date_match:
+            date_obj = parse_date(date_match.group(1))
+        else:
+            date_obj = None
+
         articles.append({
-            "title": title,
-            "url": href,
-            "source": source
+            "Headline": headline,
+            "Date": date_obj.strftime("%Y-%m-%d") if date_obj else "Unknown",
+            "_date": date_obj,
+            "URL": full_url
         })
 
     return articles
 
 # =========================================================
-# MAIN SCRAPER
+# USA FILTER
 # =========================================================
-def scrape_sources(
+def article_matches_state(headline, state):
 
+    if state == "All USA":
+        return True
+
+    return state.lower() in headline.lower()
+
+# =========================================================
+# SCRAPER
+# =========================================================
+def scrape_articles(
+    cutoff_date,
     max_pages,
-    selected_states,
-    start_date
-
+    selected_state,
+    progress_bar
 ):
 
-    final_data = []
+    collected = []
 
-    progress = st.progress(0)
+    for page in range(1, max_pages + 1):
 
-    total_steps = (
-        len(SOURCES) * max_pages
-    )
+        progress_bar.progress(
+            page / max_pages,
+            text=f"Scraping page {page}/{max_pages}"
+        )
 
-    current_step = 0
+        url = (
+            f"{BASE_URL}/en/news/"
+            f"?term=the-data-center-construction-channel"
+            f"&term=north-america"
+            f"&page={page}"
+        )
 
-    for source, template in SOURCES.items():
+        soup = fetch_page(url)
 
-        for page in range(1, max_pages + 1):
+        if not soup:
+            continue
 
-            current_step += 1
+        page_articles = extract_articles(soup)
 
-            progress.progress(
-                current_step / total_steps,
-                text=f"Scanning {source} page {page}"
-            )
+        if not page_articles:
+            continue
 
-            url = template.format(page)
+        for article in page_articles:
 
-            soup = fetch_url(url)
-
-            if not soup:
+            # Filter by state
+            if not article_matches_state(
+                article["Headline"],
+                selected_state
+            ):
                 continue
 
-            parsed_articles = parse_articles(
-                soup,
-                source
-            )
+            # Filter by date
+            if article["_date"]:
 
-            for article in parsed_articles:
-
-                try:
-
-                    article_text = scrape_article_page(
-                        article["url"]
-                    )
-
-                    combined = (
-                        article["title"]
-                        + " "
-                        + article_text
-                    )
-
-                    # FILTER DC TERMS
-                    if not any(
-                        x.lower() in combined.lower()
-                        for x in DC_TERMS
-                    ):
-                        continue
-
-                    # FILTER PROJECT TERMS
-                    if not any(
-                        x.lower() in combined.lower()
-                        for x in PROJECT_TERMS
-                    ):
-                        continue
-
-                    # FILTER STATES
-                    detected_state = extract_state(
-                        combined
-                    )
-
-                    if selected_states:
-
-                        if detected_state == "Unknown":
-                            continue
-
-                        if not any(
-                            s in detected_state
-                            for s in selected_states
-                        ):
-                            continue
-
-                    # QUALITY SCORE
-                    score = quality_score(
-                        combined
-                    )
-
-                    if score < 5:
-                        continue
-
-                    # DATE
-                    published = datetime.now().strftime(
-                        "%Y-%m-%d"
-                    )
-
-                    # DATA
-                    final_data.append({
-
-                        "Title":
-                        article["title"],
-
-                        "Source":
-                        source,
-
-                        "Published Date":
-                        published,
-
-                        "Company":
-                        extract_company(combined),
-
-                        "State":
-                        detected_state,
-
-                        "Project Stage":
-                        classify_stage(combined),
-
-                        "MW Capacity":
-                        extract_mw(combined),
-
-                        "Investment":
-                        extract_cost(combined),
-
-                        "URL":
-                        article["url"]
-                    })
-
-                except:
+                if article["_date"] < cutoff_date:
                     continue
 
-            time.sleep(1)
+            collected.append(article)
 
-    progress.empty()
+        time.sleep(1)
 
-    return pd.DataFrame(final_data)
+    return collected
 
 # =========================================================
 # EXCEL EXPORT
@@ -522,294 +293,318 @@ def scrape_sources(
 def build_excel(df):
 
     wb = Workbook()
-
     ws = wb.active
 
-    ws.title = "US Data Center Intelligence"
+    ws.title = "US Data Center Disclosures"
 
-    headers = list(df.columns)
+    headers = [
+        "#",
+        "Headline",
+        "Published Date",
+        "URL"
+    ]
 
-    fill = PatternFill(
+    widths = [5, 90, 18, 70]
+
+    header_fill = PatternFill(
         "solid",
         fgColor="1F4E79"
     )
 
-    font = Font(
+    header_font = Font(
         bold=True,
-        color="FFFFFF"
+        color="FFFFFF",
+        size=11
     )
+
+    thin = Side(style="thin", color="CCCCCC")
 
     border = Border(
-
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin")
+        left=thin,
+        right=thin,
+        top=thin,
+        bottom=thin
     )
 
-    for col_num, header in enumerate(headers, 1):
+    # HEADER
+    for i, (h, w) in enumerate(zip(headers, widths), 1):
 
         cell = ws.cell(
             row=1,
-            column=col_num,
-            value=header
+            column=i,
+            value=h
         )
 
-        cell.fill = fill
-        cell.font = font
+        cell.fill = header_fill
+        cell.font = header_font
         cell.border = border
+
         cell.alignment = Alignment(
-            horizontal="center"
+            horizontal="center",
+            vertical="center"
         )
 
-    for row in df.itertuples(index=False):
+        ws.column_dimensions[
+            get_column_letter(i)
+        ].width = w
 
-        ws.append(row)
+    # DATA
+    for row_idx, row in enumerate(
+        df.itertuples(index=False),
+        start=2
+    ):
 
-    for col in ws.columns:
+        values = [
+            row_idx - 1,
+            row.Headline,
+            row.Date,
+            row.URL
+        ]
 
-        max_length = 0
+        for col_idx, val in enumerate(values, 1):
 
-        column = col[0].column_letter
+            c = ws.cell(
+                row=row_idx,
+                column=col_idx,
+                value=val
+            )
 
-        for cell in col:
+            c.border = border
 
-            try:
+            if col_idx == 4:
+                c.hyperlink = val
+                c.style = "Hyperlink"
 
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
+    ws.freeze_panes = "B2"
 
-            except:
-                pass
+    buffer = io.BytesIO()
 
-        adjusted = min(max_length + 5, 60)
+    wb.save(buffer)
 
-        ws.column_dimensions[column].width = adjusted
+    buffer.seek(0)
 
-    excel_file = io.BytesIO()
-
-    wb.save(excel_file)
-
-    excel_file.seek(0)
-
-    return excel_file
+    return buffer.read()
 
 # =========================================================
-# MAIN UI
+# APP
 # =========================================================
 def main():
 
-    st.title(
-        "🏗️ US Data Center Intelligence Tracker"
+    st.set_page_config(
+        page_title="US Data Center Intelligence",
+        page_icon="🏗️",
+        layout="wide"
     )
+
+    st.title("🏗️ US Data Center Disclosure Tracker")
 
     st.markdown("""
 Tracks:
-- Data center construction
-- AI infrastructure campuses
-- Land acquisitions
-- Planning approvals
-- Utility infrastructure
-- Hyperscale expansion
-- Investment announcements
+- Data Center Construction
+- Investments
+- Campus Developments
+- Groundbreaking
+- Permits
+- Approvals
+- Expansion Announcements
+- Land Acquisition
+- Site Selection
+- Planning Activity
+""")
+
+    if not _USE_CLOUDSCRAPER:
+
+        st.warning("""
+Install cloudscraper for better scraping:
+
+pip install cloudscraper
 """)
 
     # =====================================================
     # SIDEBAR
     # =====================================================
-    st.sidebar.header("Filters")
+    with st.sidebar:
 
-    time_option = st.sidebar.radio(
+        st.header("⚙️ Filters")
 
-        "Select Time Range",
+        # STATE FILTER
+        selected_state = st.selectbox(
+            "Select USA State",
+            US_STATES
+        )
 
-        [
-            "Past 10 Days",
-            "Past 30 Days",
-            "Latest"
+        # DATE FILTER
+        date_option = st.radio(
+            "Date Filter",
+            [
+                "Latest Available",
+                "Past 10 Days",
+                "Past 30 Days",
+                "Custom Date Range"
+            ]
+        )
+
+        today = datetime.today()
+
+        if date_option == "Latest Available":
+            cutoff_date = datetime(2020, 1, 1)
+
+        elif date_option == "Past 10 Days":
+            cutoff_date = today - timedelta(days=10)
+
+        elif date_option == "Past 30 Days":
+            cutoff_date = today - timedelta(days=30)
+
+        else:
+
+            custom_start = st.date_input(
+                "Start Date",
+                today - timedelta(days=30)
+            )
+
+            custom_end = st.date_input(
+                "End Date",
+                today
+            )
+
+            cutoff_date = datetime.combine(
+                custom_start,
+                datetime.min.time()
+            )
+
+        max_pages = st.slider(
+            "Pages to Scrape",
+            1,
+            50,
+            15
+        )
+
+        scrape_btn = st.button(
+            "🚀 Start Scraping",
+            use_container_width=True
+        )
+
+    # =====================================================
+    # MAIN
+    # =====================================================
+    if not scrape_btn:
+
+        st.info("Select filters and click Start Scraping")
+
+        return
+
+    progress = st.progress(
+        0,
+        text="Starting scraper..."
+    )
+
+    articles = scrape_articles(
+        cutoff_date,
+        max_pages,
+        selected_state,
+        progress
+    )
+
+    progress.empty()
+
+    if not articles:
+
+        st.error("No articles found")
+
+        return
+
+    df = pd.DataFrame(articles)
+
+    # REMOVE DUPLICATES
+    df.drop_duplicates(
+        subset=["Headline"],
+        inplace=True
+    )
+
+    # DATE FILTER
+    if date_option == "Custom Date Range":
+
+        end_dt = datetime.combine(
+            custom_end,
+            datetime.max.time()
+        )
+
+        df["_date"] = pd.to_datetime(
+            df["_date"],
+            errors="coerce"
+        )
+
+        df = df[
+            (df["_date"] >= cutoff_date) &
+            (df["_date"] <= end_dt)
         ]
+
+    # SORT
+    df = df.sort_values(
+        "_date",
+        ascending=False
     )
 
-    if time_option == "Past 10 Days":
+    # KEEP COLUMNS
+    df = df[
+        [
+            "Headline",
+            "Date",
+            "URL"
+        ]
+    ]
 
-        start_date = (
-            datetime.now()
-            - timedelta(days=10)
-        )
+    # =====================================================
+    # METRICS
+    # =====================================================
+    c1, c2, c3 = st.columns(3)
 
-    elif time_option == "Past 30 Days":
-
-        start_date = (
-            datetime.now()
-            - timedelta(days=30)
-        )
-
-    else:
-
-        start_date = (
-            datetime.now()
-            - timedelta(days=3)
-        )
-
-    selected_states = st.sidebar.multiselect(
-
-        "Select States",
-
-        US_STATES
+    c1.metric(
+        "Articles",
+        len(df)
     )
 
-    max_pages = st.sidebar.slider(
+    c2.metric(
+        "Pages Scraped",
+        max_pages
+    )
 
-        "Pages Per Source",
-
-        1,
-        20,
-        5
+    c3.metric(
+        "State Filter",
+        selected_state
     )
 
     # =====================================================
-    # SCRAPE BUTTON
+    # TABLE
     # =====================================================
-    if st.button(
-        "🚀 Run Intelligence Scan"
-    ):
-
-        with st.spinner(
-            "Scanning infrastructure developments..."
-        ):
-
-            df = scrape_sources(
-
-                max_pages=
-                    max_pages,
-
-                selected_states=
-                    selected_states,
-
-                start_date=
-                    start_date
+    st.dataframe(
+        df,
+        use_container_width=True,
+        height=700,
+        column_config={
+            "URL": st.column_config.LinkColumn(
+                "Article Link",
+                display_text="🔗 Open Article"
             )
+        }
+    )
 
-            if df.empty:
+    # =====================================================
+    # DOWNLOAD
+    # =====================================================
+    excel_data = build_excel(df)
 
-                st.warning(
-                    "No matching articles found"
-                )
+    timestamp = datetime.now().strftime(
+        "%Y%m%d_%H%M"
+    )
 
-                return
-
-            # DEDUP
-            df.drop_duplicates(
-
-                subset="Title",
-
-                inplace=True
-            )
-
-            # SORT
-            df = df.sort_values(
-
-                "Published Date",
-
-                ascending=False
-            )
-
-            # =================================================
-            # METRICS
-            # =================================================
-            c1, c2, c3, c4 = st.columns(4)
-
-            c1.metric(
-                "Articles",
-                len(df)
-            )
-
-            c2.metric(
-                "Companies",
-                df["Company"].nunique()
-            )
-
-            c3.metric(
-                "States",
-                df["State"].nunique()
-            )
-
-            c4.metric(
-                "Sources",
-                df["Source"].nunique()
-            )
-
-            # =================================================
-            # CHARTS
-            # =================================================
-            st.subheader(
-                "📊 Intelligence Analytics"
-            )
-
-            state_chart = px.histogram(
-
-                df,
-
-                x="State",
-
-                title="Projects by State"
-            )
-
-            st.plotly_chart(
-                state_chart,
-                use_container_width=True
-            )
-
-            stage_chart = px.histogram(
-
-                df,
-
-                x="Project Stage",
-
-                title="Projects by Stage"
-            )
-
-            st.plotly_chart(
-                stage_chart,
-                use_container_width=True
-            )
-
-            # =================================================
-            # TABLE
-            # =================================================
-            st.subheader(
-                "📄 Intelligence Results"
-            )
-
-            st.dataframe(
-
-                df,
-
-                use_container_width=True,
-
-                height=700
-            )
-
-            # =================================================
-            # EXCEL DOWNLOAD
-            # =================================================
-            excel = build_excel(df)
-
-            st.download_button(
-
-                "📥 Download Intelligence Report",
-
-                data=excel,
-
-                file_name=(
-                    "us_data_center_intelligence.xlsx"
-                ),
-
-                mime=(
-                    "application/vnd.openxmlformats-"
-                    "officedocument.spreadsheetml.sheet"
-                )
-            )
+    st.download_button(
+        label="📥 Download Excel",
+        data=excel_data,
+        file_name=f"US_Data_Center_Disclosures_{timestamp}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
 # =========================================================
 # RUN
