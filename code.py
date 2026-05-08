@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from io import BytesIO
 import time
+import re
 
 # ==========================================================
 # PAGE CONFIG
@@ -15,55 +16,62 @@ st.set_page_config(
 )
 
 # ==========================================================
-# CONFIG
+# BASE CONFIG
 # ==========================================================
 BASE_URL = "https://www.datacenterdynamics.com"
 
-DCD_CONSTRUCTION_URL = (
+SEARCH_URL = (
     "https://www.datacenterdynamics.com/en/news/"
-    "?term=the-data-center-construction-channel"
+    "?term=the-data-center-construction-channel&page={}"
 )
 
-# ==========================================================
-# US FILTER KEYWORDS
-# ==========================================================
-US_KEYWORDS = [
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 "
+        "(Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/120.0 Safari/537.36"
+    )
+}
 
-    "usa",
-    "united states",
+# ==========================================================
+# US STATES
+# ==========================================================
+US_STATES = [
 
-    "texas",
-    "virginia",
-    "california",
-    "arizona",
-    "ohio",
-    "georgia",
-    "illinois",
-    "new york",
-    "oregon",
-    "washington",
-    "utah",
-    "north carolina",
-    "nevada",
-    "florida",
-    "tennessee",
-    "indiana",
-    "louisiana",
-    "new mexico",
-    "mississippi",
-    "iowa",
-    "wisconsin",
-    "pennsylvania",
-    "new jersey",
-    "massachusetts",
-    "maryland",
-    "south carolina",
-    "alabama",
-    "kentucky"
+    "Texas",
+    "Virginia",
+    "California",
+    "Arizona",
+    "Ohio",
+    "Georgia",
+    "Illinois",
+    "New York",
+    "Nevada",
+    "North Carolina",
+    "Washington",
+    "Oregon",
+    "Utah",
+    "Florida",
+    "Indiana",
+    "Louisiana",
+    "Tennessee",
+    "Pennsylvania",
+    "New Jersey",
+    "Maryland",
+    "Massachusetts",
+    "South Carolina",
+    "Alabama",
+    "Kentucky",
+    "Wisconsin",
+    "Mississippi",
+    "New Mexico",
+    "Iowa"
 ]
 
 # ==========================================================
-# DEVELOPMENT SIGNALS
+# DEVELOPMENT KEYWORDS
 # ==========================================================
 DEVELOPMENT_KEYWORDS = [
 
@@ -101,7 +109,7 @@ DEVELOPMENT_KEYWORDS = [
 # ==========================================================
 # DATA CENTER TERMS
 # ==========================================================
-DC_TERMS = [
+DATA_CENTER_TERMS = [
 
     "data center",
     "data centre",
@@ -114,237 +122,267 @@ DC_TERMS = [
 ]
 
 # ==========================================================
-# FILTER FUNCTION
+# RELEVANT ARTICLE CHECK
 # ==========================================================
-def is_relevant_article(text):
+def is_relevant_article(text, selected_states):
 
     text = str(text).lower()
 
-    # MUST HAVE DATA CENTER TERM
-    if not any(k in text for k in DC_TERMS):
+    # MUST CONTAIN DATA CENTER TERM
+    if not any(
+        term.lower() in text
+        for term in DATA_CENTER_TERMS
+    ):
         return False
 
-    # MUST HAVE DEVELOPMENT TERM
-    if not any(k in text for k in DEVELOPMENT_KEYWORDS):
+    # MUST CONTAIN DEVELOPMENT TERM
+    if not any(
+        term.lower() in text
+        for term in DEVELOPMENT_KEYWORDS
+    ):
         return False
 
-    # MUST HAVE US TERM
-    if not any(k in text for k in US_KEYWORDS):
-        return False
-
-    # REMOVE IRRELEVANT NEWS
-    blacklist = [
-
-        "earnings",
-        "financial results",
-        "sports",
-        "movie",
-        "gaming",
-        "celebrity",
-        "processor",
-        "gpu launch",
-        "software update",
-        "smartphone",
-        "laptop",
-        "cpu"
+    # USA FILTER
+    usa_terms = [
+        "usa",
+        "united states"
     ]
 
-    if any(k in text for k in blacklist):
-        return False
+    if selected_states:
+
+        if not any(
+            state.lower() in text
+            for state in selected_states
+        ):
+
+            # fallback USA
+            if not any(
+                u in text for u in usa_terms
+            ):
+                return False
 
     return True
 
 # ==========================================================
-# EXTRACT ARTICLE DATE
+# EXTRACT DATE
 # ==========================================================
-def extract_date(date_text):
+def parse_date(date_text):
 
     try:
 
-        parsed_date = pd.to_datetime(
+        parsed = pd.to_datetime(
             date_text,
             errors="coerce"
         )
 
-        if pd.isna(parsed_date):
+        if pd.isna(parsed):
             return None
 
-        return parsed_date
+        return parsed
 
     except:
         return None
 
 # ==========================================================
-# SCRAPE DCD MULTIPLE PAGES
+# SCRAPE SINGLE PAGE
 # ==========================================================
-def scrape_dcd(max_pages=15, days_limit=30):
+def scrape_page(page_num):
 
-    all_articles = []
+    try:
 
-    cutoff_date = datetime.now() - timedelta(days=days_limit)
+        url = SEARCH_URL.format(page_num)
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code != 200:
+            return []
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        articles = []
+
+        # FIND ALL ARTICLE BLOCKS
+        article_blocks = soup.find_all(
+            "article"
+        )
+
+        for block in article_blocks:
+
+            try:
+
+                # TITLE
+                title_tag = block.find(
+                    ["h2", "h3"]
+                )
+
+                if not title_tag:
+                    continue
+
+                title = title_tag.get_text(
+                    strip=True
+                )
+
+                # LINK
+                link_tag = block.find("a")
+
+                if not link_tag:
+                    continue
+
+                href = link_tag.get("href")
+
+                if not href:
+                    continue
+
+                if href.startswith("/"):
+
+                    href = BASE_URL + href
+
+                # DATE
+                time_tag = block.find("time")
+
+                if time_tag:
+
+                    raw_date = (
+                        time_tag.get_text(
+                            strip=True
+                        )
+                    )
+
+                    parsed_date = parse_date(
+                        raw_date
+                    )
+
+                else:
+
+                    parsed_date = None
+
+                # DESCRIPTION
+                desc_tag = block.find("p")
+
+                description = ""
+
+                if desc_tag:
+
+                    description = (
+                        desc_tag.get_text(
+                            strip=True
+                        )
+                    )
+
+                articles.append({
+
+                    "title": title,
+                    "link": href,
+                    "description": description,
+                    "date": parsed_date
+                })
+
+            except:
+                continue
+
+        return articles
+
+    except:
+        return []
+
+# ==========================================================
+# SCRAPE MULTIPLE PAGES
+# ==========================================================
+def scrape_dcd_articles(
+
+    selected_states,
+    start_date,
+    end_date,
+    max_pages=50
+):
+
+    collected = []
 
     progress_bar = st.progress(0)
 
     for page in range(1, max_pages + 1):
 
-        try:
+        progress_bar.progress(
+            page / max_pages
+        )
 
-            progress_bar.progress(
-                page / max_pages
-            )
+        page_articles = scrape_page(page)
 
-            page_url = (
-                f"{DCD_CONSTRUCTION_URL}&page={page}"
-            )
+        if not page_articles:
+            continue
 
-            response = requests.get(
+        for art in page_articles:
 
-                page_url,
-                headers=headers,
-                timeout=20
-            )
+            try:
 
-            if response.status_code != 200:
-                continue
+                title = art["title"]
+                desc = art["description"]
 
-            soup = BeautifulSoup(
-                response.text,
-                "html.parser"
-            )
+                combined_text = (
+                    f"{title} {desc}"
+                )
 
-            articles = soup.find_all("article")
-
-            if not articles:
-                continue
-
-            for article in articles:
-
-                try:
-
-                    # ==================================
-                    # TITLE
-                    # ==================================
-                    title_tag = article.find("h3")
-
-                    if not title_tag:
-                        continue
-
-                    title = title_tag.get_text(
-                        strip=True
-                    )
-
-                    # ==================================
-                    # LINK
-                    # ==================================
-                    link_tag = article.find("a")
-
-                    if not link_tag:
-                        continue
-
-                    href = link_tag.get("href")
-
-                    if not href:
-                        continue
-
-                    if href.startswith("/"):
-
-                        full_link = (
-                            BASE_URL + href
-                        )
-
-                    else:
-
-                        full_link = href
-
-                    # ==================================
-                    # DATE
-                    # ==================================
-                    time_tag = article.find("time")
-
-                    if time_tag:
-
-                        date_text = (
-                            time_tag.get_text(
-                                strip=True
-                            )
-                        )
-
-                        parsed_date = extract_date(
-                            date_text
-                        )
-
-                    else:
-
-                        parsed_date = datetime.now()
-
-                    # ==================================
-                    # DATE FILTER
-                    # ==================================
-                    if parsed_date:
-
-                        if parsed_date < cutoff_date:
-                            continue
-
-                    # ==================================
-                    # DESCRIPTION
-                    # ==================================
-                    desc_tag = article.find("p")
-
-                    description = ""
-
-                    if desc_tag:
-                        description = desc_tag.get_text(
-                            strip=True
-                        )
-
-                    # ==================================
-                    # COMBINED TEXT
-                    # ==================================
-                    combined_text = (
-                        f"{title} {description}"
-                    )
-
-                    # ==================================
-                    # FILTER
-                    # ==================================
-                    if not is_relevant_article(
-                        combined_text
-                    ):
-                        continue
-
-                    # ==================================
-                    # ADD ARTICLE
-                    # ==================================
-                    all_articles.append({
-
-                        "Title": title,
-
-                        "Link": full_link,
-
-                        "Source":
-                            "DataCenterDynamics",
-
-                        "Published Date":
-                            parsed_date.strftime(
-                                "%Y-%m-%d"
-                            )
-                    })
-
-                except:
+                # RELEVANCE FILTER
+                if not is_relevant_article(
+                    combined_text,
+                    selected_states
+                ):
                     continue
 
-            time.sleep(1)
+                # DATE FILTER
+                article_date = art["date"]
 
-        except:
-            continue
+                if article_date:
+
+                    article_date = (
+                        article_date.replace(
+                            tzinfo=None
+                        )
+                    )
+
+                    if article_date < start_date:
+                        continue
+
+                    if article_date > end_date:
+                        continue
+
+                    formatted_date = (
+                        article_date.strftime(
+                            "%Y-%m-%d"
+                        )
+                    )
+
+                else:
+
+                    formatted_date = ""
+
+                collected.append({
+
+                    "Title": title,
+                    "Link": art["link"],
+                    "Source":
+                        "DataCenterDynamics",
+                    "Published Date":
+                        formatted_date
+                })
+
+            except:
+                continue
+
+        time.sleep(1)
 
     progress_bar.empty()
 
-    return pd.DataFrame(all_articles)
+    df = pd.DataFrame(collected)
+
+    return df
 
 # ==========================================================
 # CLEAN DATAFRAME
@@ -354,29 +392,36 @@ def clean_dataframe(df):
     if df.empty:
         return df
 
+    # REMOVE DUPLICATES
     df.drop_duplicates(
         subset="Title",
         inplace=True
     )
 
+    # REMOVE EMPTY TITLES
     df = df[
-        df["Title"].str.len() > 20
+        df["Title"].notna()
     ]
 
-    df["Published Date"] = pd.to_datetime(
-        df["Published Date"],
-        errors="coerce"
-    )
+    # SORT BY DATE
+    try:
 
-    df = df.sort_values(
+        df["Published Date"] = pd.to_datetime(
+            df["Published Date"],
+            errors="coerce"
+        )
 
-        by="Published Date",
-        ascending=False
-    )
+        df = df.sort_values(
+            by="Published Date",
+            ascending=False
+        )
 
-    df["Published Date"] = df[
-        "Published Date"
-    ].dt.strftime("%Y-%m-%d")
+        df["Published Date"] = df[
+            "Published Date"
+        ].dt.strftime("%Y-%m-%d")
+
+    except:
+        pass
 
     return df
 
@@ -386,6 +431,17 @@ def clean_dataframe(df):
 def to_excel(df):
 
     output = BytesIO()
+
+    # REMOVE TIMEZONE ISSUES
+    for col in df.columns:
+
+        if pd.api.types.is_datetime64_any_dtype(
+            df[col]
+        ):
+
+            df[col] = df[col].dt.tz_localize(
+                None
+            )
 
     with pd.ExcelWriter(
         output,
@@ -410,14 +466,14 @@ def main():
 
     st.markdown("""
     ### Tracks ONLY:
-    - US data center construction
-    - Hyperscale campus developments
-    - AI infrastructure projects
+    - Data center construction
+    - Campus developments
+    - Hyperscale investments
     - Planning approvals
-    - Investments
-    - Groundbreaking announcements
-    - Utility + power infrastructure
-    - Campus expansions
+    - Groundbreaking
+    - Land acquisitions
+    - Utility infrastructure
+    - Expansion projects
     """)
 
     # ======================================================
@@ -425,61 +481,113 @@ def main():
     # ======================================================
     st.sidebar.header("Filters")
 
-    time_range = st.sidebar.radio(
+    # TIME FILTER
+    time_filter = st.sidebar.radio(
 
         "Select Time Range",
 
         [
             "Latest",
             "Past 10 Days",
-            "Past 30 Days"
+            "Past 30 Days",
+            "Custom Date"
         ]
     )
 
-    if time_range == "Latest":
-        days_limit = 1
+    today = datetime.now()
 
-    elif time_range == "Past 10 Days":
-        days_limit = 10
+    if time_filter == "Latest":
+
+        start_date = today - timedelta(days=1)
+        end_date = today
+
+    elif time_filter == "Past 10 Days":
+
+        start_date = today - timedelta(days=10)
+        end_date = today
+
+    elif time_filter == "Past 30 Days":
+
+        start_date = today - timedelta(days=30)
+        end_date = today
 
     else:
-        days_limit = 30
 
+        start_date = st.sidebar.date_input(
+            "Start Date",
+            today - timedelta(days=30)
+        )
+
+        end_date = st.sidebar.date_input(
+            "End Date",
+            today
+        )
+
+        start_date = datetime.combine(
+            start_date,
+            datetime.min.time()
+        )
+
+        end_date = datetime.combine(
+            end_date,
+            datetime.max.time()
+        )
+
+    # STATE FILTER
+    selected_states = st.sidebar.multiselect(
+
+        "Select USA States",
+
+        options=US_STATES,
+
+        default=[]
+    )
+
+    # PAGE SCAN
     max_pages = st.sidebar.slider(
 
         "Pages to Scan",
 
         min_value=5,
-        max_value=50,
-        value=20
+        max_value=100,
+        value=30
     )
 
     # ======================================================
     # FETCH BUTTON
     # ======================================================
     if st.button(
-        "🚀 Fetch US Development Articles"
+        "🚀 Fetch Development Articles"
     ):
 
         with st.spinner(
             "Scanning DataCenterDynamics..."
         ):
 
-            df = scrape_dcd(
+            df = scrape_dcd_articles(
 
-                max_pages=max_pages,
-                days_limit=days_limit
+                selected_states=
+                    selected_states,
+
+                start_date=
+                    start_date,
+
+                end_date=
+                    end_date,
+
+                max_pages=
+                    max_pages
             )
 
             df = clean_dataframe(df)
 
-            # ==============================================
+            # ==================================================
             # OUTPUT
-            # ==============================================
+            # ==================================================
             if not df.empty:
 
                 st.success(
-                    f"{len(df)} US Development Articles Found"
+                    f"{len(df)} Articles Found"
                 )
 
                 st.dataframe(
@@ -487,9 +595,7 @@ def main():
                     use_container_width=True
                 )
 
-                # ==========================================
                 # DOWNLOAD
-                # ==========================================
                 excel = to_excel(df)
 
                 st.download_button(
@@ -504,7 +610,7 @@ def main():
             else:
 
                 st.warning(
-                    "No US development-related articles found"
+                    "No matching US development articles found"
                 )
 
 # ==========================================================
