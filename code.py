@@ -1,620 +1,322 @@
 import streamlit as st
 import requests
-import pandas as pd
 from bs4 import BeautifulSoup
+import pandas as pd
 from datetime import datetime, timedelta
-from io import BytesIO
-import time
 import re
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
-# ==========================================================
-# PAGE CONFIG
-# ==========================================================
-st.set_page_config(
-    page_title="US Data Center Development Tracker",
-    layout="wide"
+# ─── US States for filtering ───────────────────────────────────────────────
+US_STATES = [
+    "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
+    "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+    "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+    "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+    "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+    "New Hampshire", "New Jersey", "New Mexico", "New York",
+    "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+    "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+    "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+    "West Virginia", "Wisconsin", "Wyoming",
+    # Common abbreviations
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    # US cities often seen in data center news
+    "Silicon Valley", "Northern Virginia", "NoVA", "Loudoun County",
+    "Dallas", "Chicago", "Phoenix", "Atlanta", "Seattle", "Denver",
+    "San Jose", "San Francisco", "Los Angeles", "Houston", "Miami",
+    "New York City", "NYC", "Boston", "Portland", "Las Vegas",
+    "Reno", "Quincy", "Ashburn", "Sterling", "Manassas",
+    "United States", "U.S.", "US "
+]
+
+US_PATTERN = re.compile(
+    r'\b(' + '|'.join(re.escape(s) for s in US_STATES) + r')\b',
+    re.IGNORECASE
 )
 
-# ==========================================================
-# BASE CONFIG
-# ==========================================================
 BASE_URL = "https://www.datacenterdynamics.com"
-
-SEARCH_URL = (
-    "https://www.datacenterdynamics.com/en/news/"
-    "?term=the-data-center-construction-channel&page={}"
-)
+CHANNEL_URL = f"{BASE_URL}/en/news/?term=the-data-center-construction-channel"
 
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/120.0 Safari/537.36"
-    )
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
-# ==========================================================
-# US STATES
-# ==========================================================
-US_STATES = [
 
-    "Texas",
-    "Virginia",
-    "California",
-    "Arizona",
-    "Ohio",
-    "Georgia",
-    "Illinois",
-    "New York",
-    "Nevada",
-    "North Carolina",
-    "Washington",
-    "Oregon",
-    "Utah",
-    "Florida",
-    "Indiana",
-    "Louisiana",
-    "Tennessee",
-    "Pennsylvania",
-    "New Jersey",
-    "Maryland",
-    "Massachusetts",
-    "South Carolina",
-    "Alabama",
-    "Kentucky",
-    "Wisconsin",
-    "Mississippi",
-    "New Mexico",
-    "Iowa"
-]
+# ─── Scraping helpers ───────────────────────────────────────────────────────
 
-# ==========================================================
-# DEVELOPMENT KEYWORDS
-# ==========================================================
-DEVELOPMENT_KEYWORDS = [
+def parse_date(date_str: str) -> datetime | None:
+    """Try multiple date formats and return a datetime or None."""
+    date_str = date_str.strip()
+    for fmt in ("%B %d, %Y", "%d %B %Y", "%Y-%m-%d", "%b %d, %Y"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None
 
-    "construction",
-    "investment",
-    "expansion",
-    "campus",
-    "approved",
-    "approval",
-    "permit",
-    "planning",
-    "planned",
-    "groundbreaking",
-    "development",
-    "proposal",
-    "proposed",
-    "land acquisition",
-    "site selection",
-    "build",
-    "built",
-    "new facility",
-    "substation",
-    "utility infrastructure",
-    "power agreement",
-    "utility approval",
-    "infrastructure",
-    "announces",
-    "acquires land",
-    "construction starts",
-    "opening",
-    "zoning",
-    "site plan"
-]
 
-# ==========================================================
-# DATA CENTER TERMS
-# ==========================================================
-DATA_CENTER_TERMS = [
-
-    "data center",
-    "data centre",
-    "hyperscale",
-    "colocation",
-    "ai infrastructure",
-    "cloud campus",
-    "compute campus",
-    "server farm"
-]
-
-# ==========================================================
-# RELEVANT ARTICLE CHECK
-# ==========================================================
-def is_relevant_article(text, selected_states):
-
-    text = str(text).lower()
-
-    # MUST CONTAIN DATA CENTER TERM
-    if not any(
-        term.lower() in text
-        for term in DATA_CENTER_TERMS
-    ):
-        return False
-
-    # MUST CONTAIN DEVELOPMENT TERM
-    if not any(
-        term.lower() in text
-        for term in DEVELOPMENT_KEYWORDS
-    ):
-        return False
-
-    # USA FILTER
-    usa_terms = [
-        "usa",
-        "united states"
-    ]
-
-    if selected_states:
-
-        if not any(
-            state.lower() in text
-            for state in selected_states
-        ):
-
-            # fallback USA
-            if not any(
-                u in text for u in usa_terms
-            ):
-                return False
-
-    return True
-
-# ==========================================================
-# EXTRACT DATE
-# ==========================================================
-def parse_date(date_text):
-
+def fetch_page(url: str) -> BeautifulSoup | None:
     try:
-
-        parsed = pd.to_datetime(
-            date_text,
-            errors="coerce"
-        )
-
-        if pd.isna(parsed):
-            return None
-
-        return parsed
-
-    except:
+        r = requests.get(url, headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        return BeautifulSoup(r.text, "html.parser")
+    except Exception as e:
+        st.warning(f"Failed to fetch {url}: {e}")
         return None
 
-# ==========================================================
-# SCRAPE SINGLE PAGE
-# ==========================================================
-def scrape_page(page_num):
 
-    try:
+def scrape_articles(cutoff: datetime, max_pages: int = 10) -> list[dict]:
+    """Scrape DCD construction channel up to cutoff date."""
+    articles = []
+    page = 1
 
-        url = SEARCH_URL.format(page_num)
+    while page <= max_pages:
+        url = CHANNEL_URL if page == 1 else f"{CHANNEL_URL}&page={page}"
+        soup = fetch_page(url)
+        if not soup:
+            break
 
-        response = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=30
-        )
+        cards = soup.select("article, .article-card, [data-component='article-card']")
 
-        if response.status_code != 200:
-            return []
+        # Fallback: broader selector
+        if not cards:
+            cards = soup.select("a[href*='/en/news/']")
 
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser"
-        )
+        if not cards:
+            break
 
-        articles = []
+        found_any = False
+        stop_early = False
 
-        # FIND ALL ARTICLE BLOCKS
-        article_blocks = soup.find_all(
-            "article"
-        )
-
-        for block in article_blocks:
-
-            try:
-
-                # TITLE
-                title_tag = block.find(
-                    ["h2", "h3"]
-                )
-
-                if not title_tag:
-                    continue
-
-                title = title_tag.get_text(
-                    strip=True
-                )
-
-                # LINK
-                link_tag = block.find("a")
-
-                if not link_tag:
-                    continue
-
-                href = link_tag.get("href")
-
-                if not href:
-                    continue
-
-                if href.startswith("/"):
-
-                    href = BASE_URL + href
-
-                # DATE
-                time_tag = block.find("time")
-
-                if time_tag:
-
-                    raw_date = (
-                        time_tag.get_text(
-                            strip=True
-                        )
-                    )
-
-                    parsed_date = parse_date(
-                        raw_date
-                    )
-
+        for card in cards:
+            # ── headline ──
+            headline_tag = card.select_one("h2, h3, h4, .headline, .title")
+            if not headline_tag:
+                if card.name == "a":
+                    headline_tag = card
                 else:
-
-                    parsed_date = None
-
-                # DESCRIPTION
-                desc_tag = block.find("p")
-
-                description = ""
-
-                if desc_tag:
-
-                    description = (
-                        desc_tag.get_text(
-                            strip=True
-                        )
-                    )
-
-                articles.append({
-
-                    "title": title,
-                    "link": href,
-                    "description": description,
-                    "date": parsed_date
-                })
-
-            except:
+                    continue
+            headline = headline_tag.get_text(strip=True)
+            if not headline:
                 continue
 
-        return articles
+            # ── url ──
+            link_tag = card.select_one("a") or (card if card.name == "a" else None)
+            if not link_tag:
+                continue
+            href = link_tag.get("href", "")
+            if not href.startswith("http"):
+                href = BASE_URL + href
 
-    except:
-        return []
+            # ── date ──
+            date_tag = card.select_one("time, .date, [class*='date'], [class*='time']")
+            article_date = None
+            if date_tag:
+                raw = date_tag.get("datetime") or date_tag.get_text(strip=True)
+                article_date = parse_date(raw)
 
-# ==========================================================
-# SCRAPE MULTIPLE PAGES
-# ==========================================================
-def scrape_dcd_articles(
+            if article_date and article_date < cutoff:
+                stop_early = True
+                break
 
-    selected_states,
-    start_date,
-    end_date,
-    max_pages=50
-):
+            found_any = True
+            articles.append({
+                "Headline": headline,
+                "Date": article_date.strftime("%Y-%m-%d") if article_date else "Unknown",
+                "URL": href,
+                "_date_obj": article_date,
+            })
 
-    collected = []
+        if stop_early or not found_any:
+            break
+        page += 1
 
-    progress_bar = st.progress(0)
+    return articles
 
-    for page in range(1, max_pages + 1):
 
-        progress_bar.progress(
-            page / max_pages
-        )
+def is_us_related(headline: str) -> bool:
+    return bool(US_PATTERN.search(headline))
 
-        page_articles = scrape_page(page)
 
-        if not page_articles:
+def filter_articles(articles: list[dict], days: int | None) -> list[dict]:
+    """Filter by date window and US-only headlines."""
+    now = datetime.now()
+    result = []
+    for a in articles:
+        d = a.get("_date_obj")
+        if days is not None and d:
+            if (now - d).days > days:
+                continue
+        if not is_us_related(a["Headline"]):
             continue
+        result.append(a)
+    return result
 
-        for art in page_articles:
 
-            try:
+# ─── Excel export ────────────────────────────────────────────────────────────
 
-                title = art["title"]
-                desc = art["description"]
+def build_excel(df: pd.DataFrame) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DCD US Construction News"
 
-                combined_text = (
-                    f"{title} {desc}"
-                )
+    # Header style
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(bold=True, color="FFFFFF", name="Arial", size=11)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin = Side(border_style="thin", color="AAAAAA")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-                # RELEVANCE FILTER
-                if not is_relevant_article(
-                    combined_text,
-                    selected_states
-                ):
-                    continue
+    cols = ["Headline", "Date", "URL"]
+    col_widths = [70, 15, 60]
 
-                # DATE FILTER
-                article_date = art["date"]
+    for ci, (col, width) in enumerate(zip(cols, col_widths), start=1):
+        cell = ws.cell(row=1, column=ci, value=col)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = border
+        ws.column_dimensions[get_column_letter(ci)].width = width
 
-                if article_date:
+    ws.row_dimensions[1].height = 28
 
-                    article_date = (
-                        article_date.replace(
-                            tzinfo=None
-                        )
-                    )
+    # Alternating row colours
+    fill_even = PatternFill("solid", fgColor="DCE6F1")
+    fill_odd  = PatternFill("solid", fgColor="FFFFFF")
+    link_font = Font(name="Arial", size=10, color="0563C1", underline="single")
+    normal_font = Font(name="Arial", size=10)
 
-                    if article_date < start_date:
-                        continue
+    for ri, row in enumerate(df.itertuples(index=False), start=2):
+        fill = fill_even if ri % 2 == 0 else fill_odd
+        for ci, col in enumerate(cols, start=1):
+            val = getattr(row, col)
+            cell = ws.cell(row=ri, column=ci, value=val)
+            cell.fill = fill
+            cell.border = border
+            cell.alignment = Alignment(vertical="center", wrap_text=(ci == 1))
+            if ci == 3:  # URL column — make it a hyperlink
+                cell.hyperlink = val
+                cell.font = link_font
+            else:
+                cell.font = normal_font
 
-                    if article_date > end_date:
-                        continue
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:C{len(df)+1}"
 
-                    formatted_date = (
-                        article_date.strftime(
-                            "%Y-%m-%d"
-                        )
-                    )
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
 
-                else:
 
-                    formatted_date = ""
+# ─── Streamlit UI ────────────────────────────────────────────────────────────
 
-                collected.append({
-
-                    "Title": title,
-                    "Link": art["link"],
-                    "Source":
-                        "DataCenterDynamics",
-                    "Published Date":
-                        formatted_date
-                })
-
-            except:
-                continue
-
-        time.sleep(1)
-
-    progress_bar.empty()
-
-    df = pd.DataFrame(collected)
-
-    return df
-
-# ==========================================================
-# CLEAN DATAFRAME
-# ==========================================================
-def clean_dataframe(df):
-
-    if df.empty:
-        return df
-
-    # REMOVE DUPLICATES
-    df.drop_duplicates(
-        subset="Title",
-        inplace=True
-    )
-
-    # REMOVE EMPTY TITLES
-    df = df[
-        df["Title"].notna()
-    ]
-
-    # SORT BY DATE
-    try:
-
-        df["Published Date"] = pd.to_datetime(
-            df["Published Date"],
-            errors="coerce"
-        )
-
-        df = df.sort_values(
-            by="Published Date",
-            ascending=False
-        )
-
-        df["Published Date"] = df[
-            "Published Date"
-        ].dt.strftime("%Y-%m-%d")
-
-    except:
-        pass
-
-    return df
-
-# ==========================================================
-# EXPORT TO EXCEL
-# ==========================================================
-def to_excel(df):
-
-    output = BytesIO()
-
-    # REMOVE TIMEZONE ISSUES
-    for col in df.columns:
-
-        if pd.api.types.is_datetime64_any_dtype(
-            df[col]
-        ):
-
-            df[col] = df[col].dt.tz_localize(
-                None
-            )
-
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
-
-        df.to_excel(
-            writer,
-            index=False
-        )
-
-    return output.getvalue()
-
-# ==========================================================
-# UI
-# ==========================================================
 def main():
-
-    st.title(
-        "🏗️ US Data Center Development Tracker"
+    st.set_page_config(
+        page_title="DCD US Construction News Scraper",
+        page_icon="🏗️",
+        layout="wide",
     )
 
-    st.markdown("""
-    ### Tracks ONLY:
-    - Data center construction
-    - Campus developments
-    - Hyperscale investments
-    - Planning approvals
-    - Groundbreaking
-    - Land acquisitions
-    - Utility infrastructure
-    - Expansion projects
-    """)
-
-    # ======================================================
-    # SIDEBAR
-    # ======================================================
-    st.sidebar.header("Filters")
-
-    # TIME FILTER
-    time_filter = st.sidebar.radio(
-
-        "Select Time Range",
-
-        [
-            "Latest",
-            "Past 10 Days",
-            "Past 30 Days",
-            "Custom Date"
-        ]
+    st.title("🏗️ Data Center Dynamics — US Construction News")
+    st.caption(
+        "Scrapes the [DCD Construction Channel]("
+        "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel"
+        ") and filters for **American state** mentions."
     )
 
-    today = datetime.now()
+    # ── Sidebar controls ────────────────────────────────────────────────────
+    with st.sidebar:
+        st.header("⚙️ Filters")
+        time_option = st.radio(
+            "Date range",
+            ["Latest (no limit)", "Past 30 days", "Past 10 days"],
+            index=0,
+        )
+        days_map = {
+            "Latest (no limit)": None,
+            "Past 30 days": 30,
+            "Past 10 days": 10,
+        }
+        selected_days = days_map[time_option]
 
-    if time_filter == "Latest":
+        max_pages = st.slider("Max pages to scrape", 1, 20, 5)
 
-        start_date = today - timedelta(days=1)
-        end_date = today
+        scrape_btn = st.button("🔍 Scrape Now", use_container_width=True, type="primary")
 
-    elif time_filter == "Past 10 Days":
+    # ── Main area ────────────────────────────────────────────────────────────
+    if scrape_btn:
+        cutoff = (
+            datetime.min
+            if selected_days is None
+            else datetime.now() - timedelta(days=selected_days)
+        )
 
-        start_date = today - timedelta(days=10)
-        end_date = today
+        with st.spinner("Fetching articles from datacenterdynamics.com …"):
+            raw = scrape_articles(cutoff, max_pages=max_pages)
 
-    elif time_filter == "Past 30 Days":
+        with st.spinner("Filtering for US-related headlines …"):
+            filtered = filter_articles(raw, days=selected_days)
 
-        start_date = today - timedelta(days=30)
-        end_date = today
+        st.success(
+            f"Found **{len(raw)}** total articles → **{len(filtered)}** US-related"
+        )
+
+        if not filtered:
+            st.info(
+                "No US-related articles found for the selected range. "
+                "Try increasing the date range or page limit."
+            )
+            return
+
+        # Clean display DF
+        df = pd.DataFrame(filtered)[["Headline", "Date", "URL"]]
+        df = df.sort_values("Date", ascending=False).reset_index(drop=True)
+
+        st.dataframe(
+            df,
+            use_container_width=True,
+            height=500,
+            column_config={
+                "URL": st.column_config.LinkColumn("URL"),
+            },
+        )
+
+        # Excel download
+        excel_bytes = build_excel(df)
+        ts = datetime.now().strftime("%Y%m%d_%H%M")
+        label = time_option.replace(" ", "_").replace("(", "").replace(")", "")
+        filename = f"DCD_US_Construction_{label}_{ts}.xlsx"
+
+        st.download_button(
+            label="📥 Download Excel",
+            data=excel_bytes,
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+        with st.expander("📊 Quick stats"):
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total articles", len(raw))
+            col2.metric("US-related", len(filtered))
+            col3.metric("Pages scraped", min(max_pages, (len(raw) // 10) + 1))
 
     else:
+        st.info("👈 Configure filters in the sidebar and click **Scrape Now**.")
 
-        start_date = st.sidebar.date_input(
-            "Start Date",
-            today - timedelta(days=30)
-        )
 
-        end_date = st.sidebar.date_input(
-            "End Date",
-            today
-        )
-
-        start_date = datetime.combine(
-            start_date,
-            datetime.min.time()
-        )
-
-        end_date = datetime.combine(
-            end_date,
-            datetime.max.time()
-        )
-
-    # STATE FILTER
-    selected_states = st.sidebar.multiselect(
-
-        "Select USA States",
-
-        options=US_STATES,
-
-        default=[]
-    )
-
-    # PAGE SCAN
-    max_pages = st.sidebar.slider(
-
-        "Pages to Scan",
-
-        min_value=5,
-        max_value=100,
-        value=30
-    )
-
-    # ======================================================
-    # FETCH BUTTON
-    # ======================================================
-    if st.button(
-        "🚀 Fetch Development Articles"
-    ):
-
-        with st.spinner(
-            "Scanning DataCenterDynamics..."
-        ):
-
-            df = scrape_dcd_articles(
-
-                selected_states=
-                    selected_states,
-
-                start_date=
-                    start_date,
-
-                end_date=
-                    end_date,
-
-                max_pages=
-                    max_pages
-            )
-
-            df = clean_dataframe(df)
-
-            # ==================================================
-            # OUTPUT
-            # ==================================================
-            if not df.empty:
-
-                st.success(
-                    f"{len(df)} Articles Found"
-                )
-
-                st.dataframe(
-                    df,
-                    use_container_width=True
-                )
-
-                # DOWNLOAD
-                excel = to_excel(df)
-
-                st.download_button(
-
-                    "📥 Download Excel",
-
-                    excel,
-
-                    "us_data_center_developments.xlsx"
-                )
-
-            else:
-
-                st.warning(
-                    "No matching US development articles found"
-                )
-
-# ==========================================================
-# MAIN
-# ==========================================================
 if __name__ == "__main__":
     main()
