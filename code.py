@@ -1,59 +1,81 @@
 import streamlit as st
-import pandas as pd
-import feedparser
+import re
+import io
+import time
 from datetime import datetime, timedelta
-from io import BytesIO
 
-# ==========================================================
+import pandas as pd
+import plotly.express as px
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+# =========================================================
+# REQUEST ENGINE
+# =========================================================
+try:
+    import cloudscraper
+
+    scraper = cloudscraper.create_scraper(
+        browser={
+            "browser": "chrome",
+            "platform": "windows",
+            "mobile": False
+        }
+    )
+
+except:
+    import requests
+    scraper = requests.Session()
+
+from bs4 import BeautifulSoup
+
+# =========================================================
 # PAGE CONFIG
-# ==========================================================
+# =========================================================
 st.set_page_config(
-    page_title="US Data Center Development Tracker",
+    page_title="US Data Center Intelligence Tracker",
+    page_icon="🏗️",
     layout="wide"
 )
 
-# ==========================================================
-# RSS FEEDS
-# ==========================================================
-RSS_FEEDS = {
+# =========================================================
+# SOURCES
+# =========================================================
+SOURCES = {
 
-    "DataCenterDynamics":
-    "https://www.datacenterdynamics.com/en/rss/",
+    "DCD Construction":
+    "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel&page={}",
+
+    "DCD North America":
+    "https://www.datacenterdynamics.com/en/news/?term=north-america&page={}",
 
     "DataCenterKnowledge":
-    "https://www.datacenterknowledge.com/rss.xml",
-
-    "DataCentreMagazine":
-    "https://datacentremagazine.com/rss",
+    "https://www.datacenterknowledge.com/search?search_api_fulltext=data+center&page={}",
 
     "DataCenterFrontier":
-    "https://datacenterfrontier.com/feed/",
+    "https://datacenterfrontier.com/page/{}/",
 
-    "CapacityMedia":
-    "https://www.capacitymedia.com/rss.xml"
+    "DataCentreMagazine":
+    "https://datacentremagazine.com/search?search=data+center&page={}"
 }
 
-# ==========================================================
-# DATA CENTER TERMS
-# ==========================================================
-DATA_CENTER_TERMS = [
-
+# =========================================================
+# KEYWORDS
+# =========================================================
+DC_TERMS = [
     "data center",
     "data centre",
     "hyperscale",
     "colocation",
     "ai infrastructure",
-    "cloud campus",
-    "compute campus",
     "server farm",
-    "digital infrastructure"
+    "digital infrastructure",
+    "cloud campus"
 ]
 
-# ==========================================================
-# DEVELOPMENT TERMS
-# ==========================================================
-DEVELOPMENT_TERMS = [
-
+PROJECT_TERMS = [
     "construction",
     "investment",
     "expansion",
@@ -76,442 +98,721 @@ DEVELOPMENT_TERMS = [
     "utility infrastructure",
     "power agreement",
     "utility approval",
-    "infrastructure",
-    "announces",
-    "acquires land",
     "construction starts",
     "opening",
     "zoning",
-    "site plan"
+    "site plan",
+    "announced",
+    "pipeline"
 ]
 
-# ==========================================================
-# USA STATES
-# ==========================================================
+COMPANIES = [
+    "AWS",
+    "Amazon",
+    "Microsoft",
+    "Google",
+    "Meta",
+    "Oracle",
+    "Equinix",
+    "Digital Realty",
+    "QTS",
+    "CyrusOne",
+    "Aligned",
+    "CoreSite",
+    "Compass Datacenters",
+    "Stack Infrastructure",
+    "NTT",
+    "Vantage",
+    "Switch",
+    "Apple"
+]
+
 US_STATES = [
-
-    "Texas",
-    "Virginia",
-    "California",
-    "Arizona",
-    "Ohio",
-    "Georgia",
-    "Illinois",
-    "New York",
-    "Nevada",
-    "North Carolina",
-    "Washington",
-    "Oregon",
-    "Utah",
-    "Florida",
-    "Indiana",
-    "Louisiana",
-    "Tennessee",
-    "Pennsylvania",
-    "New Jersey",
-    "Maryland",
-    "Massachusetts",
-    "South Carolina",
-    "Alabama",
-    "Kentucky",
-    "Wisconsin",
-    "Mississippi",
-    "New Mexico",
-    "Iowa"
+    "Texas","Virginia","California","Arizona","Ohio",
+    "Georgia","Illinois","New York","Nevada",
+    "North Carolina","Washington","Oregon",
+    "Florida","Utah","Indiana","Tennessee",
+    "Pennsylvania","New Jersey","Maryland"
 ]
 
-# ==========================================================
-# RELEVANT ARTICLE FILTER
-# ==========================================================
-def is_relevant_article(text, selected_states):
+# =========================================================
+# REGEX
+# =========================================================
+MW_RE = re.compile(r"\b\d+(\.\d+)?\s?(MW|GW)\b", re.I)
 
-    text = str(text).lower()
+COST_RE = re.compile(
+    r"\$[\d\.]+\s?(million|billion|bn|m)",
+    re.I
+)
 
-    # MUST HAVE DATA CENTER TERM
-    has_dc_term = any(
-        term.lower() in text
-        for term in DATA_CENTER_TERMS
-    )
+# =========================================================
+# HEADERS
+# =========================================================
+HEADERS = {
+    "User-Agent":
+    "Mozilla/5.0"
+}
 
-    if not has_dc_term:
-        return False
-
-    # MUST HAVE DEVELOPMENT TERM
-    has_dev_term = any(
-        term.lower() in text
-        for term in DEVELOPMENT_TERMS
-    )
-
-    if not has_dev_term:
-        return False
-
-    # USA FILTER
-    usa_terms = [
-        "usa",
-        "united states",
-        "u.s."
-    ]
-
-    if selected_states:
-
-        state_match = any(
-            state.lower() in text
-            for state in selected_states
-        )
-
-        usa_match = any(
-            term in text
-            for term in usa_terms
-        )
-
-        if not state_match and not usa_match:
-            return False
-
-    return True
-
-# ==========================================================
-# DATE PARSER
-# ==========================================================
-def parse_date(entry):
+# =========================================================
+# FETCH URL
+# =========================================================
+@st.cache_data(ttl=3600)
+def fetch_url(url):
 
     try:
 
-        if hasattr(entry, "published_parsed"):
+        response = scraper.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
 
-            parsed = datetime(*entry.published_parsed[:6])
+        if response.status_code == 200:
 
-            return parsed
+            return BeautifulSoup(
+                response.text,
+                "html.parser"
+            )
 
     except:
-        pass
+        return None
 
     return None
 
-# ==========================================================
-# FETCH RSS ARTICLES
-# ==========================================================
-def fetch_rss_articles(
+# =========================================================
+# PARSE DATE
+# =========================================================
+def parse_date(text):
 
+    patterns = [
+
+        "%Y-%m-%d",
+        "%d %B %Y",
+        "%B %d %Y",
+        "%d %b %Y"
+    ]
+
+    for p in patterns:
+
+        try:
+            return datetime.strptime(text, p)
+        except:
+            pass
+
+    return None
+
+# =========================================================
+# EXTRACT COMPANY
+# =========================================================
+def extract_company(text):
+
+    found = []
+
+    for c in COMPANIES:
+
+        if c.lower() in text.lower():
+            found.append(c)
+
+    return ", ".join(found) if found else "Unknown"
+
+# =========================================================
+# EXTRACT STATE
+# =========================================================
+def extract_state(text):
+
+    found = []
+
+    for s in US_STATES:
+
+        if s.lower() in text.lower():
+            found.append(s)
+
+    return ", ".join(found) if found else "Unknown"
+
+# =========================================================
+# EXTRACT MW
+# =========================================================
+def extract_mw(text):
+
+    match = MW_RE.search(text)
+
+    return match.group(0) if match else "N/A"
+
+# =========================================================
+# EXTRACT COST
+# =========================================================
+def extract_cost(text):
+
+    match = COST_RE.search(text)
+
+    return match.group(0) if match else "N/A"
+
+# =========================================================
+# PROJECT STAGE
+# =========================================================
+def classify_stage(text):
+
+    text = text.lower()
+
+    if "approved" in text:
+        return "Approved"
+
+    if "permit" in text:
+        return "Permitting"
+
+    if "construction" in text:
+        return "Construction"
+
+    if "groundbreaking" in text:
+        return "Groundbreaking"
+
+    if "expansion" in text:
+        return "Expansion"
+
+    if "planning" in text:
+        return "Planning"
+
+    if "investment" in text:
+        return "Investment"
+
+    return "General"
+
+# =========================================================
+# QUALITY SCORE
+# =========================================================
+def quality_score(text):
+
+    score = 0
+
+    if any(
+        x.lower() in text.lower()
+        for x in DC_TERMS
+    ):
+        score += 2
+
+    if any(
+        x.lower() in text.lower()
+        for x in PROJECT_TERMS
+    ):
+        score += 2
+
+    if extract_company(text) != "Unknown":
+        score += 2
+
+    if extract_state(text) != "Unknown":
+        score += 2
+
+    if extract_mw(text) != "N/A":
+        score += 1
+
+    if extract_cost(text) != "N/A":
+        score += 1
+
+    return score
+
+# =========================================================
+# SCRAPE ARTICLE PAGE
+# =========================================================
+def scrape_article_page(url):
+
+    soup = fetch_url(url)
+
+    if not soup:
+        return ""
+
+    return soup.get_text(
+        " ",
+        strip=True
+    )
+
+# =========================================================
+# PARSE ARTICLES
+# =========================================================
+def parse_articles(soup, source):
+
+    articles = []
+
+    links = soup.find_all(
+        "a",
+        href=True
+    )
+
+    seen = set()
+
+    for a in links:
+
+        href = a["href"]
+
+        title = a.get_text(
+            strip=True
+        )
+
+        if len(title) < 20:
+            continue
+
+        if href in seen:
+            continue
+
+        seen.add(href)
+
+        if href.startswith("/"):
+
+            if "datacenterdynamics" in source:
+
+                href = (
+                    "https://www.datacenterdynamics.com"
+                    + href
+                )
+
+        elif not href.startswith("http"):
+            continue
+
+        articles.append({
+            "title": title,
+            "url": href,
+            "source": source
+        })
+
+    return articles
+
+# =========================================================
+# MAIN SCRAPER
+# =========================================================
+def scrape_sources(
+
+    max_pages,
     selected_states,
-    start_date,
-    end_date
+    start_date
+
 ):
 
-    all_articles = []
+    final_data = []
 
     progress = st.progress(0)
 
-    total_feeds = len(RSS_FEEDS)
+    total_steps = (
+        len(SOURCES) * max_pages
+    )
 
-    current = 0
+    current_step = 0
 
-    for source, url in RSS_FEEDS.items():
+    for source, template in SOURCES.items():
 
-        current += 1
+        for page in range(1, max_pages + 1):
 
-        progress.progress(current / total_feeds)
+            current_step += 1
 
-        try:
+            progress.progress(
+                current_step / total_steps,
+                text=f"Scanning {source} page {page}"
+            )
 
-            feed = feedparser.parse(url)
+            url = template.format(page)
 
-            entries = feed.entries
+            soup = fetch_url(url)
 
-            for entry in entries:
+            if not soup:
+                continue
+
+            parsed_articles = parse_articles(
+                soup,
+                source
+            )
+
+            for article in parsed_articles:
 
                 try:
 
-                    title = entry.get(
-                        "title",
-                        ""
+                    article_text = scrape_article_page(
+                        article["url"]
                     )
 
-                    summary = entry.get(
-                        "summary",
-                        ""
+                    combined = (
+                        article["title"]
+                        + " "
+                        + article_text
                     )
 
-                    link = entry.get(
-                        "link",
-                        ""
-                    )
-
-                    combined_text = (
-                        f"{title} {summary}"
-                    )
-
-                    # FILTER ARTICLES
-                    if not is_relevant_article(
-                        combined_text,
-                        selected_states
+                    # FILTER DC TERMS
+                    if not any(
+                        x.lower() in combined.lower()
+                        for x in DC_TERMS
                     ):
                         continue
 
-                    # DATE
-                    article_date = parse_date(
-                        entry
+                    # FILTER PROJECT TERMS
+                    if not any(
+                        x.lower() in combined.lower()
+                        for x in PROJECT_TERMS
+                    ):
+                        continue
+
+                    # FILTER STATES
+                    detected_state = extract_state(
+                        combined
                     )
 
-                    if article_date:
+                    if selected_states:
 
-                        if article_date < start_date:
+                        if detected_state == "Unknown":
                             continue
 
-                        if article_date > end_date:
+                        if not any(
+                            s in detected_state
+                            for s in selected_states
+                        ):
                             continue
 
-                        formatted_date = (
-                            article_date.strftime(
-                                "%Y-%m-%d"
-                            )
-                        )
+                    # QUALITY SCORE
+                    score = quality_score(
+                        combined
+                    )
 
-                    else:
+                    if score < 5:
+                        continue
 
-                        formatted_date = ""
+                    # DATE
+                    published = datetime.now().strftime(
+                        "%Y-%m-%d"
+                    )
 
-                    all_articles.append({
+                    # DATA
+                    final_data.append({
 
-                        "Title": title,
+                        "Title":
+                        article["title"],
 
-                        "Link": link,
-
-                        "Source": source,
+                        "Source":
+                        source,
 
                         "Published Date":
-                            formatted_date
+                        published,
+
+                        "Company":
+                        extract_company(combined),
+
+                        "State":
+                        detected_state,
+
+                        "Project Stage":
+                        classify_stage(combined),
+
+                        "MW Capacity":
+                        extract_mw(combined),
+
+                        "Investment":
+                        extract_cost(combined),
+
+                        "URL":
+                        article["url"]
                     })
 
                 except:
                     continue
 
-        except:
-            continue
+            time.sleep(1)
 
     progress.empty()
 
-    return pd.DataFrame(all_articles)
+    return pd.DataFrame(final_data)
 
-# ==========================================================
-# CLEAN DATAFRAME
-# ==========================================================
-def clean_dataframe(df):
+# =========================================================
+# EXCEL EXPORT
+# =========================================================
+def build_excel(df):
 
-    if df.empty:
-        return df
+    wb = Workbook()
 
-    # REMOVE DUPLICATES
-    df.drop_duplicates(
-        subset="Title",
-        inplace=True
+    ws = wb.active
+
+    ws.title = "US Data Center Intelligence"
+
+    headers = list(df.columns)
+
+    fill = PatternFill(
+        "solid",
+        fgColor="1F4E79"
     )
 
-    # REMOVE EMPTY TITLES
-    df = df[
-        df["Title"].notna()
-    ]
+    font = Font(
+        bold=True,
+        color="FFFFFF"
+    )
 
-    # SORT BY DATE
-    try:
+    border = Border(
 
-        df["Published Date"] = pd.to_datetime(
-            df["Published Date"],
-            errors="coerce"
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin")
+    )
+
+    for col_num, header in enumerate(headers, 1):
+
+        cell = ws.cell(
+            row=1,
+            column=col_num,
+            value=header
         )
 
-        df = df.sort_values(
-            by="Published Date",
-            ascending=False
+        cell.fill = fill
+        cell.font = font
+        cell.border = border
+        cell.alignment = Alignment(
+            horizontal="center"
         )
 
-        df["Published Date"] = df[
-            "Published Date"
-        ].dt.strftime("%Y-%m-%d")
+    for row in df.itertuples(index=False):
 
-    except:
-        pass
+        ws.append(row)
 
-    return df
+    for col in ws.columns:
 
-# ==========================================================
-# EXPORT TO EXCEL
-# ==========================================================
-def to_excel(df):
+        max_length = 0
 
-    output = BytesIO()
+        column = col[0].column_letter
 
-    # REMOVE TIMEZONE ISSUES
-    for col in df.columns:
+        for cell in col:
 
-        if pd.api.types.is_datetime64_any_dtype(
-            df[col]
-        ):
+            try:
 
-            df[col] = df[col].dt.tz_localize(
-                None
-            )
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
 
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
+            except:
+                pass
 
-        df.to_excel(
-            writer,
-            index=False
-        )
+        adjusted = min(max_length + 5, 60)
 
-    return output.getvalue()
+        ws.column_dimensions[column].width = adjusted
 
-# ==========================================================
-# UI
-# ==========================================================
+    excel_file = io.BytesIO()
+
+    wb.save(excel_file)
+
+    excel_file.seek(0)
+
+    return excel_file
+
+# =========================================================
+# MAIN UI
+# =========================================================
 def main():
 
     st.title(
-        "🏗️ US Data Center Development Tracker"
+        "🏗️ US Data Center Intelligence Tracker"
     )
 
     st.markdown("""
-    ### Tracks:
-    - Data center construction
-    - Hyperscale developments
-    - AI infrastructure campuses
-    - Planning approvals
-    - Groundbreaking projects
-    - Utility infrastructure
-    - Land acquisitions
-    - Expansion announcements
-    """)
+Tracks:
+- Data center construction
+- AI infrastructure campuses
+- Land acquisitions
+- Planning approvals
+- Utility infrastructure
+- Hyperscale expansion
+- Investment announcements
+""")
 
-    # ======================================================
+    # =====================================================
     # SIDEBAR
-    # ======================================================
+    # =====================================================
     st.sidebar.header("Filters")
 
-    # TIME FILTER
-    time_filter = st.sidebar.radio(
+    time_option = st.sidebar.radio(
 
         "Select Time Range",
 
         [
-            "Latest",
             "Past 10 Days",
             "Past 30 Days",
-            "Custom Date"
+            "Latest"
         ]
     )
 
-    today = datetime.now()
+    if time_option == "Past 10 Days":
 
-    if time_filter == "Latest":
+        start_date = (
+            datetime.now()
+            - timedelta(days=10)
+        )
 
-        start_date = today - timedelta(days=1)
-        end_date = today
+    elif time_option == "Past 30 Days":
 
-    elif time_filter == "Past 10 Days":
-
-        start_date = today - timedelta(days=10)
-        end_date = today
-
-    elif time_filter == "Past 30 Days":
-
-        start_date = today - timedelta(days=30)
-        end_date = today
+        start_date = (
+            datetime.now()
+            - timedelta(days=30)
+        )
 
     else:
 
-        custom_start = st.sidebar.date_input(
-            "Start Date",
-            today - timedelta(days=30)
+        start_date = (
+            datetime.now()
+            - timedelta(days=3)
         )
 
-        custom_end = st.sidebar.date_input(
-            "End Date",
-            today
-        )
-
-        start_date = datetime.combine(
-            custom_start,
-            datetime.min.time()
-        )
-
-        end_date = datetime.combine(
-            custom_end,
-            datetime.max.time()
-        )
-
-    # ======================================================
-    # STATE FILTER
-    # ======================================================
     selected_states = st.sidebar.multiselect(
 
-        "Select USA States",
+        "Select States",
 
-        options=US_STATES,
-
-        default=[]
+        US_STATES
     )
 
-    # ======================================================
-    # FETCH BUTTON
-    # ======================================================
+    max_pages = st.sidebar.slider(
+
+        "Pages Per Source",
+
+        1,
+        20,
+        5
+    )
+
+    # =====================================================
+    # SCRAPE BUTTON
+    # =====================================================
     if st.button(
-        "🚀 Fetch Development Articles"
+        "🚀 Run Intelligence Scan"
     ):
 
         with st.spinner(
-            "Collecting US Data Center Development News..."
+            "Scanning infrastructure developments..."
         ):
 
-            df = fetch_rss_articles(
+            df = scrape_sources(
+
+                max_pages=
+                    max_pages,
 
                 selected_states=
                     selected_states,
 
                 start_date=
-                    start_date,
-
-                end_date=
-                    end_date
+                    start_date
             )
 
-            df = clean_dataframe(df)
-
-            # ==================================================
-            # OUTPUT
-            # ==================================================
-            if not df.empty:
-
-                st.success(
-                    f"{len(df)} Articles Found"
-                )
-
-                st.dataframe(
-                    df,
-                    use_container_width=True
-                )
-
-                # DOWNLOAD
-                excel = to_excel(df)
-
-                st.download_button(
-
-                    "📥 Download Excel",
-
-                    excel,
-
-                    "us_data_center_developments.xlsx"
-                )
-
-            else:
+            if df.empty:
 
                 st.warning(
-                    "No matching development articles found"
+                    "No matching articles found"
                 )
 
-# ==========================================================
-# MAIN
-# ==========================================================
+                return
+
+            # DEDUP
+            df.drop_duplicates(
+
+                subset="Title",
+
+                inplace=True
+            )
+
+            # SORT
+            df = df.sort_values(
+
+                "Published Date",
+
+                ascending=False
+            )
+
+            # =================================================
+            # METRICS
+            # =================================================
+            c1, c2, c3, c4 = st.columns(4)
+
+            c1.metric(
+                "Articles",
+                len(df)
+            )
+
+            c2.metric(
+                "Companies",
+                df["Company"].nunique()
+            )
+
+            c3.metric(
+                "States",
+                df["State"].nunique()
+            )
+
+            c4.metric(
+                "Sources",
+                df["Source"].nunique()
+            )
+
+            # =================================================
+            # CHARTS
+            # =================================================
+            st.subheader(
+                "📊 Intelligence Analytics"
+            )
+
+            state_chart = px.histogram(
+
+                df,
+
+                x="State",
+
+                title="Projects by State"
+            )
+
+            st.plotly_chart(
+                state_chart,
+                use_container_width=True
+            )
+
+            stage_chart = px.histogram(
+
+                df,
+
+                x="Project Stage",
+
+                title="Projects by Stage"
+            )
+
+            st.plotly_chart(
+                stage_chart,
+                use_container_width=True
+            )
+
+            # =================================================
+            # TABLE
+            # =================================================
+            st.subheader(
+                "📄 Intelligence Results"
+            )
+
+            st.dataframe(
+
+                df,
+
+                use_container_width=True,
+
+                height=700
+            )
+
+            # =================================================
+            # EXCEL DOWNLOAD
+            # =================================================
+            excel = build_excel(df)
+
+            st.download_button(
+
+                "📥 Download Intelligence Report",
+
+                data=excel,
+
+                file_name=(
+                    "us_data_center_intelligence.xlsx"
+                ),
+
+                mime=(
+                    "application/vnd.openxmlformats-"
+                    "officedocument.spreadsheetml.sheet"
+                )
+            )
+
+# =========================================================
+# RUN
+# =========================================================
 if __name__ == "__main__":
     main()
