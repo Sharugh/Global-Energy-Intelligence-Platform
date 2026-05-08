@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import re
 from datetime import datetime, timedelta
 from io import BytesIO
 from bs4 import BeautifulSoup
@@ -13,206 +12,158 @@ NEWSAPI_KEY = "3087034a13564f75bfc769c0046e729c"
 NEWSAPI_URL = "https://newsapi.org/v2/everything"
 
 # ==========================================================
-# STRONG DATA CENTER KEYWORDS
+# MULTIPLE QUERIES
 # ==========================================================
-KEYWORDS = [
-    "data center",
-    "data centre",
-    "hyperscale",
-    "colocation",
-    "AI infrastructure",
-    "AI data center",
-    "data center campus",
-    "server farm",
-    "cloud campus",
-    "digital infrastructure",
-    "GPU cluster",
-    "AI cluster",
-    "compute campus",
-    "cloud infrastructure",
-    "edge data center",
-    "data center construction",
-    "data center investment",
-    "data center expansion",
-    "data center development",
-    "substation",
-    "power infrastructure",
-    "switchyard",
-    "gigawatt campus",
-    "utility infrastructure",
-    "server infrastructure",
-    "rack density",
-    "liquid cooling",
-    "high-density compute",
-    "AI compute",
-    "hyperscale campus",
-    "mega campus",
-    "compute facility"
+SEARCH_QUERIES = [
+
+    '"data center" USA',
+    '"hyperscale" USA',
+    '"colocation" USA',
+    '"AI infrastructure" USA',
+    '"data center campus" USA',
+    '"server farm" USA',
+    '"cloud campus" USA',
+    '"digital infrastructure" USA',
+    '"compute campus" USA',
+    '"AI data center" USA',
+    '"GPU cluster" USA',
+    '"data center expansion" USA',
+    '"data center development" USA',
+    '"data center construction" USA',
+    '"data center investment" USA',
+    '"cloud infrastructure" USA'
 ]
 
 # ==========================================================
-# US MARKET TERMS
+# TRUSTED SOURCES
 # ==========================================================
-US_TERMS = [
-    "USA",
-    "United States",
-    "Texas",
-    "Virginia",
-    "California",
-    "Arizona",
-    "Ohio",
-    "Georgia",
-    "Illinois",
-    "Nevada",
-    "Oregon",
-    "Washington",
-    "Utah",
-    "North Carolina",
-    "New York"
-]
+SCRAPE_SOURCES = {
+    "DataCenterDynamics":
+        "https://www.datacenterdynamics.com/en/news/",
 
-# ==========================================================
-# TRUSTED DATA CENTER SOURCES
-# ==========================================================
-TRUSTED_SOURCES = {
-    "DataCenterDynamics": "https://www.datacenterdynamics.com/en/news/",
-    "DataCenterKnowledge": "https://www.datacenterknowledge.com/",
-    "DataCentreMagazine": "https://datacentremagazine.com/",
-    "CapacityMedia": "https://www.capacitymedia.com/",
-    "DCD": "https://www.datacenterdynamics.com/",
-    "BizJournal": "https://www.bizjournals.com/",
-    "Reuters": "https://www.reuters.com/",
-    "Bloomberg": "https://www.bloomberg.com/",
-    "CRN": "https://www.crn.com/",
-    "TechTarget": "https://www.techtarget.com/searchdatacenter/",
-    "TheRegister": "https://www.theregister.com/data_centre/",
-    "NetworkWorld": "https://www.networkworld.com/",
-    "DataCenterFrontier": "https://datacenterfrontier.com/"
+    "DataCenterKnowledge":
+        "https://www.datacenterknowledge.com/",
+
+    "DataCentreMagazine":
+        "https://datacentremagazine.com/",
+
+    "DataCenterFrontier":
+        "https://datacenterfrontier.com/",
+
+    "CapacityMedia":
+        "https://www.capacitymedia.com/",
+
+    "TechTarget":
+        "https://www.techtarget.com/searchdatacenter/",
+
+    "TheRegister":
+        "https://www.theregister.com/data_centre/",
+
+    "CRN":
+        "https://www.crn.com/news/data-center",
+
+    "NetworkWorld":
+        "https://www.networkworld.com/",
+
+    "BizJournal":
+        "https://www.bizjournals.com/"
 }
 
 # ==========================================================
-# STRICT US DATA CENTER FILTER
+# DATA CENTER FILTER
 # ==========================================================
-def is_us_data_center_article(text):
+def is_data_center_article(text):
 
     text = str(text).lower()
 
-    # MUST CONTAIN DATA CENTER TERMS
-    if not any(k.lower() in text for k in KEYWORDS):
-        return False
-
-    # MUST CONTAIN US TERMS
-    if not any(u.lower() in text for u in US_TERMS):
-        return False
-
-    # REMOVE NOISE
-    blacklist = [
-        "sports",
-        "movie",
-        "celebrity",
-        "football",
-        "basketball",
-        "music",
-        "war",
-        "politics",
-        "election",
-        "hollywood",
-        "netflix",
-        "streaming show",
-        "actor"
+    keywords = [
+        "data center",
+        "data centre",
+        "hyperscale",
+        "colocation",
+        "server farm",
+        "campus",
+        "cloud infrastructure",
+        "compute",
+        "gpu cluster",
+        "ai infrastructure"
     ]
 
-    if any(b in text for b in blacklist):
-        return False
-
-    return True
+    return any(k in text for k in keywords)
 
 # ==========================================================
-# GENERATE QUERY
+# NEWSAPI FETCH
 # ==========================================================
-def build_query():
+def fetch_newsapi(start_date, end_date):
 
-    keyword_query = " OR ".join(
-        [f'"{k}"' for k in KEYWORDS]
-    )
+    all_articles = []
 
-    us_query = " OR ".join(
-        [f'"{u}"' for u in US_TERMS]
-    )
+    for query in SEARCH_QUERIES:
 
-    final_query = f"({keyword_query}) AND ({us_query})"
+        for page in range(1, 6):
 
-    return final_query
-
-# ==========================================================
-# NEWS API FETCH
-# ==========================================================
-def fetch_newsapi_articles(start_date, end_date):
-
-    query = build_query()
-
-    params = {
-        "q": query,
-        "from": start_date,
-        "to": end_date,
-        "language": "en",
-        "sortBy": "publishedAt",
-        "pageSize": 200,
-        "searchIn": "title,description",
-        "apiKey": NEWSAPI_KEY
-    }
-
-    try:
-
-        res = requests.get(
-            NEWSAPI_URL,
-            params=params,
-            timeout=20
-        )
-
-        if res.status_code != 200:
-            return pd.DataFrame()
-
-        data = res.json()
-
-        articles = data.get("articles", [])
-
-        rows = []
-
-        for a in articles:
-
-            title = a.get("title", "")
-            desc = a.get("description", "")
-
-            combined_text = f"{title} {desc}"
-
-            if not is_us_data_center_article(combined_text):
-                continue
-
-            date_value = a.get("publishedAt")
+            params = {
+                "q": query,
+                "from": start_date,
+                "to": end_date,
+                "language": "en",
+                "sortBy": "publishedAt",
+                "pageSize": 100,
+                "page": page,
+                "searchIn": "title",
+                "apiKey": NEWSAPI_KEY
+            }
 
             try:
-                date_value = pd.to_datetime(
-                    date_value
-                ).strftime("%Y-%m-%d")
+
+                res = requests.get(
+                    NEWSAPI_URL,
+                    params=params,
+                    timeout=20
+                )
+
+                if res.status_code != 200:
+                    continue
+
+                data = res.json()
+
+                articles = data.get("articles", [])
+
+                if not articles:
+                    break
+
+                for a in articles:
+
+                    title = a.get("title", "")
+
+                    if not is_data_center_article(title):
+                        continue
+
+                    date_value = a.get("publishedAt")
+
+                    try:
+                        date_value = pd.to_datetime(
+                            date_value
+                        ).strftime("%Y-%m-%d")
+                    except:
+                        pass
+
+                    all_articles.append({
+                        "Title": title,
+                        "Link": a.get("url"),
+                        "Source": a.get(
+                            "source", {}
+                        ).get("name"),
+                        "Published Date": date_value
+                    })
+
             except:
-                pass
+                continue
 
-            rows.append({
-                "Title": title,
-                "Link": a.get("url"),
-                "Description": desc,
-                "Source": a.get("source", {}).get("name"),
-                "Published Date": date_value
-            })
-
-        return pd.DataFrame(rows)
-
-    except:
-        return pd.DataFrame()
+    return pd.DataFrame(all_articles)
 
 # ==========================================================
-# GENERIC SCRAPER
+# SCRAPER
 # ==========================================================
 def scrape_website(source_name, url):
 
@@ -248,12 +199,10 @@ def scrape_website(source_name, url):
             if not href:
                 continue
 
-            if len(title) < 25:
+            if len(title) < 20:
                 continue
 
-            text = title.lower()
-
-            if not is_us_data_center_article(text):
+            if not is_data_center_article(title):
                 continue
 
             if href in seen:
@@ -262,15 +211,18 @@ def scrape_website(source_name, url):
             seen.add(href)
 
             if href.startswith("/"):
-                base = "/".join(url.split("/")[:3])
+                base = "/".join(
+                    url.split("/")[:3]
+                )
+
                 href = base + href
 
             articles.append({
                 "Title": title,
                 "Link": href,
-                "Description": f"US data center news from {source_name}",
                 "Source": source_name,
-                "Published Date": datetime.now().strftime("%Y-%m-%d")
+                "Published Date":
+                    datetime.now().strftime("%Y-%m-%d")
             })
 
         return pd.DataFrame(articles)
@@ -279,13 +231,13 @@ def scrape_website(source_name, url):
         return pd.DataFrame()
 
 # ==========================================================
-# SCRAPE ALL SOURCES
+# SCRAPE ALL
 # ==========================================================
 def scrape_all_sources():
 
-    all_dfs = []
+    dfs = []
 
-    for source_name, url in TRUSTED_SOURCES.items():
+    for source_name, url in SCRAPE_SOURCES.items():
 
         df = scrape_website(
             source_name,
@@ -293,60 +245,51 @@ def scrape_all_sources():
         )
 
         if not df.empty:
-            all_dfs.append(df)
+            dfs.append(df)
 
-    if all_dfs:
+    if dfs:
         return pd.concat(
-            all_dfs,
+            dfs,
             ignore_index=True
         )
 
     return pd.DataFrame()
 
 # ==========================================================
-# FINAL CLEANING
+# CLEAN
 # ==========================================================
 def clean_dataframe(df):
 
     if df.empty:
         return df
 
-    # REMOVE DUPLICATES
     df.drop_duplicates(
         subset="Title",
         inplace=True
     )
 
-    # REMOVE EMPTY TITLES
-    df = df[
-        df["Title"].notna()
-    ]
-
-    # REMOVE SHORT TITLES
     df = df[
         df["Title"].str.len() > 20
     ]
 
-    # SORT
-    if "Published Date" in df.columns:
+    try:
 
-        try:
-            df["Published Date"] = pd.to_datetime(
-                df["Published Date"],
-                errors="coerce"
-            )
+        df["Published Date"] = pd.to_datetime(
+            df["Published Date"],
+            errors="coerce"
+        )
 
-            df = df.sort_values(
-                by="Published Date",
-                ascending=False
-            )
+        df = df.sort_values(
+            by="Published Date",
+            ascending=False
+        )
 
-            df["Published Date"] = df[
-                "Published Date"
-            ].dt.strftime("%Y-%m-%d")
+        df["Published Date"] = df[
+            "Published Date"
+        ].dt.strftime("%Y-%m-%d")
 
-        except:
-            pass
+    except:
+        pass
 
     return df
 
@@ -375,7 +318,8 @@ def to_excel(df):
 def main():
 
     st.set_page_config(
-        page_title="US Data Center Intelligence Tracker",
+        page_title=
+            "US Data Center Intelligence",
         layout="wide"
     )
 
@@ -384,18 +328,14 @@ def main():
     )
 
     st.markdown("""
-    ### Track:
-    - Hyperscale campuses
+    Track:
+    - Hyperscale developments
     - AI infrastructure
-    - Data center developments
-    - Colocation projects
-    - Utility + power infrastructure
-    - US compute campus expansions
+    - Data center campuses
+    - Colocation expansions
+    - Compute infrastructure
     """)
 
-    # ======================================================
-    # SIDEBAR
-    # ======================================================
     st.sidebar.header("Filters")
 
     time_filter = st.sidebar.radio(
@@ -407,9 +347,6 @@ def main():
         ]
     )
 
-    # ======================================================
-    # DATE LOGIC
-    # ======================================================
     end_date = datetime.today()
 
     if time_filter == "Latest":
@@ -421,17 +358,16 @@ def main():
     else:
         start_date = end_date - timedelta(days=30)
 
-    # ======================================================
-    # FETCH
-    # ======================================================
-    if st.button("🚀 Fetch Maximum US Data Center News"):
+    if st.button(
+        "🚀 Fetch Maximum Articles"
+    ):
 
         with st.spinner(
-            "Collecting US Data Center Intelligence..."
+            "Collecting Data Center Intelligence..."
         ):
 
-            # NEWS API
-            df_api = fetch_newsapi_articles(
+            # NEWSAPI
+            df_news = fetch_newsapi(
                 start_date.strftime("%Y-%m-%d"),
                 end_date.strftime("%Y-%m-%d")
             )
@@ -441,7 +377,7 @@ def main():
 
             # COMBINE
             final_df = pd.concat(
-                [df_api, df_scraped],
+                [df_news, df_scraped],
                 ignore_index=True
             )
 
@@ -450,13 +386,10 @@ def main():
                 final_df
             )
 
-            # ==================================================
-            # OUTPUT
-            # ==================================================
             if not final_df.empty:
 
                 st.success(
-                    f"{len(final_df)} US Data Center Articles Found"
+                    f"{len(final_df)} Articles Found"
                 )
 
                 st.dataframe(
@@ -464,19 +397,20 @@ def main():
                     use_container_width=True
                 )
 
-                # DOWNLOAD
-                excel = to_excel(final_df)
+                excel = to_excel(
+                    final_df
+                )
 
                 st.download_button(
                     "📥 Download Excel",
                     excel,
-                    "us_data_center_intelligence.xlsx"
+                    "us_data_center_articles.xlsx"
                 )
 
             else:
 
                 st.warning(
-                    "No US data center articles found"
+                    "No articles found"
                 )
 
 # ==========================================================
