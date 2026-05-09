@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ── optional cloudscraper ──────────────────────────────────────────────────
+
 try:
     import cloudscraper
     _SCRAPER = cloudscraper.create_scraper()
@@ -22,7 +22,7 @@ except ImportError:
 
 from bs4 import BeautifulSoup
 
-# ─── CSS / Theme injection ─────────────────────────────────────────────────
+
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap');
@@ -334,7 +334,7 @@ hr { border-color: #1a2b48 !important; }
 </style>
 """
 
-# ─── US geography ──────────────────────────────────────────────────────────
+
 US_STATES_FULL = [
     "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
     "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
@@ -369,10 +369,10 @@ _parts += [r"\b" + a + r"\b" for a in _ABBREVS]
 _parts += [r"\bU\.S\.\b", r"\bUS\b"]
 US_RE = re.compile("|".join(_parts), re.IGNORECASE)
 
-# map state → abbreviation for tagging
+
 STATE_TO_ABBR = {s: _ABBREVS[i] for i, s in enumerate(US_STATES_FULL)}
 
-# Keywords for topic tagging
+
 TOPIC_KEYWORDS = {
     "Hyperscale": ["hyperscale","microsoft","google","amazon","aws","meta","apple","oracle"],
     "Colocation": ["colo","colocation","equinix","digital realty","ironmountain","coresite"],
@@ -400,7 +400,7 @@ _HEADERS = {
 }
 
 
-# ─── Scraping (unchanged) ──────────────────────────────────────────────────
+
 def parse_date(raw: str):
     raw = raw.strip()
     try:
@@ -505,7 +505,7 @@ def is_us(text: str) -> bool:
     return bool(US_RE.search(text))
 
 
-# ─── Enrichment ───────────────────────────────────────────────────────────
+
 def detect_state(headline: str) -> str:
     for state in US_STATES_FULL:
         if re.search(r"\b" + re.escape(state) + r"\b", headline, re.I):
@@ -541,7 +541,7 @@ def enrich(articles: list) -> list:
     return articles
 
 
-# ─── Excel export ──────────────────────────────────────────────────────────
+
 def build_excel(df: pd.DataFrame) -> bytes:
     wb = Workbook()
 
@@ -591,7 +591,7 @@ def build_excel(df: pd.DataFrame) -> bytes:
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = f"A1:G{len(df)+1}"
 
-    # ── Sheet 2: State Summary ──
+    
     ws2 = wb.create_sheet("State Breakdown")
     state_counts = df["State"].value_counts().reset_index()
     state_counts.columns = ["State", "Article Count"]
@@ -610,7 +610,7 @@ def build_excel(df: pd.DataFrame) -> bytes:
             c.border = brd
             c.alignment = Alignment(horizontal="center" if ci == 2 else "left", vertical="center")
 
-    # ── Sheet 3: Topic Summary ──
+    
     ws3 = wb.create_sheet("Topic Breakdown")
     topic_counts = df["Topic"].value_counts().reset_index()
     topic_counts.columns = ["Topic", "Article Count"]
@@ -635,7 +635,7 @@ def build_excel(df: pd.DataFrame) -> bytes:
     return buf.read()
 
 
-# ─── Render helpers ────────────────────────────────────────────────────────
+
 def kpi_card(label: str, value, color: str = "blue", delta: str = ""):
     delta_html = f'<div class="kpi-delta">{delta}</div>' if delta else ""
     return f"""
@@ -751,7 +751,7 @@ def dark_table(df_in: pd.DataFrame, max_rows: int = 200) -> str:
 
 
 
-# ─── Main App ──────────────────────────────────────────────────────────────
+
 def main():
     st.set_page_config(
         page_title="DCD Intel | US Data Center Construction",
@@ -761,7 +761,7 @@ def main():
     )
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-    # ── Sidebar ────────────────────────────────────────────────────────────
+    
     with st.sidebar:
         st.markdown("""
         <div style="padding:1rem 0 0.5rem;text-align:center;">
@@ -800,7 +800,7 @@ def main():
         st.divider()
         go = st.button("🔍  Run Intelligence Scan", use_container_width=True, type="primary")
 
-    # ── Banner ─────────────────────────────────────────────────────────────
+    
     now_str = datetime.now().strftime("%A, %d %B %Y  ·  %H:%M UTC")
     st.markdown(f"""
     <div class="dcd-banner">
@@ -811,7 +811,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Welcome state ──────────────────────────────────────────────────────
+    
     if "df_full" not in st.session_state:
         st.session_state.df_full = None
 
@@ -860,7 +860,7 @@ def main():
         """, unsafe_allow_html=True)
         return
 
-    # ── Scrape ─────────────────────────────────────────────────────────────
+    
     if go:
         st.session_state.filters = {"topics": [], "states": [], "keyword": ""}
         cutoff = datetime.min if sel_days is None else datetime.now() - timedelta(days=sel_days)
@@ -885,13 +885,12 @@ def main():
         st.session_state.scan_time = datetime.now().strftime("%H:%M, %d %b %Y")
         st.rerun()
 
-    # ── Dashboard ──────────────────────────────────────────────────────────
+    
     df_full = st.session_state.df_full
     if df_full is None or df_full.empty:
         st.warning("No US articles found. Try increasing page count or disabling NA pre-filter.")
         return
 
-    # Apply sidebar filters
     filters = st.session_state.get("filters", {})
     df = df_full.copy()
     if filters.get("topics"):
@@ -903,7 +902,6 @@ def main():
         df = df[df["Headline"].str.lower().str.contains(kw, na=False)]
     df = df.reset_index(drop=True)
 
-    # ── KPIs ──
     states_covered = df["State"].nunique()
     capacity_arts  = df[df["Capacity"] != ""]["Capacity"].count()
     scan_ts        = st.session_state.get("scan_time", "—")
@@ -918,7 +916,6 @@ def main():
     </div>"""
     st.markdown(kpi_html, unsafe_allow_html=True)
 
-    # ── Insight pills ──
     top_state  = df["State"].value_counts().idxmax() if not df.empty else "—"
     top_topic  = df["Topic"].value_counts().idxmax() if not df.empty else "—"
     latest_dt  = df["Date"].max() if not df.empty else "—"
@@ -932,10 +929,8 @@ def main():
     </div>"""
     st.markdown(pills, unsafe_allow_html=True)
 
-    # ── Tabs ───────────────────────────────────────────────────────────────
     tab1, tab2, tab3, tab4 = st.tabs(["📰 Articles", "📊 Analytics", "🗺️ State View", "⬇️ Export"])
 
-    # ── Tab 1: Articles ──
     with tab1:
         st.markdown('<div class="section-header">Latest US Construction Articles</div>', unsafe_allow_html=True)
         if df.empty:
@@ -951,7 +946,6 @@ def main():
                     unsafe_allow_html=True,
                 )
 
-    # ── Tab 2: Analytics ──
     with tab2:
         import plotly.graph_objects as go
         import plotly.express as px
@@ -988,7 +982,6 @@ def main():
             "General":     "#3a5280",
         }
 
-        # ── 1. Topic breakdown horizontal bar ──
         st.markdown('<div class="section-header">Articles by Topic</div>', unsafe_allow_html=True)
         topic_counts = df["Topic"].value_counts().reset_index()
         topic_counts.columns = ["Topic", "Count"]
@@ -1010,13 +1003,11 @@ def main():
         fig_topic.update_layout(xaxis_title="", yaxis_title="")
         st.plotly_chart(fig_topic, use_container_width=True, config={"displayModeBar": False})
 
-        # ── 2. Top states bar chart ──
         st.markdown('<div class="section-header">Top 15 States by Article Volume</div>', unsafe_allow_html=True)
         state_counts = df["State"].value_counts().head(15).reset_index()
         state_counts.columns = ["State", "Count"]
         state_counts = state_counts.sort_values("Count")
 
-        # gradient blue → cyan by rank
         n = len(state_counts)
         bar_colors = [f"rgba({int(0 + (0-0)*i/max(n-1,1))}, {int(87 + (198-87)*i/max(n-1,1))}, {int(255 + (255-255)*i/max(n-1,1))}, 0.85)" for i in range(n)]
 
@@ -1033,7 +1024,6 @@ def main():
         _dark_layout(fig_state, height=420)
         st.plotly_chart(fig_state, use_container_width=True, config={"displayModeBar": False})
 
-        # ── 3. Articles over time ──
         st.markdown('<div class="section-header">Publication Volume Over Time</div>', unsafe_allow_html=True)
         df_time = df[df["Date"] != "Unknown"].copy()
         if not df_time.empty:
@@ -1054,7 +1044,6 @@ def main():
             fig_time.update_layout(xaxis_title="", yaxis_title="Articles")
             st.plotly_chart(fig_time, use_container_width=True, config={"displayModeBar": False})
 
-        # ── 4. Topic share donut ──
         st.markdown('<div class="section-header">Topic Share</div>', unsafe_allow_html=True)
         topic_pie = df["Topic"].value_counts().reset_index()
         topic_pie.columns = ["Topic", "Count"]
@@ -1091,7 +1080,6 @@ def main():
         )
         st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
 
-        # ── 5. Capacity table ──
         st.markdown('<div class="section-header">⚡ Capacity Mentions</div>', unsafe_allow_html=True)
         cap_df = df[df["Capacity"] != ""][["Headline", "Capacity", "Date", "State", "Topic"]].head(20)
         if not cap_df.empty:
@@ -1099,7 +1087,6 @@ def main():
         else:
             st.info("No capacity mentions found in current filter.")
 
-    # ── Tab 3: State View ──
     with tab3:
         st.markdown('<div class="section-header">State Breakdown</div>', unsafe_allow_html=True)
         state_df = df["State"].value_counts().reset_index()
@@ -1124,7 +1111,6 @@ def main():
                     unsafe_allow_html=True
                 )
 
-    # ── Tab 4: Export ──
     with tab4:
         st.markdown('<div class="section-header">Export Data</div>', unsafe_allow_html=True)
 
