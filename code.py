@@ -851,44 +851,164 @@ def main():
         if df.empty:
             st.info("No articles match your current filters.")
         else:
-            cards_html = '<div class="card-grid">'
+            # Render each card individually — avoids Streamlit truncating large HTML blobs
             for _, row in df.iterrows():
-                cards_html += article_card_html(
-                    row["Headline"], row["Date"], row["URL"],
-                    row["Topic"], row.get("Capacity","")
+                st.markdown(
+                    article_card_html(
+                        row["Headline"], row["Date"], row["URL"],
+                        row["Topic"], row.get("Capacity", "")
+                    ),
+                    unsafe_allow_html=True,
                 )
-            cards_html += "</div>"
-            st.markdown(cards_html, unsafe_allow_html=True)
 
     # ── Tab 2: Analytics ──
     with tab2:
-        st.markdown('<div class="section-header">Topic Distribution</div>', unsafe_allow_html=True)
-        col_a, col_b = st.columns(2)
+        import plotly.graph_objects as go
+        import plotly.express as px
 
-        with col_a:
-            topic_counts = df["Topic"].value_counts().reset_index()
-            topic_counts.columns = ["Topic", "Count"]
-            st.bar_chart(topic_counts.set_index("Topic"), color="#0057ff", height=280)
+        _DARK_BG    = "#080c14"
+        _PAPER_BG   = "#0d1628"
+        _GRID_COL   = "#1a2b48"
+        _TEXT_COL   = "#7a90b8"
+        _TITLE_COL  = "#c8d4e8"
+        _FONT       = "Inter, sans-serif"
 
-        with col_b:
-            state_counts = df["State"].value_counts().head(10).reset_index()
-            state_counts.columns = ["State", "Count"]
-            st.markdown('<div class="section-header" style="margin-top:0">Top 10 States</div>', unsafe_allow_html=True)
-            st.bar_chart(state_counts.set_index("State"), color="#00c6ff", height=280)
+        def _dark_layout(fig, title="", height=320):
+            fig.update_layout(
+                title=dict(text=title, font=dict(family=_FONT, size=13, color=_TITLE_COL), x=0.01),
+                paper_bgcolor=_PAPER_BG,
+                plot_bgcolor=_DARK_BG,
+                font=dict(family=_FONT, color=_TEXT_COL),
+                height=height,
+                margin=dict(l=16, r=16, t=40, b=16),
+                xaxis=dict(gridcolor=_GRID_COL, linecolor=_GRID_COL, tickfont=dict(size=11)),
+                yaxis=dict(gridcolor=_GRID_COL, linecolor=_GRID_COL, tickfont=dict(size=11)),
+                showlegend=False,
+            )
+            return fig
 
-        st.markdown('<div class="section-header">Articles Over Time</div>', unsafe_allow_html=True)
+        TOPIC_PALETTE = {
+            "Hyperscale":  "#0057ff",
+            "Colocation":  "#00c6ff",
+            "AI / GPU":    "#ff3b6b",
+            "Power":       "#ffab00",
+            "Investment":  "#a855f7",
+            "Permits":     "#ff6d00",
+            "Construction":"#00ffe7",
+            "General":     "#3a5280",
+        }
+
+        # ── 1. Topic breakdown horizontal bar ──
+        st.markdown('<div class="section-header">Articles by Topic</div>', unsafe_allow_html=True)
+        topic_counts = df["Topic"].value_counts().reset_index()
+        topic_counts.columns = ["Topic", "Count"]
+        topic_counts = topic_counts.sort_values("Count")
+        fig_topic = go.Figure(go.Bar(
+            x=topic_counts["Count"],
+            y=topic_counts["Topic"],
+            orientation="h",
+            marker=dict(
+                color=[TOPIC_PALETTE.get(t, "#3a5280") for t in topic_counts["Topic"]],
+                line=dict(width=0),
+            ),
+            text=topic_counts["Count"],
+            textposition="outside",
+            textfont=dict(color=_TITLE_COL, size=12),
+            hovertemplate="<b>%{y}</b><br>Articles: %{x}<extra></extra>",
+        ))
+        _dark_layout(fig_topic, height=300)
+        fig_topic.update_layout(xaxis_title="", yaxis_title="")
+        st.plotly_chart(fig_topic, use_container_width=True, config={"displayModeBar": False})
+
+        # ── 2. Top states bar chart ──
+        st.markdown('<div class="section-header">Top 15 States by Article Volume</div>', unsafe_allow_html=True)
+        state_counts = df["State"].value_counts().head(15).reset_index()
+        state_counts.columns = ["State", "Count"]
+        state_counts = state_counts.sort_values("Count")
+
+        # gradient blue → cyan by rank
+        n = len(state_counts)
+        bar_colors = [f"rgba({int(0 + (0-0)*i/max(n-1,1))}, {int(87 + (198-87)*i/max(n-1,1))}, {int(255 + (255-255)*i/max(n-1,1))}, 0.85)" for i in range(n)]
+
+        fig_state = go.Figure(go.Bar(
+            x=state_counts["Count"],
+            y=state_counts["State"],
+            orientation="h",
+            marker=dict(color=bar_colors, line=dict(width=0)),
+            text=state_counts["Count"],
+            textposition="outside",
+            textfont=dict(color=_TITLE_COL, size=11),
+            hovertemplate="<b>%{y}</b><br>Articles: %{x}<extra></extra>",
+        ))
+        _dark_layout(fig_state, height=420)
+        st.plotly_chart(fig_state, use_container_width=True, config={"displayModeBar": False})
+
+        # ── 3. Articles over time ──
+        st.markdown('<div class="section-header">Publication Volume Over Time</div>', unsafe_allow_html=True)
         df_time = df[df["Date"] != "Unknown"].copy()
         if not df_time.empty:
             df_time["Date_dt"] = pd.to_datetime(df_time["Date"])
             daily = df_time.groupby(df_time["Date_dt"].dt.date).size().reset_index()
             daily.columns = ["Date", "Articles"]
-            st.line_chart(daily.set_index("Date"), color="#00ffe7", height=200)
+            fig_time = go.Figure()
+            fig_time.add_trace(go.Scatter(
+                x=daily["Date"], y=daily["Articles"],
+                mode="lines+markers",
+                line=dict(color="#00c6ff", width=2.5),
+                marker=dict(color="#0057ff", size=6, line=dict(color="#00c6ff", width=1.5)),
+                fill="tozeroy",
+                fillcolor="rgba(0,87,255,0.08)",
+                hovertemplate="<b>%{x}</b><br>Articles: %{y}<extra></extra>",
+            ))
+            _dark_layout(fig_time, height=260)
+            fig_time.update_layout(xaxis_title="", yaxis_title="Articles")
+            st.plotly_chart(fig_time, use_container_width=True, config={"displayModeBar": False})
 
-        st.markdown('<div class="section-header">Capacity Mentions</div>', unsafe_allow_html=True)
-        cap_df = df[df["Capacity"] != ""][["Headline","Capacity","Date","State"]].head(15)
+        # ── 4. Topic share donut ──
+        st.markdown('<div class="section-header">Topic Share</div>', unsafe_allow_html=True)
+        topic_pie = df["Topic"].value_counts().reset_index()
+        topic_pie.columns = ["Topic", "Count"]
+        fig_pie = go.Figure(go.Pie(
+            labels=topic_pie["Topic"],
+            values=topic_pie["Count"],
+            hole=0.55,
+            marker=dict(
+                colors=[TOPIC_PALETTE.get(t, "#3a5280") for t in topic_pie["Topic"]],
+                line=dict(color=_DARK_BG, width=2),
+            ),
+            textinfo="label+percent",
+            textfont=dict(color=_TITLE_COL, size=12),
+            hovertemplate="<b>%{label}</b><br>%{value} articles (%{percent})<extra></extra>",
+        ))
+        fig_pie.update_layout(
+            paper_bgcolor=_PAPER_BG,
+            plot_bgcolor=_DARK_BG,
+            font=dict(family=_FONT, color=_TEXT_COL),
+            height=380,
+            margin=dict(l=16, r=16, t=30, b=16),
+            showlegend=True,
+            legend=dict(
+                bgcolor="rgba(0,0,0,0)",
+                font=dict(color=_TITLE_COL, size=11),
+                orientation="v",
+            ),
+            annotations=[dict(
+                text=f"<b>{len(df)}</b><br>articles",
+                x=0.5, y=0.5,
+                font=dict(size=16, color=_TITLE_COL, family=_FONT),
+                showarrow=False,
+            )],
+        )
+        st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+
+        # ── 5. Capacity table ──
+        st.markdown('<div class="section-header">⚡ Capacity Mentions</div>', unsafe_allow_html=True)
+        cap_df = df[df["Capacity"] != ""][["Headline", "Capacity", "Date", "State", "Topic"]].head(20)
         if not cap_df.empty:
-            st.dataframe(cap_df, use_container_width=True, hide_index=True,
-                         column_config={"Capacity": st.column_config.TextColumn("⚡ Capacity")})
+            st.dataframe(
+                cap_df, use_container_width=True, hide_index=True,
+                column_config={"Capacity": st.column_config.TextColumn("⚡ Capacity")},
+            )
         else:
             st.info("No capacity mentions found in current filter.")
 
@@ -969,3 +1089,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
