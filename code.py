@@ -594,40 +594,40 @@ def build_excel(df: pd.DataFrame) -> bytes:
     # ── Sheet 2: State Summary ──
     ws2 = wb.create_sheet("State Breakdown")
     state_counts = df["State"].value_counts().reset_index()
-    state_counts.columns = ["State","Article Count"]
-    ws2.cell(1,1,"State").font = h_font; ws2.cell(1,1).fill = h_fill
-    ws2.cell(1,2,"Article Count").font = h_font; ws2.cell(1,2).fill = h_fill
-    for ci in [1,2]:
-        ws2.cell(1,ci).alignment = Alignment(horizontal="center", vertical="center")
-        ws2.cell(1,ci).border = brd
+    state_counts.columns = ["State", "Article Count"]
+    ws2.cell(1, 1, "State").font = h_font;        ws2.cell(1, 1).fill = h_fill
+    ws2.cell(1, 2, "Article Count").font = h_font; ws2.cell(1, 2).fill = h_fill
+    for ci in [1, 2]:
+        ws2.cell(1, ci).alignment = Alignment(horizontal="center", vertical="center")
+        ws2.cell(1, ci).border = brd
     ws2.column_dimensions["A"].width = 22
     ws2.column_dimensions["B"].width = 16
-    for ri, row in enumerate(state_counts.itertuples(index=False), start=2):
-        for ci, val in enumerate([row.State, row._2], 1):
+    for ri, (_, row) in enumerate(state_counts.iterrows(), start=2):
+        for ci, val in enumerate([row["State"], row["Article Count"]], 1):
             c = ws2.cell(ri, ci, val)
             c.font = nf
             c.fill = ev if ri % 2 == 0 else od
             c.border = brd
-            c.alignment = Alignment(horizontal="center" if ci==2 else "left", vertical="center")
+            c.alignment = Alignment(horizontal="center" if ci == 2 else "left", vertical="center")
 
     # ── Sheet 3: Topic Summary ──
     ws3 = wb.create_sheet("Topic Breakdown")
     topic_counts = df["Topic"].value_counts().reset_index()
-    topic_counts.columns = ["Topic","Article Count"]
-    ws3.cell(1,1,"Topic").font = h_font; ws3.cell(1,1).fill = h_fill
-    ws3.cell(1,2,"Article Count").font = h_font; ws3.cell(1,2).fill = h_fill
-    for ci in [1,2]:
-        ws3.cell(1,ci).alignment = Alignment(horizontal="center", vertical="center")
-        ws3.cell(1,ci).border = brd
+    topic_counts.columns = ["Topic", "Article Count"]
+    ws3.cell(1, 1, "Topic").font = h_font;         ws3.cell(1, 1).fill = h_fill
+    ws3.cell(1, 2, "Article Count").font = h_font;  ws3.cell(1, 2).fill = h_fill
+    for ci in [1, 2]:
+        ws3.cell(1, ci).alignment = Alignment(horizontal="center", vertical="center")
+        ws3.cell(1, ci).border = brd
     ws3.column_dimensions["A"].width = 18
     ws3.column_dimensions["B"].width = 16
-    for ri, row in enumerate(topic_counts.itertuples(index=False), start=2):
-        for ci, val in enumerate([row.Topic, row._2], 1):
+    for ri, (_, row) in enumerate(topic_counts.iterrows(), start=2):
+        for ci, val in enumerate([row["Topic"], row["Article Count"]], 1):
             c = ws3.cell(ri, ci, val)
             c.font = nf
             c.fill = ev if ri % 2 == 0 else od
             c.border = brd
-            c.alignment = Alignment(horizontal="center" if ci==2 else "left", vertical="center")
+            c.alignment = Alignment(horizontal="center" if ci == 2 else "left", vertical="center")
 
     buf = io.BytesIO()
     wb.save(buf)
