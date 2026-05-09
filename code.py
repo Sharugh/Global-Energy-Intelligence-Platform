@@ -2,632 +2,796 @@ import streamlit as st
 import re
 import io
 import time
+import feedparser
 from datetime import datetime, timedelta
-from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from difflib import SequenceMatcher
 
 import pandas as pd
+import plotly.graph_objects as go
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-
 try:
     import cloudscraper
-    _SCRAPER = cloudscraper.create_scraper()
-    _USE_CLOUDSCRAPER = True
+    _CS = cloudscraper.create_scraper(
+        browser={"browser": "chrome", "platform": "windows", "mobile": False}
+    )
+    _USE_CS = True
 except ImportError:
     import requests
-    _SCRAPER = requests.Session()
-    _USE_CLOUDSCRAPER = False
+    _CS = requests.Session()
+    _USE_CS = False
 
 from bs4 import BeautifulSoup
 
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap');
 
-/* ── Global reset ── */
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-}
-.stApp {
-    background: #080c14;
-    color: #e8edf5;
-}
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+.stApp { background: #060a10; color: #e8edf5; }
 
-/* ── Sidebar ── */
-[data-testid="stSidebar"] {
-    background: #0d1220 !important;
-    border-right: 1px solid #1e2a40;
-}
-[data-testid="stSidebar"] * { color: #c8d4e8 !important; }
+[data-testid="stSidebar"] { background: #0a0f1a !important; border-right: 1px solid #151f35; }
+[data-testid="stSidebar"] * { color: #b8c8e0 !important; }
 [data-testid="stSidebar"] .stButton button {
-    background: linear-gradient(135deg, #0057ff, #00c6ff) !important;
-    color: #fff !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 700 !important;
-    font-size: 0.95rem !important;
-    letter-spacing: 0.04em !important;
-    padding: 0.65rem 1rem !important;
-    transition: opacity .2s;
+    background: linear-gradient(135deg, #0047e1, #00b4ff) !important;
+    color: #fff !important; border: none !important; border-radius: 8px !important;
+    font-family: 'Syne', sans-serif !important; font-weight: 700 !important;
+    font-size: 0.92rem !important; letter-spacing: 0.04em !important;
+    padding: 0.65rem 1rem !important; transition: opacity .2s;
 }
-[data-testid="stSidebar"] .stButton button:hover { opacity: .85; }
-[data-testid="stSidebar"] hr { border-color: #1e2a40 !important; }
+[data-testid="stSidebar"] .stButton button:hover { opacity: .82; }
+[data-testid="stSidebar"] hr { border-color: #151f35 !important; }
 
-/* ── Top header banner ── */
-.dcd-banner {
-    background: linear-gradient(135deg, #0a1628 0%, #0d2347 50%, #091830 100%);
-    border: 1px solid #1a3260;
-    border-radius: 16px;
-    padding: 2rem 2.5rem;
-    margin-bottom: 1.8rem;
-    position: relative;
-    overflow: hidden;
+.gl-banner {
+    background: linear-gradient(135deg, #07111f 0%, #0b1d3a 45%, #07111f 100%);
+    border: 1px solid #132040; border-radius: 16px;
+    padding: 2rem 2.5rem; margin-bottom: 1.6rem;
+    position: relative; overflow: hidden;
 }
-.dcd-banner::before {
-    content: '';
-    position: absolute;
-    top: -60px; right: -60px;
-    width: 280px; height: 280px;
-    background: radial-gradient(circle, rgba(0,87,255,0.18) 0%, transparent 70%);
+.gl-banner::before {
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 320px; height: 320px;
+    background: radial-gradient(circle, rgba(0,71,225,0.16) 0%, transparent 68%);
     border-radius: 50%;
 }
-.dcd-banner::after {
-    content: '';
-    position: absolute;
-    bottom: -40px; left: 30%;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(0,198,255,0.10) 0%, transparent 70%);
+.gl-banner::after {
+    content: ''; position: absolute; bottom: -50px; left: 25%;
+    width: 240px; height: 240px;
+    background: radial-gradient(circle, rgba(0,180,255,0.09) 0%, transparent 68%);
     border-radius: 50%;
 }
 .banner-eyebrow {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.18em;
-    color: #00c6ff;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
+    font-family: 'DM Mono', monospace; font-size: .68rem;
+    letter-spacing: .2em; color: #00b4ff;
+    text-transform: uppercase; margin-bottom: .45rem;
 }
 .banner-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 2rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1.15;
-    margin-bottom: 0.4rem;
+    font-family: 'Syne', sans-serif; font-size: 2rem;
+    font-weight: 800; color: #fff; line-height: 1.12; margin-bottom: .35rem;
 }
-.banner-title span { color: #00c6ff; }
-.banner-sub {
-    font-size: 0.88rem;
-    color: #7a90b8;
-    font-weight: 300;
-}
-.banner-ts {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    color: #3a5280;
-    margin-top: 0.8rem;
-    letter-spacing: 0.05em;
-}
+.banner-title span { color: #00b4ff; }
+.banner-sub { font-size: .85rem; color: #6a80a8; font-weight: 300; }
+.banner-ts { font-family: 'DM Mono', monospace; font-size: .68rem; color: #2a3e60; margin-top: .7rem; letter-spacing: .05em; }
 
-/* ── KPI cards ── */
-.kpi-row { display: flex; gap: 1rem; margin-bottom: 1.8rem; flex-wrap: wrap; }
-.kpi-card {
-    flex: 1; min-width: 160px;
-    background: #0d1628;
-    border: 1px solid #1a2b48;
-    border-radius: 12px;
-    padding: 1.2rem 1.5rem;
-    position: relative;
-    overflow: hidden;
-    transition: border-color .2s, transform .2s;
+.sec-head {
+    font-family: 'Syne', sans-serif; font-size: .9rem; font-weight: 700;
+    color: #b8c8e0; letter-spacing: .07em; text-transform: uppercase;
+    border-left: 3px solid #0047e1; padding-left: .7rem;
+    margin: 1.6rem 0 .9rem 0;
 }
-.kpi-card:hover { border-color: #0057ff; transform: translateY(-2px); }
-.kpi-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
+.pill-row { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: 1.4rem; }
+.pill {
+    background: #0b1628; border: 1px solid #152038; border-radius: 20px;
+    padding: .38rem .95rem; font-size: .78rem; color: #6a80a8;
+    display: flex; align-items: center; gap: .38rem;
 }
-.kpi-card.blue::before  { background: linear-gradient(90deg, #0057ff, #00c6ff); }
-.kpi-card.cyan::before  { background: linear-gradient(90deg, #00c6ff, #00ffe7); }
-.kpi-card.green::before { background: linear-gradient(90deg, #00e676, #00c853); }
-.kpi-card.gold::before  { background: linear-gradient(90deg, #ffab00, #ff6d00); }
-.kpi-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #4a6490;
-    margin-bottom: 0.5rem;
-}
-.kpi-value {
-    font-family: 'Syne', sans-serif;
-    font-size: 2rem;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1;
-}
-.kpi-delta {
-    font-size: 0.75rem;
-    color: #4a6490;
-    margin-top: 0.3rem;
-}
+.pill b { color: #fff; }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #0047e1; flex-shrink: 0; }
 
-/* ── Section headers ── */
-.section-header {
-    font-family: 'Syne', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #c8d4e8;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    border-left: 3px solid #0057ff;
-    padding-left: 0.75rem;
-    margin: 1.8rem 0 1rem 0;
-}
-
-/* ── Article cards ── */
-.card-grid { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.5rem; }
-.article-card {
-    background: #0d1628;
-    border: 1px solid #1a2b48;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    transition: border-color .18s, background .18s;
-    text-decoration: none;
-}
-.article-card:hover {
-    border-color: #0057ff;
-    background: #101e38;
-}
-.card-headline {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #d8e4f8;
-    line-height: 1.45;
-    flex: 1;
-}
-.card-headline a {
-    color: #d8e4f8 !important;
-    text-decoration: none;
-}
-.card-headline a:hover { color: #00c6ff !important; }
-.card-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.35rem;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-.card-date {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    color: #3a5280;
-}
-.card-tag {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    background: rgba(0,87,255,0.15);
-    color: #00c6ff;
-    border: 1px solid rgba(0,198,255,0.2);
-    border-radius: 4px;
-    padding: 2px 7px;
-}
-.card-link-btn {
-    font-size: 0.72rem;
-    color: #0057ff !important;
-    text-decoration: none;
-    font-family: 'DM Mono', monospace;
-}
-.card-link-btn:hover { color: #00c6ff !important; }
-
-/* ── Insight pills ── */
-.insight-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
-.insight-pill {
-    background: #0d1628;
-    border: 1px solid #1a2b48;
-    border-radius: 20px;
-    padding: 0.4rem 1rem;
-    font-size: 0.8rem;
-    color: #7a90b8;
-    display: flex; align-items: center; gap: 0.4rem;
-}
-.insight-pill b { color: #ffffff; }
-.insight-pill .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #0057ff;
-    flex-shrink: 0;
-}
-
-/* ── Search bar ── */
-.stTextInput input {
-    background: #0d1628 !important;
-    border: 1px solid #1a2b48 !important;
-    border-radius: 8px !important;
-    color: #d8e4f8 !important;
-    font-family: 'Inter', sans-serif !important;
-}
-.stTextInput input:focus {
-    border-color: #0057ff !important;
-    box-shadow: 0 0 0 2px rgba(0,87,255,0.2) !important;
-}
-
-/* ── Multiselect ── */
-.stMultiSelect [data-baseweb="select"] {
-    background: #0d1628 !important;
-    border-color: #1a2b48 !important;
-    border-radius: 8px !important;
-}
-
-/* ── Selectbox ── */
-.stSelectbox [data-baseweb="select"] > div {
-    background: #0d1628 !important;
-    border-color: #1a2b48 !important;
-}
-
-/* ── Download button ── */
-.stDownloadButton button {
-    background: linear-gradient(135deg, #00390f, #006622) !important;
-    color: #00e676 !important;
-    border: 1px solid #00c853 !important;
-    border-radius: 8px !important;
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.04em !important;
-    transition: opacity .2s !important;
-}
-.stDownloadButton button:hover { opacity: .85 !important; }
-
-/* ── Tabs ── */
 .stTabs [data-baseweb="tab-list"] {
-    background: #0d1628 !important;
-    border-radius: 10px !important;
-    padding: 4px !important;
-    gap: 4px !important;
-    border: 1px solid #1a2b48;
+    background: #0b1628 !important; border-radius: 10px !important;
+    padding: 4px !important; gap: 3px !important; border: 1px solid #152038;
 }
 .stTabs [data-baseweb="tab"] {
-    background: transparent !important;
-    color: #4a6490 !important;
-    border-radius: 7px !important;
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 0.82rem !important;
-    letter-spacing: 0.04em !important;
-    padding: 0.5rem 1.2rem !important;
+    background: transparent !important; color: #3a5480 !important;
+    border-radius: 7px !important; font-family: 'Syne', sans-serif !important;
+    font-weight: 600 !important; font-size: .8rem !important;
+    letter-spacing: .04em !important; padding: .45rem 1.1rem !important;
 }
-.stTabs [aria-selected="true"] {
-    background: #0057ff !important;
-    color: #ffffff !important;
-}
-.stTabs [data-baseweb="tab-panel"] { padding-top: 1.2rem !important; }
+.stTabs [aria-selected="true"] { background: #0047e1 !important; color: #fff !important; }
+.stTabs [data-baseweb="tab-panel"] { padding-top: 1.1rem !important; }
 
-/* ── Expander ── */
-.streamlit-expanderHeader {
-    background: #0d1628 !important;
-    border: 1px solid #1a2b48 !important;
-    border-radius: 8px !important;
-    color: #c8d4e8 !important;
-    font-family: 'Syne', sans-serif !important;
+.stDownloadButton button {
+    background: linear-gradient(135deg, #002d0a, #005214) !important;
+    color: #00e676 !important; border: 1px solid #00a846 !important;
+    border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
+    font-weight: 700 !important; letter-spacing: .04em !important;
 }
-.streamlit-expanderContent {
-    background: #080c14 !important;
-    border: 1px solid #1a2b48 !important;
-    border-top: none !important;
+.stDownloadButton button:hover { opacity: .82 !important; }
+.stTextInput input {
+    background: #0b1628 !important; border: 1px solid #152038 !important;
+    border-radius: 8px !important; color: #d0dff0 !important;
 }
-
-/* ── Divider ── */
-hr { border-color: #1a2b48 !important; }
-
-/* ── Hide Streamlit branding ── */
+.stTextInput input:focus { border-color: #0047e1 !important; }
+.stMultiSelect [data-baseweb="select"] { background: #0b1628 !important; border-color: #152038 !important; }
+.stSelectbox [data-baseweb="select"] > div { background: #0b1628 !important; border-color: #152038 !important; }
+hr { border-color: #152038 !important; }
 #MainMenu, footer, header { visibility: hidden; }
 </style>
 """
 
+MONTHS = {
+    "jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+    "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12,
+}
 
-US_STATES_FULL = [
-    "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
-    "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
-    "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
-    "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
-    "New Hampshire","New Jersey","New Mexico","New York","North Carolina",
-    "North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island",
-    "South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
-    "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
-]
-_US_WORDS = US_STATES_FULL + [
-    "United States","Silicon Valley","Northern Virginia","NoVA","Loudoun","Ashburn",
-    "Sterling","Manassas","Dallas","Chicago","Phoenix","Atlanta","Seattle","Denver",
-    "San Jose","San Francisco","Los Angeles","Houston","Miami","Boston","Portland",
-    "Las Vegas","Reno","Quincy","Salt Lake","New York City","NYC","San Antonio",
-    "Austin","Columbus","Kansas City","Nashville","Charlotte","Raleigh","Richmond",
-    "Sacramento","Boise","Indianapolis","Baltimore","San Diego","Oakland","Pittsburgh",
-    "Newark","Memphis","Louisville","Detroit","Minneapolis","Cleveland","Cincinnati",
-    "Tampa","Orlando","Jacksonville","Spokane","Tacoma","Bellevue","Mesa","Tucson",
-    "Chandler","Scottsdale","Henderson","El Paso","Fort Worth","Garland","Lubbock",
-    "Amarillo","Midland","Killeen","Waco","Perry County","Loudoun County",
-    "Prince William","Fairfax","Guadalupe County","Tyrone","Sweetwater","Beacon Point",
-]
-_ABBREVS = [
-    "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN",
-    "IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV",
-    "NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN",
-    "TX","UT","VT","VA","WA","WV","WI","WY","DC",
-]
-_parts  = [r"\b" + re.escape(w) + r"\b" for w in _US_WORDS]
-_parts += [r"\b" + a + r"\b" for a in _ABBREVS]
-_parts += [r"\bU\.S\.\b", r"\bUS\b"]
-US_RE = re.compile("|".join(_parts), re.IGNORECASE)
+TOPIC_COLORS = {
+    "Hyperscale":   "#0047e1",
+    "Colocation":   "#00b4ff",
+    "AI / GPU":     "#ff2d6b",
+    "Power":        "#ffaa00",
+    "Investment":   "#a855f7",
+    "Permits":      "#ff6400",
+    "Construction": "#00e5c8",
+    "Sustainability":"#00e676",
+    "General":      "#2e4470",
+}
 
+REGION_COLORS = {
+    "North America":  "#0047e1",
+    "Europe":         "#00b4ff",
+    "Asia Pacific":   "#ff2d6b",
+    "Middle East":    "#ffaa00",
+    "Latin America":  "#a855f7",
+    "Africa":         "#00e676",
+    "Global":         "#2e4470",
+}
 
-STATE_TO_ABBR = {s: _ABBREVS[i] for i, s in enumerate(US_STATES_FULL)}
+SOURCE_META = {
+    "DataCenterDynamics": {"color": "#0047e1", "short": "DCD"},
+    "DataCenter Knowledge": {"color": "#00b4ff", "short": "DCK"},
+    "DataCenterFrontier":  {"color": "#00e5c8", "short": "DCF"},
+    "Google News":         {"color": "#ffaa00", "short": "GNS"},
+    "PR Newswire":         {"color": "#a855f7", "short": "PRN"},
+    "BusinessWire":        {"color": "#ff6400", "short": "BIZ"},
+    "Reuters":             {"color": "#ff2d6b", "short": "REU"},
+    "Unknown":             {"color": "#2e4470", "short": "UNK"},
+}
 
+COUNTRY_TO_REGION = {
+    "United States": "North America", "Canada": "North America", "Mexico": "North America",
+    "United Kingdom": "Europe", "Germany": "Europe", "France": "Europe",
+    "Netherlands": "Europe", "Ireland": "Europe", "Sweden": "Europe",
+    "Norway": "Europe", "Denmark": "Europe", "Finland": "Europe",
+    "Spain": "Europe", "Italy": "Europe", "Poland": "Europe",
+    "Switzerland": "Europe", "Austria": "Europe", "Belgium": "Europe",
+    "Portugal": "Europe", "Romania": "Europe", "Czech Republic": "Europe",
+    "Singapore": "Asia Pacific", "Japan": "Asia Pacific", "South Korea": "Asia Pacific",
+    "Australia": "Asia Pacific", "India": "Asia Pacific", "China": "Asia Pacific",
+    "Hong Kong": "Asia Pacific", "Taiwan": "Asia Pacific", "Malaysia": "Asia Pacific",
+    "Indonesia": "Asia Pacific", "Thailand": "Asia Pacific", "Philippines": "Asia Pacific",
+    "New Zealand": "Asia Pacific", "Vietnam": "Asia Pacific",
+    "Saudi Arabia": "Middle East", "UAE": "Middle East", "Qatar": "Middle East",
+    "Bahrain": "Middle East", "Kuwait": "Middle East", "Oman": "Middle East",
+    "Israel": "Middle East", "Jordan": "Middle East", "Egypt": "Middle East",
+    "Brazil": "Latin America", "Chile": "Latin America", "Colombia": "Latin America",
+    "Argentina": "Latin America", "Peru": "Latin America", "Mexico": "Latin America",
+    "South Africa": "Africa", "Nigeria": "Africa", "Kenya": "Africa",
+    "Ethiopia": "Africa", "Ghana": "Africa", "Morocco": "Africa",
+    "Tanzania": "Africa", "Rwanda": "Africa",
+}
+
+COUNTRY_ISO = {
+    "United States": "USA", "Canada": "CAN", "Mexico": "MEX",
+    "United Kingdom": "GBR", "Germany": "DEU", "France": "FRA",
+    "Netherlands": "NLD", "Ireland": "IRL", "Sweden": "SWE",
+    "Norway": "NOR", "Denmark": "DNK", "Finland": "FIN",
+    "Spain": "ESP", "Italy": "ITA", "Poland": "POL",
+    "Switzerland": "CHE", "Austria": "AUT", "Belgium": "BEL",
+    "Portugal": "PRT", "Romania": "ROU", "Czech Republic": "CZE",
+    "Singapore": "SGP", "Japan": "JPN", "South Korea": "KOR",
+    "Australia": "AUS", "India": "IND", "China": "CHN",
+    "Hong Kong": "HKG", "Taiwan": "TWN", "Malaysia": "MYS",
+    "Indonesia": "IDN", "Thailand": "THA", "Philippines": "PHL",
+    "New Zealand": "NZL", "Vietnam": "VNM",
+    "Saudi Arabia": "SAU", "UAE": "ARE", "Qatar": "QAT",
+    "Bahrain": "BHR", "Kuwait": "KWT", "Oman": "OMN",
+    "Israel": "ISR", "Jordan": "JOR", "Egypt": "EGY",
+    "Brazil": "BRA", "Chile": "CHL", "Colombia": "COL",
+    "Argentina": "ARG", "Peru": "PER",
+    "South Africa": "ZAF", "Nigeria": "NGA", "Kenya": "KEN",
+    "Ethiopia": "ETH", "Ghana": "GHA", "Morocco": "MAR",
+    "Tanzania": "TZA", "Rwanda": "RWA",
+}
+
+COUNTRY_KEYWORDS = {k: [k] for k in COUNTRY_TO_REGION}
+COUNTRY_KEYWORDS.update({
+    "United States": ["United States", "U.S.", r"\bUS\b", "America", "American",
+                      "Virginia", "Texas", "California", "Georgia", "Ohio",
+                      "Indiana", "Nevada", "Arizona", "Illinois", "Pennsylvania",
+                      "North Carolina", "Florida", "Oregon", "Washington",
+                      "Colorado", "Utah", "Wyoming", "Montana", "Idaho",
+                      "Minnesota", "Wisconsin", "Michigan", "Iowa", "Kansas",
+                      "Missouri", "Oklahoma", "Arkansas", "Louisiana",
+                      "Mississippi", "Alabama", "Tennessee", "Kentucky",
+                      "Maryland", "New Jersey", "New York", "Massachusetts",
+                      "Connecticut", "Maine", "New Mexico", "Alaska", "Hawaii",
+                      "Dallas", "Austin", "Chicago", "Phoenix", "Atlanta",
+                      "Seattle", "Denver", "Reno", "Ashburn", "Portland",
+                      "Las Vegas", "San Jose", "San Francisco", "Los Angeles",
+                      "Houston", "Miami", "Boston", "Columbus", "Nashville",
+                      "Charlotte", "Northern Virginia", "Silicon Valley"],
+    "United Kingdom": ["United Kingdom", r"\bUK\b", "England", "Scotland",
+                       "Wales", "London", "Manchester", "Birmingham",
+                       "Bristol", "Edinburgh", "Glasgow", "Slough", "Reading"],
+    "Germany": ["Germany", "German", "Berlin", "Frankfurt", "Munich",
+                "Hamburg", "Cologne", "Stuttgart", "Dusseldorf"],
+    "Netherlands": ["Netherlands", "Dutch", "Amsterdam", "Rotterdam",
+                    "Eindhoven", "The Hague", r"\bAMS\b"],
+    "Singapore": ["Singapore", r"\bSGP\b"],
+    "Australia": ["Australia", "Australian", "Sydney", "Melbourne",
+                  "Brisbane", "Perth", "Canberra"],
+    "India": ["India", "Indian", "Mumbai", "Bangalore", "Bengaluru",
+              "Chennai", "Hyderabad", "Delhi", "Pune", "Noida"],
+    "Japan": ["Japan", "Japanese", "Tokyo", "Osaka", "Nagoya"],
+    "Saudi Arabia": ["Saudi Arabia", "Saudi", "KSA", "Riyadh", "Jeddah",
+                     "Neom", "NEOM", "Vision 2030"],
+    "UAE": ["UAE", "United Arab Emirates", "Dubai", "Abu Dhabi",
+            "Sharjah", "Ajman"],
+    "Brazil": ["Brazil", "Brasil", "Brazilian", r"\bSP\b", "Sao Paulo",
+               "Rio de Janeiro", "Curitiba"],
+    "South Africa": ["South Africa", "Johannesburg", "Cape Town", "Durban"],
+    "Nigeria": ["Nigeria", "Nigerian", "Lagos", "Abuja"],
+    "Kenya": ["Kenya", "Nairobi"],
+    "France": ["France", "French", "Paris", "Lyon", "Marseille", "Toulouse"],
+    "Ireland": ["Ireland", "Irish", "Dublin", "Cork"],
+    "Sweden": ["Sweden", "Swedish", "Stockholm", "Gothenburg"],
+    "Norway": ["Norway", "Norwegian", "Oslo"],
+    "Denmark": ["Denmark", "Danish", "Copenhagen"],
+    "Finland": ["Finland", "Finnish", "Helsinki"],
+    "Poland": ["Poland", "Polish", "Warsaw", "Krakow"],
+    "Malaysia": ["Malaysia", "Malaysian", "Kuala Lumpur", "KL", "Johor"],
+    "Indonesia": ["Indonesia", "Indonesian", "Jakarta", "Batam"],
+    "South Korea": ["South Korea", "Korean", "Seoul", "Busan"],
+    "China": ["China", "Chinese", "Beijing", "Shanghai", "Shenzhen",
+              "Guangzhou", "Chengdu"],
+    "Hong Kong": ["Hong Kong", "HKG"],
+    "Egypt": ["Egypt", "Egyptian", "Cairo"],
+    "Qatar": ["Qatar", "Qatari", "Doha"],
+    "Chile": ["Chile", "Chilean", "Santiago"],
+    "Colombia": ["Colombia", "Colombian", "Bogota"],
+    "Mexico": ["Mexico", "Mexican", "Mexico City", "Monterrey", "Guadalajara"],
+})
 
 TOPIC_KEYWORDS = {
-    "Hyperscale": ["hyperscale","microsoft","google","amazon","aws","meta","apple","oracle"],
-    "Colocation": ["colo","colocation","equinix","digital realty","ironmountain","coresite"],
-    "AI / GPU":   ["ai","gpu","nvidia","inference","llm","generative","artificial intelligence"],
-    "Power":      ["mw","megawatt","gigawatt","power","energy","grid","nuclear","solar"],
-    "Investment": ["invest","fund","reit","billion","million","acquire","acquisition","ipo","lease"],
-    "Permits":    ["permit","zoning","moratorium","approved","approval","planning","ordinance"],
-    "Construction":["broke ground","groundbreaking","opens","opens","topping","construction","campus","build"],
+    "Hyperscale": ["hyperscale","microsoft","google","amazon","aws","meta",
+                   "apple","oracle","alibaba","tencent","bytedance",
+                   "alphabet","openai","stargate","coreweave"],
+    "Colocation": ["colocation","colo","equinix","digital realty","ironmountain",
+                   "coresite","cyrusone","ntt","vantage","switch","edgeconex",
+                   "flexential","databank","cts","global switch"],
+    "AI / GPU":   ["artificial intelligence"," ai ","gpu","nvidia","inference",
+                   "llm","generative","machine learning","deep learning",
+                   "h100","h200","gb200","xai","anthropic","grok"],
+    "Power":      [" mw "," gw ","megawatt","gigawatt","power plant",
+                   "nuclear","solar","wind farm","gas turbine","behind-the-meter",
+                   "grid","utility","energy","ppa","renewable","hydrogen",
+                   "fuel cell","battery storage","ups"],
+    "Investment": ["invest","fund","reit","billion","million","acquire",
+                   "acquisition","ipo","bond","financing","lease","deal",
+                   "partnership","joint venture","stake","raise","capital"],
+    "Permits":    ["permit","zoning","moratorium","approved","approval",
+                   "planning","ordinance","rezoning","denied","appeal",
+                   "lawsuit","sue","court","ordinance","commission",
+                   "vote","hearing","rejected"],
+    "Construction":["broke ground","groundbreaking","topping out","opens",
+                    "opened","inaugurated","construction","campus","build",
+                    "development","site","facility","phase","expansion",
+                    "warehouse","acres","sq ft","square feet"],
+    "Sustainability":["sustainability","carbon","renewable","net zero",
+                      "green","esg","water","pue","cooling","waste heat",
+                      "recycle","circular","biodiversity","solar panel",
+                      "wind power","offset"],
 }
 
-BASE_URL  = "https://www.datacenterdynamics.com"
-CHAN_TERM = "the-data-center-construction-channel"
-NA_TERM   = "north-america"
-MONTHS    = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
-             "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
+KNOWN_COMPANIES = [
+    "Microsoft","Google","Amazon","AWS","Meta","Apple","Oracle","Alibaba",
+    "Tencent","ByteDance","Baidu","Huawei","Samsung","IBM","Intel","NVIDIA",
+    "Equinix","Digital Realty","Iron Mountain","CoreSite","CyrusOne","NTT",
+    "Vantage","Switch","EdgeConneX","Flexential","DataBank","QTS","Colt",
+    "Global Switch","ChinaData","GDS","STACK","Aligned","Compass","Tract",
+    "Hut 8","Core Scientific","Riot","Marathon","Applied Digital","Iren",
+    "Cloudflare","Fastly","Akamai","Lumen","Zayo","Cogent",
+    "Schneider Electric","Vertiv","Eaton","ABB","Siemens","Caterpillar",
+    "Cummins","Aggreko","AECOM","Turner","Holder","DPR","Skanska",
+    "Prologis","Blackstone","KKR","Brookfield","GIC","Mubadala","CPPIB",
+    "SoftBank","Masdar","TAQA","ADNOC","Saudi Aramco","Neom","SABIC",
+    "CloudHQ","Coatue","DataBank","T5","Skybox","Stream","Flexential",
+    "Ascenty","Odata","Scala","Luminet","Etix","Nabiax","Bolder",
+    "VIRTUS","Kao","Yondr","Venari","Verne","Hydro66","DigiPlex",
+    "Bulk Infrastructure","Green Mountain","atNorth","Adaniconnex",
+    "CtrlS","NxtGen","Yotta","STT GDC","Keppel","Singtel","Telstra",
+    "NextDC","Macquarie","AirTrunk","MEVSPACE","Beyond.pl","Atman",
+    "DE-CIX","Interxion","euNetworks","Telehouse","Iomart","Pulsant",
+]
 
-_HEADERS = {
-    "User-Agent":(
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language":"en-US,en;q=0.9",
-    "Referer":"https://www.datacenterdynamics.com/",
-}
+GNEWS_QUERIES = [
+    ("data center construction campus groundbreaking", "Google News"),
+    ("data center hyperscale investment billion megawatt", "Google News"),
+    ("data center approved permit moratorium zoning", "Google News"),
+    ("data center power energy grid nuclear solar", "Google News"),
+    ("colocation datacenter AI GPU facility opens", "Google News"),
+]
+
+RSS_SOURCES = [
+    {
+        "name": "DataCenter Knowledge",
+        "url": "https://www.datacenterknowledge.com/rss.xml",
+        "type": "rss",
+    },
+    {
+        "name": "DataCenterFrontier",
+        "url": "https://datacenterfrontier.com/feed/",
+        "type": "rss",
+    },
+    {
+        "name": "PR Newswire",
+        "url": "https://www.prnewswire.com/rss/news-releases-list.rss",
+        "type": "rss",
+    },
+    {
+        "name": "BusinessWire",
+        "url": "https://feed.businesswire.com/rss/home/?rss=G22",
+        "type": "rss",
+    },
+    {
+        "name": "Reuters",
+        "url": "https://feeds.reuters.com/reuters/technologyNews",
+        "type": "rss",
+    },
+]
+
+SCRAPE_SOURCES = [
+    {
+        "name": "DataCenterDynamics",
+        "url": "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel",
+        "base": "https://www.datacenterdynamics.com",
+        "link_pattern": r"^/en/news/[^?#]+/$",
+        "type": "html",
+    },
+    {
+        "name": "DataCenterDynamics",
+        "url": "https://www.datacenterdynamics.com/en/news/?term=north-america",
+        "base": "https://www.datacenterdynamics.com",
+        "link_pattern": r"^/en/news/[^?#]+/$",
+        "type": "html",
+    },
+    {
+        "name": "DataCenterDynamics",
+        "url": "https://www.datacenterdynamics.com/en/news/?term=europe",
+        "base": "https://www.datacenterdynamics.com",
+        "link_pattern": r"^/en/news/[^?#]+/$",
+        "type": "html",
+    },
+    {
+        "name": "DataCenterDynamics",
+        "url": "https://www.datacenterdynamics.com/en/news/?term=asia-pacific",
+        "base": "https://www.datacenterdynamics.com",
+        "link_pattern": r"^/en/news/[^?#]+/$",
+        "type": "html",
+    },
+    {
+        "name": "DataCenterDynamics",
+        "url": "https://www.datacenterdynamics.com/en/news/?term=middle-east",
+        "base": "https://www.datacenterdynamics.com",
+        "link_pattern": r"^/en/news/[^?#]+/$",
+        "type": "html",
+    },
+]
 
 
-
-def parse_date(raw: str):
-    raw = raw.strip()
-    try:
-        return datetime.strptime(raw, "%Y-%m-%d")
-    except ValueError:
-        pass
-    for pat in (r"(\d{1,2})\s+(\w+)\s+(\d{4})", r"(\w+)\s+(\d{1,2}),?\s+(\d{4})"):
-        m = re.match(pat, raw)
-        if m:
-            g = m.groups()
-            try:
-                if g[0].isdigit():
-                    day, mon, yr = int(g[0]), g[1].lower()[:3], int(g[2])
-                else:
-                    mon, day, yr = g[0].lower()[:3], int(g[1]), int(g[2])
-                if mon in MONTHS:
-                    return datetime(yr, MONTHS[mon], day)
-            except Exception:
-                pass
-    return None
-
-def fetch(url: str):
-    for attempt in range(2):
+def parse_date_str(raw):
+    if not raw:
+        return None
+    raw = str(raw).strip()
+    raw = re.sub(r"\s+", " ", raw)
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ",
+                "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z",
+                "%Y-%m-%d", "%d %b %Y", "%B %d, %Y", "%b %d, %Y"):
         try:
-            if _USE_CLOUDSCRAPER:
-                resp = _SCRAPER.get(url, timeout=20)
-            else:
-                resp = _SCRAPER.get(url, headers=_HEADERS, timeout=20)
-            resp.raise_for_status()
-            return BeautifulSoup(resp.text, "html.parser")
-        except Exception as e:
-            if attempt == 0:
-                time.sleep(2)
-            else:
-                st.warning(f"⚠️ Could not fetch page: {e}")
+            dt = datetime.strptime(raw[:25], fmt[:len(raw[:25])])
+            return dt.replace(tzinfo=None)
+        except Exception:
+            pass
+    m = re.search(r"(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{4})", raw, re.I)
+    if m:
+        try:
+            return datetime(int(m.group(3)), MONTHS[m.group(2).lower()[:3]], int(m.group(1)))
+        except Exception:
+            pass
+    m = re.search(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2}),?\s+(\d{4})", raw, re.I)
+    if m:
+        try:
+            return datetime(int(m.group(3)), MONTHS[m.group(1).lower()[:3]], int(m.group(2)))
+        except Exception:
+            pass
     return None
 
-def parse_articles(soup: BeautifulSoup) -> list:
-    articles = []
-    seen = set()
-    for a in soup.find_all("a", href=re.compile(r"^/en/news/[^?#]+/$")):
-        href = a["href"]
-        if href in seen:
-            continue
-        seen.add(href)
-        h_tag    = a.find(["h1","h2","h3","h4"])
-        headline = h_tag.get_text(strip=True) if h_tag else a.get_text(strip=True)
-        if not headline or len(headline) < 10:
-            continue
-        date_obj = None
-        node = a.parent
-        for _ in range(8):
-            if node is None:
-                break
-            text = node.get_text(" ", strip=True)
-            m = re.search(
-                r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
-                text, re.I
-            )
-            if m:
-                date_obj = parse_date(m.group(0))
-                break
-            node = node.parent
-        articles.append({
-            "Headline":  headline,
-            "Date":      date_obj.strftime("%Y-%m-%d") if date_obj else "Unknown",
-            "URL":       BASE_URL + href,
-            "_date_obj": date_obj,
-        })
-    return articles
 
-def scrape(cutoff, max_pages: int, use_na: bool, pbar) -> list:
-    all_articles = []
-    fetch(BASE_URL + "/en/")
+def fetch_html(url, retries=2):
+    for attempt in range(retries):
+        try:
+            if _USE_CS:
+                r = _CS.get(url, timeout=18)
+            else:
+                import requests as req
+                r = req.get(url, headers=_HEADERS, timeout=18)
+            r.raise_for_status()
+            return BeautifulSoup(r.text, "html.parser")
+        except Exception:
+            if attempt == 0:
+                time.sleep(1.5)
+    return None
+
+
+def scrape_html_source(source, max_pages=3):
+    results = []
+    seen = set()
+    base = source["base"]
+    pattern = re.compile(source["link_pattern"])
+
     for page in range(1, max_pages + 1):
-        params = f"?term={CHAN_TERM}"
-        if use_na:
-            params += f"&term={NA_TERM}"
-        if page > 1:
-            params += f"&page={page}"
-        url = f"{BASE_URL}/en/news/{params}"
-        pbar.progress(page / max_pages, text=f"Fetching page {page}/{max_pages}…")
-        soup = fetch(url)
+        url = source["url"] if page == 1 else source["url"] + f"&page={page}"
+        soup = fetch_html(url)
         if not soup:
             break
-        page_arts = parse_articles(soup)
-        if not page_arts:
+        found_any = False
+        for a in soup.find_all("a", href=pattern):
+            href = a["href"]
+            if href in seen:
+                continue
+            seen.add(href)
+            h = a.find(["h1", "h2", "h3", "h4"])
+            headline = h.get_text(strip=True) if h else a.get_text(strip=True)
+            if not headline or len(headline) < 12:
+                continue
+            date_obj = None
+            node = a.parent
+            for _ in range(9):
+                if node is None:
+                    break
+                txt = node.get_text(" ", strip=True)
+                m = re.search(
+                    r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
+                    txt, re.I
+                )
+                if m:
+                    date_obj = parse_date_str(m.group(0))
+                    break
+                node = node.parent
+            results.append({
+                "headline": headline,
+                "url": base + href,
+                "date_obj": date_obj,
+                "source": source["name"],
+            })
+            found_any = True
+        if not found_any:
             break
-        stop = False
-        for art in page_arts:
-            d = art["_date_obj"]
-            if d and d < cutoff:
-                stop = True
-                break
-            all_articles.append(art)
-        if stop:
-            break
-        time.sleep(0.6)
-    return all_articles
-
-def is_us(text: str) -> bool:
-    return bool(US_RE.search(text))
+        time.sleep(0.4)
+    return results
 
 
+def fetch_rss(source):
+    results = []
+    try:
+        feed = feedparser.parse(source["url"])
+        for entry in feed.entries:
+            headline = entry.get("title", "").strip()
+            url = entry.get("link", "").strip()
+            if not headline or not url:
+                continue
+            pub = entry.get("published", "") or entry.get("updated", "")
+            date_obj = None
+            if hasattr(entry, "published_parsed") and entry.published_parsed:
+                try:
+                    date_obj = datetime(*entry.published_parsed[:6])
+                except Exception:
+                    pass
+            if date_obj is None:
+                date_obj = parse_date_str(pub)
+            results.append({
+                "headline": headline,
+                "url": url,
+                "date_obj": date_obj,
+                "source": source["name"],
+            })
+    except Exception:
+        pass
+    return results
 
-def detect_state(headline: str) -> str:
-    for state in US_STATES_FULL:
-        if re.search(r"\b" + re.escape(state) + r"\b", headline, re.I):
-            return state
-    # abbreviations — only if clearly a state context
-    abbr_map = dict(zip(_ABBREVS, US_STATES_FULL))
-    for abbr in _ABBREVS:
-        if re.search(r"\b" + abbr + r"\b", headline):
-            return abbr_map.get(abbr, abbr)
-    return "Other US"
 
-def detect_topic(headline: str) -> str:
-    hl = headline.lower()
+def fetch_google_news(query, source_label="Google News"):
+    results = []
+    try:
+        q = query.replace(" ", "+")
+        url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+        feed = feedparser.parse(url)
+        for entry in feed.entries:
+            headline = entry.get("title", "").strip()
+            url_val = entry.get("link", "").strip()
+            if not headline or not url_val:
+                continue
+            date_obj = None
+            if hasattr(entry, "published_parsed") and entry.published_parsed:
+                try:
+                    date_obj = datetime(*entry.published_parsed[:6])
+                except Exception:
+                    pass
+            results.append({
+                "headline": headline,
+                "url": url_val,
+                "date_obj": date_obj,
+                "source": source_label,
+            })
+    except Exception:
+        pass
+    return results
+
+
+def is_dc_relevant(text):
+    t = text.lower()
+    primary = ["data center", "datacenter", "data centre", "datacentre",
+               "colocation", "hyperscale", "cloud campus"]
+    secondary = ["megawatt", " mw ", "gigawatt", " gw ", "server farm",
+                 "computing facility", "edge computing", "ai campus",
+                 "gpu cluster", "compute campus"]
+    if any(p in t for p in primary):
+        return True
+    if sum(1 for s in secondary if s in t) >= 2:
+        return True
+    return False
+
+
+def detect_country(text):
+    for country, patterns in COUNTRY_KEYWORDS.items():
+        for pat in patterns:
+            if re.search(pat if pat.startswith(r"\b") else r"\b" + re.escape(pat) + r"\b", text, re.I):
+                return country
+    return "Global"
+
+
+def detect_topic(text):
+    t = text.lower()
     for topic, kws in TOPIC_KEYWORDS.items():
-        if any(k in hl for k in kws):
+        if any(k.lower() in t for k in kws):
             return topic
     return "General"
 
-def detect_mw(headline: str) -> str:
-    m = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*(GW|MW|megawatt|gigawatt)", headline, re.I)
+
+def detect_mw(text):
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt)", text, re.I)
     if m:
-        val = m.group(1).replace(",","")
-        unit = m.group(2).upper()
-        return f"{val} {unit}"
+        return m.group(1).replace(",", "") + " " + m.group(2).upper()
     return ""
 
-def enrich(articles: list) -> list:
-    for a in articles:
-        hl = a["Headline"]
-        a["State"]    = detect_state(hl)
-        a["Topic"]    = detect_topic(hl)
-        a["Capacity"] = detect_mw(hl)
-    return articles
+
+def detect_deal_size(text):
+    m = re.search(r"\$([\d,.]+)\s*(billion|bn|million|mn|m\b)", text, re.I)
+    if m:
+        val = m.group(1).replace(",", "")
+        unit = m.group(2).lower()
+        if unit in ("billion", "bn"):
+            return f"${val}bn"
+        return f"${val}m"
+    return ""
 
 
+def detect_companies(text):
+    found = []
+    for co in KNOWN_COMPANIES:
+        if re.search(r"\b" + re.escape(co) + r"\b", text, re.I):
+            found.append(co)
+    return ", ".join(found[:4]) if found else ""
 
-def build_excel(df: pd.DataFrame) -> bytes:
-    wb = Workbook()
 
-    # ── Sheet 1: Articles ──
-    ws = wb.active
-    ws.title = "US Construction Articles"
-    thin = Side(border_style="thin", color="CCCCCC")
-    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
-    cols   = ["#", "Headline", "Date", "State", "Topic", "Capacity", "URL"]
-    widths = [4,   62,          13,     18,       14,      12,         55]
-    h_fill = PatternFill("solid", fgColor="1F4E79")
-    h_font = Font(bold=True, color="FFFFFF", name="Calibri", size=11)
-    for ci, (col, w) in enumerate(zip(cols, widths), 1):
-        c = ws.cell(row=1, column=ci, value=col)
-        c.font = h_font; c.fill = h_fill
-        c.alignment = Alignment(horizontal="center", vertical="center")
-        c.border = brd
-        ws.column_dimensions[get_column_letter(ci)].width = w
-    ws.row_dimensions[1].height = 26
-    ev = PatternFill("solid", fgColor="DCE6F1")
-    od = PatternFill("solid", fgColor="FFFFFF")
-    nf = Font(name="Calibri", size=10)
-    lf = Font(name="Calibri", size=10, color="0563C1", underline="single")
-    topic_colors = {
-        "Hyperscale":"4472C4","Colocation":"70AD47","AI / GPU":"FF0000",
-        "Power":"FFC000","Investment":"7030A0","Permits":"FF7C00","Construction":"00B0F0",
+def detect_sentiment(text):
+    t = text.lower()
+    if any(w in t for w in ["broke ground", "groundbreaking", "opens", "opened",
+                             "inaugurated", "energizes", "goes live", "launches"]):
+        return "Opened / Live"
+    if any(w in t for w in ["approved", "approval", "go-ahead", "green light",
+                             "permits", "zoning approved", "rezoning"]):
+        return "Approved"
+    if any(w in t for w in ["proposed", "plans", "eyes", "looks to", "could build",
+                             "may build", "files for", "announces plans"]):
+        return "Proposed"
+    if any(w in t for w in ["rejected", "denied", "moratorium", "blocked",
+                             "lawsuit", "sues", "opposition", "withdrawn"]):
+        return "Challenged"
+    if any(w in t for w in ["under construction", "construction begins",
+                             "construction started", "building"]):
+        return "Under Construction"
+    return "News"
+
+
+def fuzzy_similar(a, b, threshold=0.82):
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio() >= threshold
+
+
+def deduplicate(articles):
+    keep = []
+    seen_headlines = []
+    for art in articles:
+        hl = art["Headline"]
+        is_dup = False
+        for seen in seen_headlines:
+            if fuzzy_similar(hl, seen):
+                is_dup = True
+                break
+        if not is_dup:
+            keep.append(art)
+            seen_headlines.append(hl)
+    return keep
+
+
+def enrich(raw_item):
+    hl = raw_item["headline"]
+    d = raw_item.get("date_obj")
+    country = detect_country(hl)
+    region = COUNTRY_TO_REGION.get(country, "Global")
+    return {
+        "Headline":  hl,
+        "Date":      d.strftime("%Y-%m-%d") if d else "Unknown",
+        "Source":    raw_item.get("source", "Unknown"),
+        "URL":       raw_item.get("url", ""),
+        "Country":   country,
+        "Region":    region,
+        "Topic":     detect_topic(hl),
+        "Sentiment": detect_sentiment(hl),
+        "Capacity":  detect_mw(hl),
+        "Deal Size": detect_deal_size(hl),
+        "Companies": detect_companies(hl),
+        "_date_obj": d,
     }
-    for ri, row in enumerate(df.itertuples(index=False), start=2):
-        fill = ev if ri % 2 == 0 else od
-        vals = [ri-1, row.Headline, row.Date, row.State, row.Topic, row.Capacity, row.URL]
-        for ci, val in enumerate(vals, 1):
-            c = ws.cell(row=ri, column=ci, value=str(val) if val else "")
-            c.fill = fill; c.border = brd
-            if ci == 7:
-                c.hyperlink = val; c.font = lf
-                c.alignment = Alignment(horizontal="center", vertical="center")
-            elif ci == 5:   # Topic — colored
-                c.font = Font(name="Calibri", size=10, bold=True,
-                              color=topic_colors.get(str(val), "000000"))
-                c.alignment = Alignment(horizontal="center", vertical="center")
-            elif ci == 2:
-                c.font = nf
-                c.alignment = Alignment(vertical="center", wrap_text=True)
-            else:
-                c.font = nf
-                c.alignment = Alignment(horizontal="center", vertical="center")
-    ws.freeze_panes = "B2"
-    ws.auto_filter.ref = f"A1:G{len(df)+1}"
 
-    
-    ws2 = wb.create_sheet("State Breakdown")
-    state_counts = df["State"].value_counts().reset_index()
-    state_counts.columns = ["State", "Article Count"]
-    ws2.cell(1, 1, "State").font = h_font;        ws2.cell(1, 1).fill = h_fill
-    ws2.cell(1, 2, "Article Count").font = h_font; ws2.cell(1, 2).fill = h_fill
-    for ci in [1, 2]:
-        ws2.cell(1, ci).alignment = Alignment(horizontal="center", vertical="center")
-        ws2.cell(1, ci).border = brd
-    ws2.column_dimensions["A"].width = 22
-    ws2.column_dimensions["B"].width = 16
-    for ri, (_, row) in enumerate(state_counts.iterrows(), start=2):
-        for ci, val in enumerate([row["State"], row["Article Count"]], 1):
-            c = ws2.cell(ri, ci, val)
-            c.font = nf
-            c.fill = ev if ri % 2 == 0 else od
-            c.border = brd
-            c.alignment = Alignment(horizontal="center" if ci == 2 else "left", vertical="center")
 
-    
-    ws3 = wb.create_sheet("Topic Breakdown")
-    topic_counts = df["Topic"].value_counts().reset_index()
-    topic_counts.columns = ["Topic", "Article Count"]
-    ws3.cell(1, 1, "Topic").font = h_font;         ws3.cell(1, 1).fill = h_fill
-    ws3.cell(1, 2, "Article Count").font = h_font;  ws3.cell(1, 2).fill = h_fill
-    for ci in [1, 2]:
-        ws3.cell(1, ci).alignment = Alignment(horizontal="center", vertical="center")
-        ws3.cell(1, ci).border = brd
-    ws3.column_dimensions["A"].width = 18
-    ws3.column_dimensions["B"].width = 16
-    for ri, (_, row) in enumerate(topic_counts.iterrows(), start=2):
-        for ci, val in enumerate([row["Topic"], row["Article Count"]], 1):
-            c = ws3.cell(ri, ci, val)
-            c.font = nf
-            c.fill = ev if ri % 2 == 0 else od
+def run_all_scrapers(max_html_pages, cutoff, progress_cb):
+    raw = []
+    total_tasks = len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES)
+    done = [0]
+
+    def tick(label=""):
+        done[0] += 1
+        progress_cb(done[0] / total_tasks, label)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        html_futures = {
+            pool.submit(scrape_html_source, src, max_html_pages): src["name"]
+            for src in SCRAPE_SOURCES
+        }
+        rss_futures = {
+            pool.submit(fetch_rss, src): src["name"]
+            for src in RSS_SOURCES
+        }
+        gn_futures = {
+            pool.submit(fetch_google_news, q, lbl): lbl
+            for q, lbl in GNEWS_QUERIES
+        }
+
+        for f in as_completed({**html_futures, **rss_futures, **gn_futures}):
+            try:
+                items = f.result()
+                raw.extend(items)
+            except Exception:
+                pass
+            tick()
+
+    filtered = []
+    for item in raw:
+        d = item.get("date_obj")
+        if d and d < cutoff:
+            continue
+        if not is_dc_relevant(item["headline"]):
+            continue
+        filtered.append(item)
+
+    return filtered
+
+
+def build_excel(df):
+    wb = Workbook()
+    thin = Side(border_style="thin", color="CCCCCC")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hf = Font(bold=True, color="FFFFFF", name="Calibri", size=10)
+    hfill = PatternFill("solid", fgColor="0F1E36")
+    ev = PatternFill("solid", fgColor="0B1628")
+    od = PatternFill("solid", fgColor="060A10")
+    nf = Font(name="Calibri", size=9, color="C8D4E8")
+    lf = Font(name="Calibri", size=9, color="0047E1", underline="single")
+
+    def write_sheet(ws, data_df, cols, widths):
+        for ci, (col, w) in enumerate(zip(cols, widths), 1):
+            c = ws.cell(1, ci, col)
+            c.font = hf; c.fill = hfill
+            c.alignment = Alignment(horizontal="center", vertical="center")
             c.border = brd
-            c.alignment = Alignment(horizontal="center" if ci == 2 else "left", vertical="center")
+            ws.column_dimensions[get_column_letter(ci)].width = w
+        ws.row_dimensions[1].height = 24
+        tc_map = TOPIC_COLORS
+        for ri, row in enumerate(data_df[cols if all(c in data_df.columns for c in cols) else data_df.columns].itertuples(index=False), start=2):
+            fill = ev if ri % 2 == 0 else od
+            for ci, val in enumerate(row, 1):
+                v = str(val) if val is not None else ""
+                c = ws.cell(ri, ci, v)
+                c.fill = fill; c.border = brd
+                col_name = cols[ci - 1] if ci <= len(cols) else ""
+                if col_name == "URL":
+                    c.hyperlink = v; c.font = lf
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+                elif col_name == "Topic":
+                    tc = tc_map.get(v, "2E4470")
+                    c.font = Font(name="Calibri", size=9, bold=True, color=tc.replace("#", ""))
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+                elif col_name == "Headline":
+                    c.font = nf
+                    c.alignment = Alignment(vertical="center", wrap_text=True)
+                else:
+                    c.font = nf
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{len(data_df)+1}"
+
+    ws1 = wb.active
+    ws1.title = "All Articles"
+    main_cols = ["Headline","Date","Source","Country","Region","Topic",
+                 "Sentiment","Capacity","Deal Size","Companies","URL"]
+    main_widths = [62, 12, 18, 18, 16, 14, 16, 12, 12, 28, 50]
+    safe_df = df[[c for c in main_cols if c in df.columns]]
+    write_sheet(ws1, safe_df, [c for c in main_cols if c in df.columns], main_widths[:len(main_cols)])
+
+    ws2 = wb.create_sheet("By Country")
+    cc = df["Country"].value_counts().reset_index()
+    cc.columns = ["Country", "Articles"]
+    write_sheet(ws2, cc, ["Country","Articles"], [24, 14])
+
+    ws3 = wb.create_sheet("By Region")
+    rc = df["Region"].value_counts().reset_index()
+    rc.columns = ["Region", "Articles"]
+    write_sheet(ws3, rc, ["Region","Articles"], [20, 14])
+
+    ws4 = wb.create_sheet("By Topic")
+    tc_df = df["Topic"].value_counts().reset_index()
+    tc_df.columns = ["Topic", "Articles"]
+    write_sheet(ws4, tc_df, ["Topic","Articles"], [18, 14])
+
+    ws5 = wb.create_sheet("By Company")
+    comp_rows = []
+    for _, row in df.iterrows():
+        if row.get("Companies"):
+            for co in str(row["Companies"]).split(", "):
+                co = co.strip()
+                if co:
+                    comp_rows.append({"Company": co, "Headline": row["Headline"],
+                                      "Date": row["Date"], "Country": row["Country"],
+                                      "URL": row["URL"]})
+    if comp_rows:
+        comp_df = pd.DataFrame(comp_rows)
+        write_sheet(ws5, comp_df, ["Company","Headline","Date","Country","URL"],
+                    [22, 55, 12, 18, 45])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -635,530 +799,889 @@ def build_excel(df: pd.DataFrame) -> bytes:
     return buf.read()
 
 
-
-def kpi_card(label: str, value, color: str = "blue", delta: str = ""):
-    delta_html = f'<div class="kpi-delta">{delta}</div>' if delta else ""
-    return f"""
-    <div class="kpi-card {color}">
-        <div class="kpi-label">{label}</div>
-        <div class="kpi-value">{value}</div>
-        {delta_html}
-    </div>"""
+_BG = "#060a10"
+_PAPER = "#0b1628"
+_GRID = "#152038"
+_TEXT = "#6a80a8"
+_TITLE = "#b8c8e0"
+_FONT = "Inter, sans-serif"
 
 
-TOPIC_COLORS = {
-    "Hyperscale":   "#0057ff",
-    "Colocation":   "#00c6ff",
-    "AI / GPU":     "#ff3b6b",
-    "Power":        "#ffab00",
-    "Investment":   "#a855f7",
-    "Permits":      "#ff6d00",
-    "Construction": "#00ffe7",
-    "General":      "#3a5280",
-}
-
-
-def article_card_html(headline: str, date: str, url: str, topic: str, capacity: str) -> str:
-    tc = TOPIC_COLORS.get(topic, "#3a5280")
-    cap = (
-        '<span style="font-family:monospace;font-size:.65rem;'
-        'background:rgba(255,171,0,0.12);color:#ffab00;'
-        'border:1px solid rgba(255,171,0,0.3);border-radius:4px;'
-        'padding:2px 7px;white-space:nowrap;">'
-        + "\u26a1 " + capacity + "</span>"
-    ) if capacity else ""
-    arrow = "\u2197"
-    return (
-        '<div style="background:#0d1628;border:1px solid #1a2b48;border-radius:10px;'
-        'padding:.9rem 1.2rem;display:flex;justify-content:space-between;'
-        'align-items:flex-start;gap:1rem;margin-bottom:.5rem;">'
-        '<div style="flex:1;font-size:.88rem;font-weight:500;line-height:1.5;">'
-        f'<a href="{url}" target="_blank" '
-        'style="color:#d8e4f8;text-decoration:none;font-family:Inter,sans-serif;">'
-        f'{headline}</a></div>'
-        '<div style="display:flex;flex-direction:column;align-items:flex-end;'
-        'gap:.3rem;flex-shrink:0;white-space:nowrap;">'
-        f'<span style="font-family:monospace;font-size:.7rem;color:#3a5280;">\U0001f4c5 {date}</span>'
-        f'<span style="font-family:monospace;font-size:.65rem;background:{tc}22;color:{tc};'
-        f'border:1px solid {tc}55;border-radius:4px;padding:2px 7px;">{topic}</span>'
-        f'{cap}'
-        f'<a href="{url}" target="_blank" '
-        f'style="font-family:monospace;font-size:.68rem;color:#0057ff;text-decoration:none;">'
-        f'{arrow} open</a>'
-        '</div></div>'
+def _dark(fig, height=320):
+    fig.update_layout(
+        paper_bgcolor=_PAPER, plot_bgcolor=_BG,
+        font=dict(family=_FONT, color=_TEXT),
+        height=height,
+        margin=dict(l=14, r=14, t=36, b=14),
+        xaxis=dict(gridcolor=_GRID, linecolor=_GRID,
+                   tickfont=dict(size=10, color=_TEXT),
+                   title_font=dict(color=_TEXT)),
+        yaxis=dict(gridcolor=_GRID, linecolor=_GRID,
+                   tickfont=dict(size=10, color=_TEXT),
+                   title_font=dict(color=_TEXT)),
+        showlegend=False,
     )
+    return fig
 
 
-def dark_table(df_in: pd.DataFrame, max_rows: int = 200) -> str:
-    """Render a DataFrame as a dark-themed HTML table matching the UI."""
+def chart_topic_bar(df):
+    tc = df["Topic"].value_counts().reset_index()
+    tc.columns = ["Topic", "Count"]
+    tc = tc.sort_values("Count")
+    colors = [TOPIC_COLORS.get(t, "#2e4470") for t in tc["Topic"]]
+    fig = go.Figure(go.Bar(
+        x=tc["Count"], y=tc["Topic"], orientation="h",
+        marker=dict(color=colors, line=dict(width=0)),
+        text=tc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=11),
+        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+    ))
+    _dark(fig, 300)
+    fig.update_layout(title=dict(text="Articles by Topic", font=dict(color=_TITLE, size=13), x=0.01))
+    return fig
+
+
+def chart_region_bar(df):
+    rc = df["Region"].value_counts().reset_index()
+    rc.columns = ["Region", "Count"]
+    rc = rc.sort_values("Count")
+    colors = [REGION_COLORS.get(r, "#2e4470") for r in rc["Region"]]
+    fig = go.Figure(go.Bar(
+        x=rc["Count"], y=rc["Region"], orientation="h",
+        marker=dict(color=colors, line=dict(width=0)),
+        text=rc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=11),
+        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+    ))
+    _dark(fig, 280)
+    fig.update_layout(title=dict(text="Articles by Region", font=dict(color=_TITLE, size=13), x=0.01))
+    return fig
+
+
+def chart_country_bar(df, top_n=20):
+    cc = df["Country"].value_counts().head(top_n).reset_index()
+    cc.columns = ["Country", "Count"]
+    cc = cc.sort_values("Count")
+    n = len(cc)
+    c_colors = [
+        f"rgba({int(0 + 71*i/max(n-1,1))}, {int(71 + (180-71)*i/max(n-1,1))}, {int(225 + (255-225)*i/max(n-1,1))}, 0.85)"
+        for i in range(n)
+    ]
+    fig = go.Figure(go.Bar(
+        x=cc["Count"], y=cc["Country"], orientation="h",
+        marker=dict(color=c_colors, line=dict(width=0)),
+        text=cc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=10),
+        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+    ))
+    _dark(fig, max(320, top_n * 22))
+    fig.update_layout(title=dict(text=f"Top {top_n} Countries", font=dict(color=_TITLE, size=13), x=0.01))
+    return fig
+
+
+def chart_timeline(df):
+    df2 = df[df["Date"] != "Unknown"].copy()
+    if df2.empty:
+        return None
+    df2["dt"] = pd.to_datetime(df2["Date"])
+    daily = df2.groupby(df2["dt"].dt.date).size().reset_index()
+    daily.columns = ["Date", "Articles"]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=daily["Date"], y=daily["Articles"],
+        mode="lines+markers",
+        line=dict(color="#00b4ff", width=2.5),
+        marker=dict(color="#0047e1", size=5, line=dict(color="#00b4ff", width=1.5)),
+        fill="tozeroy", fillcolor="rgba(0,71,225,0.07)",
+        hovertemplate="<b>%{x}</b><br>%{y} articles<extra></extra>",
+    ))
+    _dark(fig, 240)
+    fig.update_layout(
+        title=dict(text="Publication Volume Over Time", font=dict(color=_TITLE, size=13), x=0.01),
+        yaxis_title="Articles",
+    )
+    return fig
+
+
+def chart_sentiment(df):
+    sc = df["Sentiment"].value_counts().reset_index()
+    sc.columns = ["Sentiment", "Count"]
+    sent_colors = {
+        "Opened / Live": "#00e676", "Approved": "#00b4ff",
+        "Proposed": "#ffaa00", "Under Construction": "#00e5c8",
+        "Challenged": "#ff2d6b", "News": "#2e4470",
+    }
+    colors = [sent_colors.get(s, "#2e4470") for s in sc["Sentiment"]]
+    fig = go.Figure(go.Bar(
+        x=sc["Sentiment"], y=sc["Count"],
+        marker=dict(color=colors, line=dict(width=0)),
+        text=sc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=11),
+        hovertemplate="<b>%{x}</b>: %{y}<extra></extra>",
+    ))
+    _dark(fig, 280)
+    fig.update_layout(title=dict(text="Article Sentiment / Status", font=dict(color=_TITLE, size=13), x=0.01))
+    return fig
+
+
+def chart_donut(df):
+    tc = df["Topic"].value_counts().reset_index()
+    tc.columns = ["Topic", "Count"]
+    colors = [TOPIC_COLORS.get(t, "#2e4470") for t in tc["Topic"]]
+    fig = go.Figure(go.Pie(
+        labels=tc["Topic"], values=tc["Count"], hole=0.55,
+        marker=dict(colors=colors, line=dict(color=_BG, width=2)),
+        textinfo="label+percent",
+        textfont=dict(color=_TITLE, size=11),
+        hovertemplate="<b>%{label}</b>: %{value} (%{percent})<extra></extra>",
+    ))
+    fig.update_layout(
+        paper_bgcolor=_PAPER, plot_bgcolor=_BG,
+        font=dict(family=_FONT, color=_TEXT),
+        height=340, margin=dict(l=14, r=14, t=36, b=14),
+        showlegend=True,
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+        annotations=[dict(
+            text=f"<b>{len(df)}</b><br><span style='font-size:10px'>articles</span>",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=15, color=_TITLE, family=_FONT),
+        )],
+        title=dict(text="Topic Share", font=dict(color=_TITLE, size=13), x=0.01),
+    )
+    return fig
+
+
+def chart_source_bar(df):
+    sc = df["Source"].value_counts().reset_index()
+    sc.columns = ["Source", "Count"]
+    sc = sc.sort_values("Count")
+    colors = [SOURCE_META.get(s, SOURCE_META["Unknown"])["color"] for s in sc["Source"]]
+    fig = go.Figure(go.Bar(
+        x=sc["Count"], y=sc["Source"], orientation="h",
+        marker=dict(color=colors, line=dict(width=0)),
+        text=sc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=11),
+        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+    ))
+    _dark(fig, 280)
+    fig.update_layout(title=dict(text="Articles by Source", font=dict(color=_TITLE, size=13), x=0.01))
+    return fig
+
+
+def chart_world_map(df):
+    cc = df[df["Country"] != "Global"]["Country"].value_counts().reset_index()
+    cc.columns = ["Country", "Count"]
+    cc["ISO"] = cc["Country"].map(COUNTRY_ISO)
+    cc = cc.dropna(subset=["ISO"])
+    fig = go.Figure(go.Choropleth(
+        locations=cc["ISO"],
+        z=cc["Count"],
+        text=cc["Country"],
+        colorscale=[
+            [0.0, "#0a1628"],
+            [0.2, "#0e2040"],
+            [0.4, "#0047e1"],
+            [0.7, "#00b4ff"],
+            [1.0, "#00e5c8"],
+        ],
+        autocolorscale=False,
+        reversescale=False,
+        marker=dict(line=dict(color="#0f1e36", width=0.6)),
+        colorbar=dict(
+            bgcolor=_PAPER, bordercolor=_GRID, borderwidth=1,
+            tickfont=dict(color=_TITLE, size=10),
+            title=dict(text="Articles", font=dict(color=_TITLE, size=11)),
+            len=0.7, thickness=14,
+        ),
+        hovertemplate="<b>%{text}</b><br>Articles: %{z}<extra></extra>",
+        showscale=True,
+        zmin=0,
+    ))
+    fig.update_geos(
+        bgcolor=_BG,
+        landcolor="#0d1a2e",
+        oceancolor="#060a10",
+        lakecolor="#060a10",
+        rivercolor="#060a10",
+        framecolor=_GRID,
+        showland=True, showocean=True, showlakes=True,
+        showcountries=True, countrycolor="#152038",
+        showframe=True,
+        projection_type="natural earth",
+    )
+    fig.update_layout(
+        paper_bgcolor=_BG, plot_bgcolor=_BG,
+        height=480,
+        margin=dict(l=0, r=0, t=32, b=0),
+        title=dict(
+            text="Global Data Center Activity",
+            font=dict(color=_TITLE, size=14, family=_FONT), x=0.01,
+        ),
+        geo=dict(bgcolor=_BG),
+    )
+    return fig
+
+
+def dark_table(df_in, max_rows=300):
     th = (
-        "background:#0f1e36;color:#c8d4e8;font-family:monospace;"
-        "font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;"
-        "padding:.6rem .9rem;border-bottom:2px solid #0057ff;white-space:nowrap;"
-        "text-align:left;"
+        "background:#0f1e36;color:#b8c8e0;font-family:monospace;"
+        "font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;"
+        "padding:.55rem .85rem;border-bottom:2px solid #0047e1;"
+        "white-space:nowrap;text-align:left;"
     )
-    td_base = (
-        "padding:.55rem .9rem;font-size:.82rem;color:#c8d4e8;"
-        "border-bottom:1px solid #141f35;font-family:Inter,sans-serif;"
+    td = (
+        "padding:.5rem .85rem;font-size:.8rem;color:#b8c8e0;"
+        "border-bottom:1px solid #101b2e;font-family:Inter,sans-serif;"
         "vertical-align:middle;"
     )
-    rows_html = ""
+    rows = ""
     for i, (_, row) in enumerate(df_in.head(max_rows).iterrows()):
-        bg = "#0d1628" if i % 2 == 0 else "#080c14"
+        bg = "#0b1628" if i % 2 == 0 else "#060a10"
         cells = ""
         for col in df_in.columns:
-            raw = row[col]
-            val = str(raw) if raw is not None else ""
-            if col == "URL" or (val.startswith("http")):
+            v = str(row[col]) if row[col] is not None else ""
+            if col == "URL" or (col != "Headline" and v.startswith("http")):
                 cells += (
-                    f'<td style="{td_base}background:{bg};">'
-                    f'<a href="{val}" target="_blank" '
-                    f'style="color:#0057ff;text-decoration:none;font-size:.78rem;">'
+                    f'<td style="{td}background:{bg};">'
+                    f'<a href="{v}" target="_blank" '
+                    f'style="color:#0047e1;text-decoration:none;font-size:.75rem;">'
                     f'Open \u2192</a></td>'
                 )
-            elif col == "Capacity" and val:
+            elif col == "Capacity" and v:
                 cells += (
-                    f'<td style="{td_base}background:{bg};">'
-                    f'<span style="color:#ffab00;font-family:monospace;font-size:.78rem;">'
-                    f'\u26a1 {val}</span></td>'
+                    f'<td style="{td}background:{bg};">'
+                    f'<span style="color:#ffaa00;font-family:monospace;font-size:.76rem;">'
+                    f'\u26a1 {v}</span></td>'
+                )
+            elif col == "Deal Size" and v:
+                cells += (
+                    f'<td style="{td}background:{bg};">'
+                    f'<span style="color:#00e676;font-family:monospace;font-size:.76rem;">'
+                    f'{v}</span></td>'
                 )
             elif col == "Topic":
-                tc2 = TOPIC_COLORS.get(val, "#3a5280")
+                tc = TOPIC_COLORS.get(v, "#2e4470")
                 cells += (
-                    f'<td style="{td_base}background:{bg};">'
-                    f'<span style="background:{tc2}22;color:{tc2};'
-                    f'border:1px solid {tc2}55;border-radius:4px;'
-                    f'padding:2px 8px;font-size:.72rem;font-family:monospace;">'
-                    f'{val}</span></td>'
+                    f'<td style="{td}background:{bg};">'
+                    f'<span style="background:{tc}22;color:{tc};border:1px solid {tc}44;'
+                    f'border-radius:4px;padding:2px 7px;font-size:.68rem;font-family:monospace;">'
+                    f'{v}</span></td>'
                 )
-            elif col == "Headline":
+            elif col == "Region":
+                rc2 = REGION_COLORS.get(v, "#2e4470")
                 cells += (
-                    f'<td style="{td_base}background:{bg};max-width:500px;'
-                    f'word-wrap:break-word;white-space:normal;">{val}</td>'
+                    f'<td style="{td}background:{bg};">'
+                    f'<span style="background:{rc2}22;color:{rc2};border:1px solid {rc2}44;'
+                    f'border-radius:4px;padding:2px 7px;font-size:.68rem;font-family:monospace;">'
+                    f'{v}</span></td>'
+                )
+            elif col == "Sentiment":
+                sent_c = {
+                    "Opened / Live":"#00e676","Approved":"#00b4ff","Proposed":"#ffaa00",
+                    "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
+                }.get(v, "#2e4470")
+                cells += (
+                    f'<td style="{td}background:{bg};">'
+                    f'<span style="background:{sent_c}18;color:{sent_c};'
+                    f'border:1px solid {sent_c}44;border-radius:4px;'
+                    f'padding:2px 7px;font-size:.68rem;font-family:monospace;">'
+                    f'{v}</span></td>'
+                )
+            elif col == "Source":
+                sc2 = SOURCE_META.get(v, SOURCE_META["Unknown"])
+                sc2_color = sc2["color"]
+                sc2_short = sc2["short"]
+                cells += (
+                    f'<td style="{td}background:{bg};">'
+                    f'<span style="background:{sc2_color}22;color:{sc2_color};'
+                    f'border:1px solid {sc2_color}44;border-radius:4px;'
+                    f'padding:2px 6px;font-size:.65rem;font-family:monospace;">'
+                    f'{sc2_short}</span></td>'
+                )
+            elif col in ("Headline", "Companies"):
+                cells += (
+                    f'<td style="{td}background:{bg};max-width:480px;'
+                    f'word-wrap:break-word;white-space:normal;">{v}</td>'
                 )
             else:
-                cells += f'<td style="{td_base}background:{bg};">{val}</td>'
-        rows_html += f"<tr>{cells}</tr>"
+                cells += f'<td style="{td}background:{bg};">{v}</td>'
+        rows += f"<tr>{cells}</tr>"
 
-    headers = "".join(f'<th style="{th}">{c}</th>' for c in df_in.columns)
+    heads = "".join(f'<th style="{th}">{c}</th>' for c in df_in.columns)
     return (
-        '<div style="overflow-x:auto;border-radius:10px;'
-        'border:1px solid #1a2b48;margin-bottom:1rem;">'
-        f'<table style="width:100%;border-collapse:collapse;background:#080c14;">'
-        f'<thead><tr>{headers}</tr></thead>'
-        f'<tbody>{rows_html}</tbody></table></div>'
+        '<div style="overflow-x:auto;border-radius:10px;border:1px solid #152038;margin-bottom:1rem;">'
+        f'<table style="width:100%;border-collapse:collapse;background:#060a10;">'
+        f'<thead><tr>{heads}</tr></thead>'
+        f'<tbody>{rows}</tbody></table></div>'
     )
 
 
+def article_card(headline, date, url, source, country, topic, capacity, deal, sentiment):
+    tc = TOPIC_COLORS.get(topic, "#2e4470")
+    sc_meta = SOURCE_META.get(source, SOURCE_META["Unknown"])
+    cap_html = (
+        f'<span style="background:rgba(255,170,0,0.12);color:#ffaa00;'
+        f'border:1px solid rgba(255,170,0,0.3);border-radius:4px;'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;">'
+        f'\u26a1 {capacity}</span>'
+    ) if capacity else ""
+    deal_html = (
+        f'<span style="background:rgba(0,230,118,0.1);color:#00e676;'
+        f'border:1px solid rgba(0,230,118,0.25);border-radius:4px;'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;">'
+        f'{deal}</span>'
+    ) if deal else ""
+    sent_c = {
+        "Opened / Live":"#00e676","Approved":"#00b4ff","Proposed":"#ffaa00",
+        "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
+    }.get(sentiment, "#2e4470")
+    arrow = "\u2197"
+    return (
+        f'<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
+        f'padding:.85rem 1.1rem;display:flex;justify-content:space-between;'
+        f'align-items:flex-start;gap:.9rem;margin-bottom:.45rem;">'
+        f'<div style="flex:1;min-width:0;">'
+        f'<a href="{url}" target="_blank" '
+        f'style="color:#ccdaf5;text-decoration:none;font-family:Inter,sans-serif;'
+        f'font-size:.86rem;font-weight:500;line-height:1.5;">{headline}</a>'
+        f'<div style="margin-top:.35rem;display:flex;gap:.4rem;flex-wrap:wrap;">'
+        f'<span style="font-family:monospace;font-size:.62rem;color:#2a3e60;">\U0001f4c5 {date}</span>'
+        f'<span style="font-family:monospace;font-size:.62rem;color:#4a6490;">\U0001f30d {country}</span>'
+        f'</div></div>'
+        f'<div style="display:flex;flex-direction:column;align-items:flex-end;'
+        f'gap:.28rem;flex-shrink:0;white-space:nowrap;">'
+        f'<span style="background:{sc_meta["color"]}22;color:{sc_meta["color"]};'
+        f'border:1px solid {sc_meta["color"]}44;border-radius:4px;'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;">{sc_meta["short"]}</span>'
+        f'<span style="background:{tc}22;color:{tc};border:1px solid {tc}44;'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{topic}</span>'
+        f'<span style="background:{sent_c}18;color:{sent_c};border:1px solid {sent_c}44;'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{sentiment}</span>'
+        f'{cap_html}{deal_html}'
+        f'<a href="{url}" target="_blank" '
+        f'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;">'
+        f'{arrow} open</a>'
+        f'</div></div>'
+    )
+
+
+def kpi(label, value, accent="blue", delta=""):
+    accent_map = {
+        "blue":  ("#0047e1", "#00b4ff"),
+        "cyan":  ("#00b4ff", "#00e5c8"),
+        "green": ("#00e676", "#00c853"),
+        "amber": ("#ffaa00", "#ff6400"),
+        "purple":("#a855f7", "#7c3aed"),
+        "red":   ("#ff2d6b", "#ff0044"),
+    }
+    c1, c2 = accent_map.get(accent, accent_map["blue"])
+    delta_html = f'<div style="font-size:.7rem;color:#2a3e60;margin-top:.25rem;">{delta}</div>' if delta else ""
+    return (
+        f'<div style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;'
+        f'border-radius:12px;padding:1.1rem 1.3rem;position:relative;overflow:hidden;">'
+        f'<div style="position:absolute;top:0;left:0;right:0;height:2px;'
+        f'background:linear-gradient(90deg,{c1},{c2});"></div>'
+        f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;'
+        f'text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">{label}</div>'
+        f'<div style="font-family:Syne,sans-serif;font-size:1.9rem;font-weight:800;'
+        f'color:#fff;line-height:1;">{value}</div>'
+        f'{delta_html}</div>'
+    )
 
 
 def main():
     st.set_page_config(
-        page_title="DCD Intel | US Data Center Construction",
-        page_icon="🏗️",
+        page_title="Global DC Intel",
+        page_icon="\U0001f310",
         layout="wide",
         initial_sidebar_state="expanded",
     )
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-    
     with st.sidebar:
-        st.markdown("""
-        <div style="padding:1rem 0 0.5rem;text-align:center;">
-            <div style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.2em;color:#3a5280;text-transform:uppercase;margin-bottom:.3rem;">Intelligence Platform</div>
-            <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#fff;">DCD Intel</div>
-            <div style="font-family:'DM Mono',monospace;font-size:.65rem;color:#3a5280;margin-top:.2rem;">US Construction Monitor</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.divider()
-        st.markdown("**📅 Date Range**")
-        time_opt = st.radio(
-            "", ["Latest (all available)", "Past 30 days", "Past 10 days"], index=0,
-            label_visibility="collapsed",
+        st.markdown(
+            '<div style="padding:.9rem 0 .4rem;text-align:center;">'
+            '<div style="font-family:monospace;font-size:.6rem;letter-spacing:.2em;'
+            'color:#1a2e50;text-transform:uppercase;margin-bottom:.25rem;">Intelligence Platform</div>'
+            '<div style="font-family:Syne,sans-serif;font-size:1.15rem;font-weight:800;color:#fff;">DC Intel</div>'
+            '<div style="font-family:monospace;font-size:.6rem;color:#1a2e50;margin-top:.15rem;">'
+            'Global Construction Monitor</div></div>',
+            unsafe_allow_html=True,
         )
-        days_map = {"Latest (all available)": None, "Past 30 days": 30, "Past 10 days": 10}
-        sel_days = days_map[time_opt]
-        st.markdown("**📄 Scrape Depth**")
-        max_pages = st.slider("", 1, 30, 5, label_visibility="collapsed",
-                               help="~28 articles per page")
-        st.markdown(f"<div style='font-size:.75rem;color:#3a5280;margin-top:-.5rem;margin-bottom:.8rem;'>≈ {max_pages*28} articles to scan</div>", unsafe_allow_html=True)
-        use_na = st.checkbox("🌎 Pre-filter: North America", value=True)
         st.divider()
 
-        # Post-filters (shown after scrape)
+        st.markdown("**\U0001f4c5 Date Range**")
+        time_opt = st.radio(
+            "", ["Latest (all)", "Past 30 days", "Past 14 days", "Past 7 days", "Custom Range"],
+            index=0, label_visibility="collapsed",
+        )
+        days_map = {"Latest (all)": None, "Past 30 days": 30, "Past 14 days": 14, "Past 7 days": 7}
+        sel_days = days_map.get(time_opt, None)
+
+        custom_start = None
+        custom_end   = None
+        if time_opt == "Custom Range":
+            today = datetime.now().date()
+            c1, c2 = st.columns(2)
+            with c1:
+                custom_start = st.date_input(
+                    "From", value=today - timedelta(days=30),
+                    max_value=today, label_visibility="visible",
+                )
+            with c2:
+                custom_end = st.date_input(
+                    "To", value=today,
+                    max_value=today, label_visibility="visible",
+                )
+            if custom_start and custom_end and custom_start > custom_end:
+                st.error("Start date must be before end date.")
+                custom_start, custom_end = custom_end, custom_start
+            st.markdown(
+                f'<div style="font-size:.68rem;color:#1a2e50;margin-top:-.3rem;margin-bottom:.4rem;">'
+                f'{custom_start.strftime("%d %b %Y") if custom_start else ""}'
+                f' → '
+                f'{custom_end.strftime("%d %b %Y") if custom_end else ""}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("**\U0001f4c4 HTML Scrape Depth**")
+        max_pages = st.slider("", 1, 10, 3, label_visibility="collapsed",
+                              help="Pages per HTML source (~28 articles/page)")
+        st.markdown(
+            f'<div style="font-size:.7rem;color:#1a2e50;margin-top:-.4rem;margin-bottom:.6rem;">'
+            f'~{max_pages * 28 * len(SCRAPE_SOURCES)} max HTML articles</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("**\U0001f4e1 Sources**")
+        use_html = st.checkbox("HTML Scrapers (DCD regions)", value=True)
+        use_rss  = st.checkbox("RSS Feeds (DCK, DCF, PRN, BIZ, Reuters)", value=True)
+        use_gn   = st.checkbox("Google News (5 queries)", value=True)
+
+        st.divider()
+
         if "df_full" in st.session_state and st.session_state.df_full is not None:
             df_full = st.session_state.df_full
-            st.markdown("**🔍 Refine Results**")
-            all_topics  = sorted(df_full["Topic"].unique().tolist())
-            all_states  = sorted(df_full["State"].unique().tolist())
-            sel_topics  = st.multiselect("Topics", all_topics, default=all_topics)
-            sel_states  = st.multiselect("States", all_states, default=all_states)
-            keyword     = st.text_input("Keyword search", placeholder="e.g. Microsoft, 100MW…")
+            st.markdown("**\U0001f50d Refine Results**")
+            all_regions  = sorted(df_full["Region"].unique().tolist())
+            all_topics   = sorted(df_full["Topic"].unique().tolist())
+            all_sources  = sorted(df_full["Source"].unique().tolist())
+            all_sents    = sorted(df_full["Sentiment"].unique().tolist())
+            sel_regions  = st.multiselect("Regions", all_regions, default=all_regions)
+            sel_topics   = st.multiselect("Topics", all_topics, default=all_topics)
+            sel_sources  = st.multiselect("Sources", all_sources, default=all_sources)
+            sel_sents    = st.multiselect("Sentiment", all_sents, default=all_sents)
+            keyword      = st.text_input("Keyword", placeholder="Microsoft, 500MW, Texas...")
+            min_mw       = st.number_input("Min capacity (MW)", min_value=0, value=0, step=10)
+
+            st.markdown("**\U0001f4c6 Filter by Published Date**")
+            valid_dates = df_full[df_full["Date"] != "Unknown"]["Date"]
+            if not valid_dates.empty:
+                min_date = pd.to_datetime(valid_dates).min().date()
+                max_date = pd.to_datetime(valid_dates).max().date()
+                fc1, fc2 = st.columns(2)
+                with fc1:
+                    filt_from = st.date_input(
+                        "From", value=min_date,
+                        min_value=min_date, max_value=max_date,
+                        key="filt_from",
+                    )
+                with fc2:
+                    filt_to = st.date_input(
+                        "To", value=max_date,
+                        min_value=min_date, max_value=max_date,
+                        key="filt_to",
+                    )
+                use_date_filter = st.checkbox("Apply date filter", value=False)
+            else:
+                filt_from = filt_to = None
+                use_date_filter = False
+
             st.session_state.filters = {
-                "topics": sel_topics, "states": sel_states, "keyword": keyword
+                "regions": sel_regions, "topics": sel_topics,
+                "sources": sel_sources, "sents": sel_sents,
+                "keyword": keyword, "min_mw": min_mw,
+                "date_from": filt_from if use_date_filter else None,
+                "date_to":   filt_to   if use_date_filter else None,
             }
+
         st.divider()
-        go = st.button("🔍  Run Intelligence Scan", use_container_width=True, type="primary")
+        go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
 
-    
-    now_str = datetime.now().strftime("%A, %d %B %Y  ·  %H:%M UTC")
-    st.markdown(f"""
-    <div class="dcd-banner">
-        <div class="banner-eyebrow">● Live Intelligence Feed</div>
-        <div class="banner-title">US Data Center <span>Construction</span> Monitor</div>
-        <div class="banner-sub">Real-time scrape of Data Center Dynamics · Filtered for American states & metros</div>
-        <div class="banner-ts">🕐 {now_str}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    now_str = datetime.now().strftime("%A, %d %B %Y  \u00b7  %H:%M UTC")
+    st.markdown(
+        f'<div class="gl-banner">'
+        f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES)} Sources Active</div>'
+        f'<div class="banner-title">Global Data Center <span>Construction</span> Intelligence</div>'
+        f'<div class="banner-sub">Real-time aggregation across trade press, RSS feeds & Google News \u00b7 '
+        f'Auto-tagged by region, topic, company & capacity \u00b7 '
+        f'Deduplicated across all sources</div>'
+        f'<div class="banner-ts">\U0001f550 {now_str}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-    
     if "df_full" not in st.session_state:
         st.session_state.df_full = None
 
-    if not go and st.session_state.df_full is None:
-        c1, c2, c3 = st.columns(3)
-        c1.markdown("""
-        <div class="kpi-card blue" style="opacity:.55">
-            <div class="kpi-label">Articles indexed</div>
-            <div class="kpi-value">—</div>
-            <div class="kpi-delta">Run scan to populate</div>
-        </div>""", unsafe_allow_html=True)
-        c2.markdown("""
-        <div class="kpi-card cyan" style="opacity:.55">
-            <div class="kpi-label">US-related</div>
-            <div class="kpi-value">—</div>
-        </div>""", unsafe_allow_html=True)
-        c3.markdown("""
-        <div class="kpi-card green" style="opacity:.55">
-            <div class="kpi-label">States covered</div>
-            <div class="kpi-value">—</div>
-        </div>""", unsafe_allow_html=True)
-        st.markdown('<div class="section-header">How it works</div>', unsafe_allow_html=True)
-        st.markdown("""
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
-            <div class="kpi-card" style="flex:1;min-width:200px;">
-                <div style="font-size:1.5rem;margin-bottom:.5rem;">🕸️</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#c8d4e8;margin-bottom:.3rem;">Smart Scrape</div>
-                <div style="font-size:.82rem;color:#4a6490;">Fetches DCD's Construction Channel using Cloudflare bypass — server-rendered HTML, no browser needed.</div>
-            </div>
-            <div class="kpi-card" style="flex:1;min-width:200px;">
-                <div style="font-size:1.5rem;margin-bottom:.5rem;">🗺️</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#c8d4e8;margin-bottom:.3rem;">US State Filter</div>
-                <div style="font-size:.82rem;color:#4a6490;">50 states + abbreviations + 80 major data center cities & counties — only American articles pass.</div>
-            </div>
-            <div class="kpi-card" style="flex:1;min-width:200px;">
-                <div style="font-size:1.5rem;margin-bottom:.5rem;">🏷️</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#c8d4e8;margin-bottom:.3rem;">Auto-Tagging</div>
-                <div style="font-size:.82rem;color:#4a6490;">Articles auto-tagged by topic (Hyperscale, AI/GPU, Power, Investment…) and capacity (MW/GW).</div>
-            </div>
-            <div class="kpi-card" style="flex:1;min-width:200px;">
-                <div style="font-size:1.5rem;margin-bottom:.5rem;">📊</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#c8d4e8;margin-bottom:.3rem;">Rich Export</div>
-                <div style="font-size:.82rem;color:#4a6490;">3-sheet Excel: articles with clickable links + State Breakdown + Topic Breakdown, all formatted.</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    if not go_btn and st.session_state.df_full is None:
+        st.markdown(
+            '<div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-bottom:1.4rem;">',
+            unsafe_allow_html=True,
+        )
+        features = [
+            ("\U0001f578\ufe0f", "Multi-Source Scraping",
+             "Hits DCD (5 regions), DataCenter Knowledge, DataCenterFrontier, "
+             "PR Newswire, BusinessWire, Reuters & 5 Google News queries simultaneously."),
+            ("\U0001f30d", "Global Coverage",
+             "Covers 45+ countries across all continents with country/region auto-detection "
+             "using 500+ geographic keywords and city names."),
+            ("\U0001f9e0", "Smart Enrichment",
+             "Every article auto-tagged: Topic, Sentiment (Approved/Proposed/Opened/Challenged), "
+             "Capacity (MW/GW), Deal Size ($bn/$m), and up to 4 company names."),
+            ("\u26a1", "Deduplication",
+             "Fuzzy title matching (82% similarity threshold) collapses the same story "
+             "appearing across multiple sources into a single clean record."),
+            ("\U0001f5fa\ufe0f", "World Map",
+             "Choropleth map showing article volume by country — instantly see "
+             "where global data center activity is hottest."),
+            ("\U0001f4ca", "5-Sheet Excel",
+             "Export: All Articles + By Country + By Region + By Topic + By Company "
+             "\u2014 all colour-coded with clickable hyperlinks."),
+        ]
+        row_html = ""
+        for icon, title, desc in features:
+            row_html += (
+                f'<div style="flex:1;min-width:200px;background:#0b1628;border:1px solid #152038;'
+                f'border-radius:10px;padding:1rem 1.15rem;">'
+                f'<div style="font-size:1.4rem;margin-bottom:.4rem;">{icon}</div>'
+                f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                f'font-size:.9rem;margin-bottom:.3rem;">{title}</div>'
+                f'<div style="font-size:.78rem;color:#3a5480;line-height:1.5;">{desc}</div>'
+                f'</div>'
+            )
+        st.markdown(row_html + '</div>', unsafe_allow_html=True)
         return
 
-    
-    if go:
-        st.session_state.filters = {"topics": [], "states": [], "keyword": ""}
-        cutoff = datetime.min if sel_days is None else datetime.now() - timedelta(days=sel_days)
-        pbar = st.progress(0, text="Initialising scan…")
-        raw = scrape(cutoff, max_pages, use_na, pbar)
-        pbar.empty()
+    if go_btn:
+        st.session_state.filters = {
+            "regions": [], "topics": [], "sources": [],
+            "sents": [], "keyword": "", "min_mw": 0,
+        }
+        if time_opt == "Custom Range" and custom_start and custom_end:
+            cutoff    = datetime.combine(custom_start, datetime.min.time())
+            cutoff_end = datetime.combine(custom_end,   datetime.max.time())
+        elif sel_days is None:
+            cutoff     = datetime.min
+            cutoff_end = datetime.max
+        else:
+            cutoff     = datetime.now() - timedelta(days=sel_days)
+            cutoff_end = datetime.max
+        st.session_state.cutoff_end = cutoff_end
 
-        if not raw:
-            st.error("No articles fetched. Check network / Cloudflare status.")
-            return
+        pbar = st.progress(0.0, text="Initialising global scan...")
 
-        us_arts = [a for a in raw if is_us(a["Headline"])]
-        us_arts = enrich(us_arts)
+        active_html  = SCRAPE_SOURCES if use_html else []
+        active_rss   = RSS_SOURCES    if use_rss  else []
+        active_gn    = GNEWS_QUERIES  if use_gn   else []
+        total_tasks  = len(active_html) + len(active_rss) + len(active_gn)
+        done_count   = [0]
+
+        def progress_cb(frac, label=""):
+            pbar.progress(min(frac, 1.0), text=f"Scanning sources... {label}")
+
+        raw = []
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures = {}
+            for src in active_html:
+                futures[pool.submit(scrape_html_source, src, max_pages)] = src["name"]
+            for src in active_rss:
+                futures[pool.submit(fetch_rss, src)] = src["name"]
+            for q, lbl in active_gn:
+                futures[pool.submit(fetch_google_news, q, lbl)] = lbl
+
+            for f in as_completed(futures):
+                try:
+                    items = f.result()
+                    raw.extend(items)
+                except Exception:
+                    pass
+                done_count[0] += 1
+                pbar.progress(
+                    done_count[0] / max(total_tasks, 1),
+                    text=f"Fetched {futures[f]}... ({done_count[0]}/{total_tasks})",
+                )
+
+        pbar.progress(1.0, text="Enriching and deduplicating...")
+
+        cutoff_end_val = st.session_state.get("cutoff_end", datetime.max)
+        filtered = []
+        for item in raw:
+            d = item.get("date_obj")
+            if d and d < cutoff:
+                continue
+            if d and d > cutoff_end_val:
+                continue
+            if not is_dc_relevant(item["headline"]):
+                continue
+            filtered.append(item)
+
+        enriched = [enrich(i) for i in filtered]
+        deduped  = deduplicate(enriched)
 
         df_full = (
-            pd.DataFrame(us_arts)[["Headline","Date","URL","State","Topic","Capacity"]]
+            pd.DataFrame(deduped)
+            .drop(columns=["_date_obj"], errors="ignore")
             .sort_values("Date", ascending=False)
             .reset_index(drop=True)
         )
         st.session_state.df_full   = df_full
         st.session_state.raw_count = len(raw)
         st.session_state.scan_time = datetime.now().strftime("%H:%M, %d %b %Y")
+        pbar.empty()
         st.rerun()
 
-    
     df_full = st.session_state.df_full
     if df_full is None or df_full.empty:
-        st.warning("No US articles found. Try increasing page count or disabling NA pre-filter.")
+        st.warning("No articles found. Try expanding the date range or enabling more sources.")
         return
 
     filters = st.session_state.get("filters", {})
     df = df_full.copy()
+    if filters.get("regions"):
+        df = df[df["Region"].isin(filters["regions"])]
     if filters.get("topics"):
         df = df[df["Topic"].isin(filters["topics"])]
-    if filters.get("states"):
-        df = df[df["State"].isin(filters["states"])]
+    if filters.get("sources"):
+        df = df[df["Source"].isin(filters["sources"])]
+    if filters.get("sents"):
+        df = df[df["Sentiment"].isin(filters["sents"])]
+    if filters.get("date_from") and filters.get("date_to"):
+        df_dates = df[df["Date"] != "Unknown"].copy()
+        df_dates["_dt"] = pd.to_datetime(df_dates["Date"], errors="coerce")
+        mask = (df_dates["_dt"] >= pd.Timestamp(filters["date_from"])) &                (df_dates["_dt"] <= pd.Timestamp(filters["date_to"]))
+        df_dates = df_dates[mask].drop(columns=["_dt"])
+        df_unk = df[df["Date"] == "Unknown"]
+        df = pd.concat([df_dates, df_unk], ignore_index=True)
     if filters.get("keyword"):
         kw = filters["keyword"].lower()
         df = df[df["Headline"].str.lower().str.contains(kw, na=False)]
+    if filters.get("min_mw", 0) > 0:
+        def extract_mw_val(cap):
+            if not cap:
+                return 0
+            m = re.search(r"([\d.]+)\s*(GW|MW)", str(cap), re.I)
+            if not m:
+                return 0
+            v = float(m.group(1))
+            return v * 1000 if m.group(2).upper() == "GW" else v
+        df = df[df["Capacity"].apply(extract_mw_val) >= filters["min_mw"]]
     df = df.reset_index(drop=True)
 
-    states_covered = df["State"].nunique()
-    capacity_arts  = df[df["Capacity"] != ""]["Capacity"].count()
-    scan_ts        = st.session_state.get("scan_time", "—")
+    scan_ts = st.session_state.get("scan_time", "\u2014")
+    top_country = df["Country"].value_counts().idxmax() if not df.empty else "\u2014"
+    top_topic   = df["Topic"].value_counts().idxmax()   if not df.empty else "\u2014"
+    cap_count   = int((df["Capacity"] != "").sum())
+    deal_count  = int((df["Deal Size"] != "").sum())
 
-    kpi_html = f"""
-    <div class="kpi-row">
-        {kpi_card("Articles Scanned", st.session_state.raw_count, "blue", "from DCD Construction Channel")}
-        {kpi_card("US-Related", len(df_full), "cyan", "matched US state / city filter")}
-        {kpi_card("Filtered View", len(df), "green", "after current filters")}
-        {kpi_card("States Covered", states_covered, "gold", "distinct US states in results")}
-        {kpi_card("Capacity Mentions", capacity_arts, "blue", "articles with MW/GW data")}
-    </div>"""
+    kpi_html = (
+        '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
+        + kpi("Sources Polled", len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES), "blue", "HTML + RSS + Google News")
+        + kpi("Raw Articles", st.session_state.raw_count, "cyan", "before dedup & filter")
+        + kpi("Unique Articles", len(df_full), "green", "after deduplication")
+        + kpi("Filtered View", len(df), "amber", "current filters applied")
+        + kpi("Capacity Mentions", cap_count, "purple", "articles with MW/GW data")
+        + kpi("Deal Mentions", deal_count, "red", "articles with $bn/$m data")
+        + '</div>'
+    )
     st.markdown(kpi_html, unsafe_allow_html=True)
 
-    top_state  = df["State"].value_counts().idxmax() if not df.empty else "—"
-    top_topic  = df["Topic"].value_counts().idxmax() if not df.empty else "—"
-    latest_dt  = df["Date"].max() if not df.empty else "—"
-    pills = f"""
-    <div class="insight-row">
-        <div class="insight-pill"><span class="dot"></span>Last scan: <b>{scan_ts}</b></div>
-        <div class="insight-pill"><span class="dot"></span>Top state: <b>{top_state}</b></div>
-        <div class="insight-pill"><span class="dot"></span>Top topic: <b>{top_topic}</b></div>
-        <div class="insight-pill"><span class="dot"></span>Most recent article: <b>{latest_dt}</b></div>
-        <div class="insight-pill"><span class="dot"></span>Source: <b>DataCenterDynamics.com</b></div>
-    </div>"""
-    st.markdown(pills, unsafe_allow_html=True)
+    top_region = df["Region"].value_counts().idxmax() if not df.empty else "\u2014"
+    latest_dt  = df["Date"].max() if not df.empty else "\u2014"
+    pills_html = (
+        '<div class="pill-row">'
+        f'<div class="pill"><span class="pill-dot"></span>Scan: <b>{scan_ts}</b></div>'
+        f'<div class="pill"><span class="pill-dot"></span>Top Region: <b>{top_region}</b></div>'
+        f'<div class="pill"><span class="pill-dot"></span>Top Country: <b>{top_country}</b></div>'
+        f'<div class="pill"><span class="pill-dot"></span>Top Topic: <b>{top_topic}</b></div>'
+        f'<div class="pill"><span class="pill-dot"></span>Latest Article: <b>{latest_dt}</b></div>'
+        f'<div class="pill"><span class="pill-dot"></span>Countries: <b>{df["Country"].nunique()}</b></div>'
+        '</div>'
+    )
+    st.markdown(pills_html, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📰 Articles", "📊 Analytics", "🗺️ State View", "⬇️ Export"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "\U0001f4f0 Feed",
+        "\U0001f5fa\ufe0f World Map",
+        "\U0001f4ca Analytics",
+        "\U0001f3e2 By Company",
+        "\u2b07\ufe0f Export",
+    ])
 
     with tab1:
-        st.markdown('<div class="section-header">Latest US Construction Articles</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-head">Global Intelligence Feed</div>', unsafe_allow_html=True)
         if df.empty:
-            st.info("No articles match your current filters.")
+            st.info("No articles match the current filters.")
         else:
-            # Render each card individually — avoids Streamlit truncating large HTML blobs
             for _, row in df.iterrows():
                 st.markdown(
-                    article_card_html(
+                    article_card(
                         row["Headline"], row["Date"], row["URL"],
-                        row["Topic"], row.get("Capacity", "")
+                        row["Source"], row["Country"], row["Topic"],
+                        row.get("Capacity", ""), row.get("Deal Size", ""),
+                        row.get("Sentiment", "News"),
                     ),
                     unsafe_allow_html=True,
                 )
 
     with tab2:
-        import plotly.graph_objects as go
-        import plotly.express as px
+        st.markdown('<div class="sec-head">Global Activity Map</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_world_map(df), use_container_width=True, config={"displayModeBar": False})
+        st.markdown('<div class="sec-head">Country Breakdown</div>', unsafe_allow_html=True)
+        cc_df = df[df["Country"] != "Global"]["Country"].value_counts().reset_index()
+        cc_df.columns = ["Country", "Articles"]
+        cc_df["Region"] = cc_df["Country"].map(COUNTRY_TO_REGION).fillna("Global")
+        st.markdown(dark_table(cc_df), unsafe_allow_html=True)
 
-        _DARK_BG    = "#080c14"
-        _PAPER_BG   = "#0d1628"
-        _GRID_COL   = "#1a2b48"
-        _TEXT_COL   = "#7a90b8"
-        _TITLE_COL  = "#c8d4e8"
-        _FONT       = "Inter, sans-serif"
+    with tab3:
+        st.markdown('<div class="sec-head">Topic Distribution</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_topic_bar(df), use_container_width=True, config={"displayModeBar": False})
 
-        def _dark_layout(fig, title="", height=320):
-            fig.update_layout(
-                title=dict(text=title, font=dict(family=_FONT, size=13, color=_TITLE_COL), x=0.01),
-                paper_bgcolor=_PAPER_BG,
-                plot_bgcolor=_DARK_BG,
-                font=dict(family=_FONT, color=_TEXT_COL),
-                height=height,
-                margin=dict(l=16, r=16, t=40, b=16),
-                xaxis=dict(gridcolor=_GRID_COL, linecolor=_GRID_COL, tickfont=dict(size=11)),
-                yaxis=dict(gridcolor=_GRID_COL, linecolor=_GRID_COL, tickfont=dict(size=11)),
-                showlegend=False,
-            )
-            return fig
+        st.markdown('<div class="sec-head">Regional Distribution</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_region_bar(df), use_container_width=True, config={"displayModeBar": False})
 
-        TOPIC_PALETTE = {
-            "Hyperscale":  "#0057ff",
-            "Colocation":  "#00c6ff",
-            "AI / GPU":    "#ff3b6b",
-            "Power":       "#ffab00",
-            "Investment":  "#a855f7",
-            "Permits":     "#ff6d00",
-            "Construction":"#00ffe7",
-            "General":     "#3a5280",
-        }
+        st.markdown('<div class="sec-head">Top Countries</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_country_bar(df), use_container_width=True, config={"displayModeBar": False})
 
-        st.markdown('<div class="section-header">Articles by Topic</div>', unsafe_allow_html=True)
-        topic_counts = df["Topic"].value_counts().reset_index()
-        topic_counts.columns = ["Topic", "Count"]
-        topic_counts = topic_counts.sort_values("Count")
-        fig_topic = go.Figure(go.Bar(
-            x=topic_counts["Count"],
-            y=topic_counts["Topic"],
-            orientation="h",
-            marker=dict(
-                color=[TOPIC_PALETTE.get(t, "#3a5280") for t in topic_counts["Topic"]],
-                line=dict(width=0),
-            ),
-            text=topic_counts["Count"],
-            textposition="outside",
-            textfont=dict(color=_TITLE_COL, size=12),
-            hovertemplate="<b>%{y}</b><br>Articles: %{x}<extra></extra>",
-        ))
-        _dark_layout(fig_topic, height=300)
-        fig_topic.update_layout(xaxis_title="", yaxis_title="")
-        st.plotly_chart(fig_topic, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('<div class="sec-head">Publication Volume Over Time</div>', unsafe_allow_html=True)
+        tl = chart_timeline(df)
+        if tl:
+            st.plotly_chart(tl, use_container_width=True, config={"displayModeBar": False})
 
-        st.markdown('<div class="section-header">Top 15 States by Article Volume</div>', unsafe_allow_html=True)
-        state_counts = df["State"].value_counts().head(15).reset_index()
-        state_counts.columns = ["State", "Count"]
-        state_counts = state_counts.sort_values("Count")
+        st.markdown('<div class="sec-head">Sentiment / Project Status</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_sentiment(df), use_container_width=True, config={"displayModeBar": False})
 
-        n = len(state_counts)
-        bar_colors = [f"rgba({int(0 + (0-0)*i/max(n-1,1))}, {int(87 + (198-87)*i/max(n-1,1))}, {int(255 + (255-255)*i/max(n-1,1))}, 0.85)" for i in range(n)]
+        st.markdown('<div class="sec-head">Topic Share</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_donut(df), use_container_width=True, config={"displayModeBar": False})
 
-        fig_state = go.Figure(go.Bar(
-            x=state_counts["Count"],
-            y=state_counts["State"],
-            orientation="h",
-            marker=dict(color=bar_colors, line=dict(width=0)),
-            text=state_counts["Count"],
-            textposition="outside",
-            textfont=dict(color=_TITLE_COL, size=11),
-            hovertemplate="<b>%{y}</b><br>Articles: %{x}<extra></extra>",
-        ))
-        _dark_layout(fig_state, height=420)
-        st.plotly_chart(fig_state, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('<div class="sec-head">Articles by Source</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_source_bar(df), use_container_width=True, config={"displayModeBar": False})
 
-        st.markdown('<div class="section-header">Publication Volume Over Time</div>', unsafe_allow_html=True)
-        df_time = df[df["Date"] != "Unknown"].copy()
-        if not df_time.empty:
-            df_time["Date_dt"] = pd.to_datetime(df_time["Date"])
-            daily = df_time.groupby(df_time["Date_dt"].dt.date).size().reset_index()
-            daily.columns = ["Date", "Articles"]
-            fig_time = go.Figure()
-            fig_time.add_trace(go.Scatter(
-                x=daily["Date"], y=daily["Articles"],
-                mode="lines+markers",
-                line=dict(color="#00c6ff", width=2.5),
-                marker=dict(color="#0057ff", size=6, line=dict(color="#00c6ff", width=1.5)),
-                fill="tozeroy",
-                fillcolor="rgba(0,87,255,0.08)",
-                hovertemplate="<b>%{x}</b><br>Articles: %{y}<extra></extra>",
-            ))
-            _dark_layout(fig_time, height=260)
-            fig_time.update_layout(xaxis_title="", yaxis_title="Articles")
-            st.plotly_chart(fig_time, use_container_width=True, config={"displayModeBar": False})
-
-        st.markdown('<div class="section-header">Topic Share</div>', unsafe_allow_html=True)
-        topic_pie = df["Topic"].value_counts().reset_index()
-        topic_pie.columns = ["Topic", "Count"]
-        fig_pie = go.Figure(go.Pie(
-            labels=topic_pie["Topic"],
-            values=topic_pie["Count"],
-            hole=0.55,
-            marker=dict(
-                colors=[TOPIC_PALETTE.get(t, "#3a5280") for t in topic_pie["Topic"]],
-                line=dict(color=_DARK_BG, width=2),
-            ),
-            textinfo="label+percent",
-            textfont=dict(color=_TITLE_COL, size=12),
-            hovertemplate="<b>%{label}</b><br>%{value} articles (%{percent})<extra></extra>",
-        ))
-        fig_pie.update_layout(
-            paper_bgcolor=_PAPER_BG,
-            plot_bgcolor=_DARK_BG,
-            font=dict(family=_FONT, color=_TEXT_COL),
-            height=380,
-            margin=dict(l=16, r=16, t=30, b=16),
-            showlegend=True,
-            legend=dict(
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(color=_TITLE_COL, size=11),
-                orientation="v",
-            ),
-            annotations=[dict(
-                text=f"<b>{len(df)}</b><br>articles",
-                x=0.5, y=0.5,
-                font=dict(size=16, color=_TITLE_COL, family=_FONT),
-                showarrow=False,
-            )],
-        )
-        st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
-
-        st.markdown('<div class="section-header">⚡ Capacity Mentions</div>', unsafe_allow_html=True)
-        cap_df = df[df["Capacity"] != ""][["Headline", "Capacity", "Date", "State", "Topic"]].head(20)
+        st.markdown('<div class="sec-head">Capacity Pipeline</div>', unsafe_allow_html=True)
+        cap_df = df[df["Capacity"] != ""][["Headline", "Capacity", "Deal Size", "Country", "Topic", "Date"]].head(25)
         if not cap_df.empty:
             st.markdown(dark_table(cap_df), unsafe_allow_html=True)
         else:
-            st.info("No capacity mentions found in current filter.")
-
-    with tab3:
-        st.markdown('<div class="section-header">State Breakdown</div>', unsafe_allow_html=True)
-        state_df = df["State"].value_counts().reset_index()
-        state_df.columns = ["State","Articles"]
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.markdown(dark_table(state_df), unsafe_allow_html=True)
-        with col2:
-            sel_state = st.selectbox("Drill into a state", state_df["State"].tolist())
-            state_articles = df[df["State"] == sel_state]
-            st.markdown(
-                f'<div style="font-family:Inter,sans-serif;font-size:.82rem;'
-                f'color:#7a90b8;margin-bottom:.75rem;">'
-                f'<b style="color:#fff">{len(state_articles)}</b> articles for '
-                f'<b style="color:#00c6ff">{sel_state}</b></div>',
-                unsafe_allow_html=True
-            )
-            for _, row in state_articles.iterrows():
-                st.markdown(
-                    article_card_html(row["Headline"], row["Date"], row["URL"],
-                                      row["Topic"], row.get("Capacity", "")),
-                    unsafe_allow_html=True
-                )
+            st.info("No capacity mentions in current filtered view.")
 
     with tab4:
-        st.markdown('<div class="section-header">Export Data</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-head">Company Activity</div>', unsafe_allow_html=True)
+        comp_rows = []
+        for _, row in df.iterrows():
+            if row.get("Companies"):
+                for co in str(row["Companies"]).split(", "):
+                    co = co.strip()
+                    if co:
+                        comp_rows.append(co)
+        if comp_rows:
+            from collections import Counter
+            co_counts = Counter(comp_rows)
+            co_df = pd.DataFrame(co_counts.most_common(30), columns=["Company", "Articles"])
+            co_df_sorted = co_df.sort_values("Articles")
+            n = len(co_df_sorted)
+            co_colors = [
+                f"rgba({int(0+71*i/max(n-1,1))},{int(71+(180-71)*i/max(n-1,1))},{int(225+(255-225)*i/max(n-1,1))},0.85)"
+                for i in range(n)
+            ]
+            fig_co = go.Figure(go.Bar(
+                x=co_df_sorted["Articles"], y=co_df_sorted["Company"],
+                orientation="h",
+                marker=dict(color=co_colors, line=dict(width=0)),
+                text=co_df_sorted["Articles"], textposition="outside",
+                textfont=dict(color=_TITLE, size=10),
+                hovertemplate="<b>%{y}</b>: %{x} mentions<extra></extra>",
+            ))
+            _dark(fig_co, max(300, n * 22))
+            fig_co.update_layout(
+                title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13), x=0.01)
+            )
+            st.plotly_chart(fig_co, use_container_width=True, config={"displayModeBar": False})
 
-        col_e1, col_e2 = st.columns(2)
-        with col_e1:
-            st.markdown("""
-            <div class="kpi-card blue">
-                <div style="font-size:1.8rem;margin-bottom:.5rem;">📊</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1rem;margin-bottom:.4rem;">Excel Report (.xlsx)</div>
-                <div style="font-size:.82rem;color:#4a6490;margin-bottom:.8rem;">
-                    3 sheets: Articles (with clickable URLs) · State Breakdown · Topic Breakdown.<br>
-                    Colour-coded topics, auto-filter, frozen header row.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            ts    = datetime.now().strftime("%Y%m%d_%H%M")
-            label = re.sub(r"[^a-zA-Z0-9]", "_", time_opt)
+            st.markdown('<div class="sec-head">Drill Into a Company</div>', unsafe_allow_html=True)
+            sel_co = st.selectbox("Select company", co_df["Company"].tolist())
+            co_articles = df[df["Companies"].str.contains(sel_co, na=False, case=False)]
+            st.markdown(
+                f'<div style="font-family:Inter,sans-serif;font-size:.82rem;color:#3a5480;margin-bottom:.7rem;">'
+                f'<b style="color:#fff">{len(co_articles)}</b> articles mentioning '
+                f'<b style="color:#00b4ff">{sel_co}</b></div>',
+                unsafe_allow_html=True,
+            )
+            for _, row in co_articles.iterrows():
+                st.markdown(
+                    article_card(
+                        row["Headline"], row["Date"], row["URL"],
+                        row["Source"], row["Country"], row["Topic"],
+                        row.get("Capacity", ""), row.get("Deal Size", ""),
+                        row.get("Sentiment", "News"),
+                    ),
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.info("No company mentions detected in the current filtered view.")
+
+    with tab5:
+        st.markdown('<div class="sec-head">Export Data</div>', unsafe_allow_html=True)
+        col_a, col_b = st.columns(2)
+        ts    = datetime.now().strftime("%Y%m%d_%H%M")
+        label = re.sub(r"[^a-zA-Z0-9]", "_", time_opt)
+
+        with col_a:
+            st.markdown(
+                '<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
+                'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
+                '<div style="font-size:1.5rem;margin-bottom:.4rem;">\U0001f4ca</div>'
+                '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                'font-size:.95rem;margin-bottom:.3rem;">Excel Report (.xlsx)</div>'
+                '<div style="font-size:.78rem;color:#2a3e60;line-height:1.5;">'
+                '5 sheets: All Articles \u00b7 By Country \u00b7 By Region \u00b7 By Topic \u00b7 By Company<br>'
+                'Colour-coded badges, auto-filter, frozen headers, clickable URLs.</div></div>',
+                unsafe_allow_html=True,
+            )
             st.download_button(
-                "📥 Download Excel Report",
+                "\U0001f4e5 Download Excel Report",
                 data=build_excel(df),
-                file_name=f"DCD_US_Construction_{label}_{ts}.xlsx",
+                file_name=f"GlobalDCIntel_{label}_{ts}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
 
-        with col_e2:
-            st.markdown("""
-            <div class="kpi-card cyan">
-                <div style="font-size:1.8rem;margin-bottom:.5rem;">📄</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1rem;margin-bottom:.4rem;">CSV Export</div>
-                <div style="font-size:.82rem;color:#4a6490;margin-bottom:.8rem;">
-                    Flat CSV of the current filtered view — ready for Excel, Python, or BI tools.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            csv_bytes = df.to_csv(index=False).encode()
+        with col_b:
+            st.markdown(
+                '<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
+                'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
+                '<div style="font-size:1.5rem;margin-bottom:.4rem;">\U0001f4c4</div>'
+                '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                'font-size:.95rem;margin-bottom:.3rem;">CSV Export</div>'
+                '<div style="font-size:.78rem;color:#2a3e60;line-height:1.5;">'
+                'Flat CSV of the filtered view.<br>'
+                'Ready for Excel, Python, PowerBI, or Tableau.</div></div>',
+                unsafe_allow_html=True,
+            )
             st.download_button(
-                "📥 Download CSV",
-                data=csv_bytes,
-                file_name=f"DCD_US_Construction_{label}_{ts}.csv",
+                "\U0001f4e5 Download CSV",
+                data=df.to_csv(index=False).encode(),
+                file_name=f"GlobalDCIntel_{label}_{ts}.csv",
                 mime="text/csv",
                 use_container_width=True,
             )
 
-        st.markdown('<div class="section-header">Preview (filtered)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-head">Full Article Preview</div>', unsafe_allow_html=True)
+        display_cols = ["Headline","Date","Source","Country","Region",
+                        "Topic","Sentiment","Capacity","Deal Size","Companies","URL"]
         st.markdown(
-            dark_table(df[["Headline","Date","State","Topic","Capacity","URL"]]),
-            unsafe_allow_html=True
+            dark_table(df[[c for c in display_cols if c in df.columns]]),
+            unsafe_allow_html=True,
         )
 
 
