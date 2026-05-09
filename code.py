@@ -1298,12 +1298,35 @@ def main():
                 filt_from = filt_to = None
                 use_date_filter = False
 
+            st.markdown("**\U0001f30d Country Filter**")
+            all_countries = sorted(df_full["Country"].unique().tolist())
+            country_search = st.text_input(
+                "Search country", placeholder="e.g. United States, India...",
+                key="country_search_input",
+            )
+            if country_search.strip():
+                matched = [c for c in all_countries if country_search.strip().lower() in c.lower()]
+            else:
+                matched = all_countries
+            sel_countries = st.multiselect(
+                "Select countries", matched, default=matched,
+                help="Showing countries matching your search above",
+            )
+
+            st.markdown("**\U0001f3e2 Company Search**")
+            company_search = st.text_input(
+                "Search company", placeholder="e.g. Microsoft, Equinix, AWS...",
+                key="company_search_input",
+            )
+
             st.session_state.filters = {
                 "regions": sel_regions, "topics": sel_topics,
                 "sources": sel_sources, "sents": sel_sents,
                 "keyword": keyword, "min_mw": min_mw,
                 "date_from": filt_from if use_date_filter else None,
                 "date_to":   filt_to   if use_date_filter else None,
+                "countries": sel_countries,
+                "company_search": company_search.strip(),
             }
 
         st.divider()
@@ -1477,6 +1500,14 @@ def main():
             v = float(m.group(1))
             return v * 1000 if m.group(2).upper() == "GW" else v
         df = df[df["Capacity"].apply(extract_mw_val) >= filters["min_mw"]]
+    if filters.get("countries"):
+        df = df[df["Country"].isin(filters["countries"])]
+    if filters.get("company_search"):
+        cs = filters["company_search"].lower()
+        df = df[
+            df["Companies"].str.lower().str.contains(cs, na=False) |
+            df["Headline"].str.lower().str.contains(cs, na=False)
+        ]
     df = df.reset_index(drop=True)
 
     scan_ts = st.session_state.get("scan_time", "\u2014")
@@ -1511,11 +1542,12 @@ def main():
     )
     st.markdown(pills_html, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "\U0001f4f0 Feed",
         "\U0001f5fa\ufe0f World Map",
         "\U0001f4ca Analytics",
         "\U0001f3e2 By Company",
+        "\U0001f9e0 Market Intel",
         "\u2b07\ufe0f Export",
     ])
 
@@ -1631,6 +1663,146 @@ def main():
             st.info("No company mentions detected in the current filtered view.")
 
     with tab5:
+        st.markdown('<div class="sec-head">\U0001f9e0 Market Intelligence Summary</div>', unsafe_allow_html=True)
+
+        filter_summary_parts = []
+        if filters.get("countries") and len(filters["countries"]) < len(df_full["Country"].unique()):
+            filter_summary_parts.append("Countries: " + ", ".join(filters["countries"][:5]) + ("..." if len(filters["countries"]) > 5 else ""))
+        if filters.get("company_search"):
+            filter_summary_parts.append(f"Company: {filters['company_search']}")
+        if filters.get("topics") and len(filters["topics"]) < len(df_full["Topic"].unique()):
+            filter_summary_parts.append("Topics: " + ", ".join(filters["topics"]))
+        if filters.get("date_from") and filters.get("date_to"):
+            filter_summary_parts.append(f"Date: {filters['date_from']} to {filters['date_to']}")
+        if filters.get("keyword"):
+            filter_summary_parts.append(f"Keyword: {filters['keyword']}")
+        scan_date_range = f"{df['Date'].min()} to {df['Date'].max()}" if not df.empty and df["Date"].min() != "Unknown" else "all dates"
+
+        sel_desc = " | ".join(filter_summary_parts) if filter_summary_parts else "All results (no specific filters applied)"
+
+        ctx_html = (
+            f'<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
+            f'padding:.9rem 1.2rem;margin-bottom:1rem;font-size:.8rem;color:#6a80a8;">'
+            f'<b style="color:#b8c8e0;">Current selection:</b> {sel_desc}<br>'
+            f'<b style="color:#b8c8e0;">Articles in view:</b> {len(df)} &nbsp;&nbsp;'
+            f'<b style="color:#b8c8e0;">Date range:</b> {scan_date_range}'
+            f'</div>'
+        )
+        st.markdown(ctx_html, unsafe_allow_html=True)
+
+        if df.empty:
+            st.info("No articles in the current filtered view. Adjust filters to generate a summary.")
+        else:
+            col_gen1, col_gen2 = st.columns([3, 1])
+            with col_gen1:
+                st.markdown(
+                    '<div style="font-size:.82rem;color:#3a5480;line-height:1.6;">'  
+                    'The AI will analyse all filtered articles and generate a structured market intelligence '  
+                    'briefing covering key themes, major players, capacity pipeline, regulatory developments, '  
+                    'and forward-looking signals.</div>',
+                    unsafe_allow_html=True,
+                )
+            with col_gen2:
+                gen_btn = st.button("\U0001f9e0 Generate Summary", use_container_width=True, type="primary")
+
+            if gen_btn or st.session_state.get("intel_summary"):
+                if gen_btn:
+                    headlines_block = ""
+                    for _, row in df.iterrows():
+                        headlines_block += (
+                            f"- [{row['Date']}] [{row['Country']}] [{row['Topic']}] "
+                            f"[{row.get('Sentiment', '')}] {row['Headline']}"
+                        )
+                        if row.get("Capacity"):
+                            headlines_block += f" | Capacity: {row['Capacity']}"
+                        if row.get("Deal Size"):
+                            headlines_block += f" | Deal: {row['Deal Size']}"
+                        if row.get("Companies"):
+                            headlines_block += f" | Companies: {row['Companies']}"
+                        headlines_block += "\n"
+
+                    prompt = f"""You are a senior data center market intelligence analyst at Wood Mackenzie. 
+You have been given {len(df)} news articles about data center construction and investment activity.
+
+Selection context: {sel_desc}
+Date range covered: {scan_date_range}
+
+Here are all the articles:
+{headlines_block}
+
+Write a structured market intelligence briefing with the following sections. Be specific, cite company names, locations, capacity figures, and deal sizes from the articles. Be analytical, not just descriptive — identify patterns, trends, and what it means for the market.
+
+## Executive Summary
+3-4 sentence high-level overview of what is happening in this market during this period.
+
+## Key Themes & Trends
+The 4-6 most significant patterns emerging from these articles. What is driving activity? What is changing?
+
+## Major Projects & Deals
+The most significant individual projects, investments, and deals. Include company, location, capacity or deal size where available.
+
+## Regulatory & Permitting Landscape
+Any moratoriums, approvals, rejections, legal challenges, or policy developments visible in the data.
+
+## Power & Infrastructure
+Key observations about power sourcing, capacity announcements, utility deals, and energy infrastructure.
+
+## Company Activity Highlights
+Which companies are most active? What strategies are visible? Any notable market entries or exits?
+
+## Market Outlook
+Based on the activity in these articles, what signals exist about near-term market direction? What should an analyst watch?
+
+Write in a professional, analytical tone. Be concise but specific. Use bullet points within sections."""
+
+                    with st.spinner("Generating market intelligence briefing..."):
+                        try:
+                            import requests as _req
+                            resp = _req.post(
+                                "https://api.anthropic.com/v1/messages",
+                                headers={"Content-Type": "application/json"},
+                                json={
+                                    "model": "claude-sonnet-4-20250514",
+                                    "max_tokens": 2000,
+                                    "messages": [{"role": "user", "content": prompt}],
+                                },
+                                timeout=60,
+                            )
+                            resp.raise_for_status()
+                            data = resp.json()
+                            summary_text = "".join(
+                                block.get("text", "") for block in data.get("content", [])
+                                if block.get("type") == "text"
+                            )
+                            st.session_state.intel_summary = summary_text
+                            st.session_state.intel_context = sel_desc
+                        except Exception as e:
+                            st.error(f"Could not generate summary: {e}")
+                            st.session_state.intel_summary = None
+
+                if st.session_state.get("intel_summary"):
+                    context_label = st.session_state.get("intel_context", "")
+                    brief_hdr = (
+                        f'<div style="background:#0b1628;border:1px solid #0047e1;border-radius:10px;'
+                        f'padding:1.2rem 1.5rem;margin-top:.8rem;">'
+                        f'<div style="font-family:monospace;font-size:.65rem;letter-spacing:.12em;'
+                        f'color:#0047e1;text-transform:uppercase;margin-bottom:.7rem;">'
+                        f'🧠 AI Market Intelligence Briefing  ·  {context_label}</div>'
+                    )
+                    st.markdown(brief_hdr, unsafe_allow_html=True)
+                    st.markdown(st.session_state.intel_summary)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    ts_intel = datetime.now().strftime("%Y%m%d_%H%M")
+                    st.download_button(
+                        "\U0001f4e5 Download Briefing (.txt)",
+                        data=st.session_state.intel_summary.encode(),
+                        file_name=f"DC_Intel_Briefing_{ts_intel}.txt",
+                        mime="text/plain",
+                        use_container_width=False,
+                    )
+
+    with tab6:
         st.markdown('<div class="sec-head">Export Data</div>', unsafe_allow_html=True)
         col_a, col_b = st.columns(2)
         ts    = datetime.now().strftime("%Y%m%d_%H%M")
