@@ -645,20 +645,110 @@ def kpi_card(label: str, value, color: str = "blue", delta: str = ""):
         {delta_html}
     </div>"""
 
+
+TOPIC_COLORS = {
+    "Hyperscale":   "#0057ff",
+    "Colocation":   "#00c6ff",
+    "AI / GPU":     "#ff3b6b",
+    "Power":        "#ffab00",
+    "Investment":   "#a855f7",
+    "Permits":      "#ff6d00",
+    "Construction": "#00ffe7",
+    "General":      "#3a5280",
+}
+
+
 def article_card_html(headline: str, date: str, url: str, topic: str, capacity: str) -> str:
-    cap_html = f'<span class="card-tag">⚡ {capacity}</span>' if capacity else ""
-    return f"""
-    <div class="article-card">
-        <div class="card-headline">
-            <a href="{url}" target="_blank">{headline}</a>
-        </div>
-        <div class="card-meta">
-            <span class="card-date">📅 {date}</span>
-            <span class="card-tag">{topic}</span>
-            {cap_html}
-            <a class="card-link-btn" href="{url}" target="_blank">↗ open</a>
-        </div>
-    </div>"""
+    tc = TOPIC_COLORS.get(topic, "#3a5280")
+    cap = (
+        '<span style="font-family:monospace;font-size:.65rem;'
+        'background:rgba(255,171,0,0.12);color:#ffab00;'
+        'border:1px solid rgba(255,171,0,0.3);border-radius:4px;'
+        'padding:2px 7px;white-space:nowrap;">'
+        + "\u26a1 " + capacity + "</span>"
+    ) if capacity else ""
+    arrow = "\u2197"
+    return (
+        '<div style="background:#0d1628;border:1px solid #1a2b48;border-radius:10px;'
+        'padding:.9rem 1.2rem;display:flex;justify-content:space-between;'
+        'align-items:flex-start;gap:1rem;margin-bottom:.5rem;">'
+        '<div style="flex:1;font-size:.88rem;font-weight:500;line-height:1.5;">'
+        f'<a href="{url}" target="_blank" '
+        'style="color:#d8e4f8;text-decoration:none;font-family:Inter,sans-serif;">'
+        f'{headline}</a></div>'
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;'
+        'gap:.3rem;flex-shrink:0;white-space:nowrap;">'
+        f'<span style="font-family:monospace;font-size:.7rem;color:#3a5280;">\U0001f4c5 {date}</span>'
+        f'<span style="font-family:monospace;font-size:.65rem;background:{tc}22;color:{tc};'
+        f'border:1px solid {tc}55;border-radius:4px;padding:2px 7px;">{topic}</span>'
+        f'{cap}'
+        f'<a href="{url}" target="_blank" '
+        f'style="font-family:monospace;font-size:.68rem;color:#0057ff;text-decoration:none;">'
+        f'{arrow} open</a>'
+        '</div></div>'
+    )
+
+
+def dark_table(df_in: pd.DataFrame, max_rows: int = 200) -> str:
+    """Render a DataFrame as a dark-themed HTML table matching the UI."""
+    th = (
+        "background:#0f1e36;color:#c8d4e8;font-family:monospace;"
+        "font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;"
+        "padding:.6rem .9rem;border-bottom:2px solid #0057ff;white-space:nowrap;"
+        "text-align:left;"
+    )
+    td_base = (
+        "padding:.55rem .9rem;font-size:.82rem;color:#c8d4e8;"
+        "border-bottom:1px solid #141f35;font-family:Inter,sans-serif;"
+        "vertical-align:middle;"
+    )
+    rows_html = ""
+    for i, (_, row) in enumerate(df_in.head(max_rows).iterrows()):
+        bg = "#0d1628" if i % 2 == 0 else "#080c14"
+        cells = ""
+        for col in df_in.columns:
+            raw = row[col]
+            val = str(raw) if raw is not None else ""
+            if col == "URL" or (val.startswith("http")):
+                cells += (
+                    f'<td style="{td_base}background:{bg};">'
+                    f'<a href="{val}" target="_blank" '
+                    f'style="color:#0057ff;text-decoration:none;font-size:.78rem;">'
+                    f'Open \u2192</a></td>'
+                )
+            elif col == "Capacity" and val:
+                cells += (
+                    f'<td style="{td_base}background:{bg};">'
+                    f'<span style="color:#ffab00;font-family:monospace;font-size:.78rem;">'
+                    f'\u26a1 {val}</span></td>'
+                )
+            elif col == "Topic":
+                tc2 = TOPIC_COLORS.get(val, "#3a5280")
+                cells += (
+                    f'<td style="{td_base}background:{bg};">'
+                    f'<span style="background:{tc2}22;color:{tc2};'
+                    f'border:1px solid {tc2}55;border-radius:4px;'
+                    f'padding:2px 8px;font-size:.72rem;font-family:monospace;">'
+                    f'{val}</span></td>'
+                )
+            elif col == "Headline":
+                cells += (
+                    f'<td style="{td_base}background:{bg};max-width:500px;'
+                    f'word-wrap:break-word;white-space:normal;">{val}</td>'
+                )
+            else:
+                cells += f'<td style="{td_base}background:{bg};">{val}</td>'
+        rows_html += f"<tr>{cells}</tr>"
+
+    headers = "".join(f'<th style="{th}">{c}</th>' for c in df_in.columns)
+    return (
+        '<div style="overflow-x:auto;border-radius:10px;'
+        'border:1px solid #1a2b48;margin-bottom:1rem;">'
+        f'<table style="width:100%;border-collapse:collapse;background:#080c14;">'
+        f'<thead><tr>{headers}</tr></thead>'
+        f'<tbody>{rows_html}</tbody></table></div>'
+    )
+
 
 
 # ─── Main App ──────────────────────────────────────────────────────────────
@@ -1005,10 +1095,7 @@ def main():
         st.markdown('<div class="section-header">⚡ Capacity Mentions</div>', unsafe_allow_html=True)
         cap_df = df[df["Capacity"] != ""][["Headline", "Capacity", "Date", "State", "Topic"]].head(20)
         if not cap_df.empty:
-            st.dataframe(
-                cap_df, use_container_width=True, hide_index=True,
-                column_config={"Capacity": st.column_config.TextColumn("⚡ Capacity")},
-            )
+            st.markdown(dark_table(cap_df), unsafe_allow_html=True)
         else:
             st.info("No capacity mentions found in current filter.")
 
@@ -1019,17 +1106,21 @@ def main():
         state_df.columns = ["State","Articles"]
         col1, col2 = st.columns([1, 2])
         with col1:
-            st.dataframe(state_df, use_container_width=True, hide_index=True, height=420)
+            st.markdown(dark_table(state_df), unsafe_allow_html=True)
         with col2:
             sel_state = st.selectbox("Drill into a state", state_df["State"].tolist())
             state_articles = df[df["State"] == sel_state]
-            st.markdown(f"**{len(state_articles)} articles** for **{sel_state}**")
+            st.markdown(
+                f'<div style="font-family:Inter,sans-serif;font-size:.82rem;'
+                f'color:#7a90b8;margin-bottom:.75rem;">'
+                f'<b style="color:#fff">{len(state_articles)}</b> articles for '
+                f'<b style="color:#00c6ff">{sel_state}</b></div>',
+                unsafe_allow_html=True
+            )
             for _, row in state_articles.iterrows():
                 st.markdown(
-                    f"<div class='article-card'>"
-                    f"<div class='card-headline'><a href='{row['URL']}' target='_blank'>{row['Headline']}</a></div>"
-                    f"<div class='card-meta'><span class='card-date'>📅 {row['Date']}</span>"
-                    f"<span class='card-tag'>{row['Topic']}</span></div></div>",
+                    article_card_html(row["Headline"], row["Date"], row["URL"],
+                                      row["Topic"], row.get("Capacity", "")),
                     unsafe_allow_html=True
                 )
 
@@ -1079,14 +1170,11 @@ def main():
             )
 
         st.markdown('<div class="section-header">Preview (filtered)</div>', unsafe_allow_html=True)
-        st.dataframe(
-            df[["Headline","Date","State","Topic","Capacity","URL"]],
-            use_container_width=True, height=400,
-            column_config={"URL": st.column_config.LinkColumn("URL", display_text="🔗 Open")},
-            hide_index=True,
+        st.markdown(
+            dark_table(df[["Headline","Date","State","Topic","Capacity","URL"]]),
+            unsafe_allow_html=True
         )
 
 
 if __name__ == "__main__":
     main()
-
