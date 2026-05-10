@@ -303,6 +303,141 @@ COUNTRY_KEYWORDS.update({
     "Mexico": ["Mexico", "Mexican", "Mexico City", "Monterrey", "Guadalajara"],
 })
 
+
+# ── States / Provinces per country ───────────────────────────────────────────
+COUNTRY_STATES = {
+    "United States": [
+        "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
+        "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
+        "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
+        "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire",
+        "New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio",
+        "Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota",
+        "Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia",
+        "Wisconsin","Wyoming","Washington D.C.","Northern Virginia",
+    ],
+    "Canada": [
+        "Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador",
+        "Northwest Territories","Nova Scotia","Nunavut","Ontario","Prince Edward Island",
+        "Quebec","Saskatchewan","Yukon",
+    ],
+    "Australia": [
+        "New South Wales","Victoria","Queensland","Western Australia","South Australia",
+        "Tasmania","Australian Capital Territory","Northern Territory",
+    ],
+    "India": [
+        "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
+        "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
+        "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
+        "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand",
+        "West Bengal","Delhi","Mumbai","Bangalore","Chennai","Hyderabad","Pune","Noida",
+    ],
+    "Germany": [
+        "Baden-Württemberg","Bavaria","Berlin","Brandenburg","Bremen","Hamburg","Hesse",
+        "Lower Saxony","Mecklenburg-Vorpommern","North Rhine-Westphalia","Rhineland-Palatinate",
+        "Saarland","Saxony","Saxony-Anhalt","Schleswig-Holstein","Thuringia","Frankfurt",
+    ],
+    "United Kingdom": [
+        "England","Scotland","Wales","Northern Ireland","London","Manchester","Birmingham",
+        "Bristol","Edinburgh","Glasgow","Leeds","Liverpool","Sheffield","Newcastle",
+    ],
+    "Brazil": [
+        "São Paulo","Rio de Janeiro","Minas Gerais","Bahia","Paraná","Rio Grande do Sul",
+        "Pernambuco","Ceará","Amazonas","Goiás","Pará","Espírito Santo","Santa Catarina",
+        "Mato Grosso","Mato Grosso do Sul","Maranhão","Paraíba","Piauí","Alagoas",
+        "Rio Grande do Norte","Tocantins","Sergipe","Rondônia","Amapá","Roraima","Acre",
+        "Distrito Federal",
+    ],
+    "China": [
+        "Beijing","Shanghai","Guangdong","Zhejiang","Jiangsu","Shandong","Sichuan","Hubei",
+        "Hunan","Fujian","Anhui","Shaanxi","Jiangxi","Chongqing","Liaoning","Yunnan",
+        "Hebei","Guangxi","Shanxi","Tianjin","Heilongjiang","Jilin","Guizhou","Xinjiang",
+        "Inner Mongolia","Gansu","Hainan","Ningxia","Qinghai","Xizang (Tibet)","Shenzhen","Hangzhou",
+    ],
+    "Mexico": [
+        "Mexico City","Jalisco","Nuevo León","Veracruz","Puebla","Guanajuato","Chihuahua",
+        "Michoacán","Oaxaca","Guerrero","Chiapas","Sinaloa","Hidalgo","Sonora","Tabasco",
+        "Baja California","Querétaro","Morelos","San Luis Potosí","Aguascalientes",
+        "Durango","Coahuila","Tamaulipas","Colima","Nayarit","Tlaxcala","Campeche","Yucatán","Zacatecas",
+    ],
+    "Malaysia": ["Johor","Kedah","Kelantan","Kuala Lumpur","Labuan","Melaka","Negeri Sembilan",
+                 "Pahang","Penang","Perak","Perlis","Putrajaya","Sabah","Sarawak","Selangor","Terengganu"],
+    "France": ["Île-de-France","Provence-Alpes-Côte d'Azur","Auvergne-Rhône-Alpes","Occitanie",
+               "Hauts-de-France","Nouvelle-Aquitaine","Grand Est","Pays de la Loire","Normandie",
+               "Bretagne","Bourgogne-Franche-Comté","Centre-Val de Loire","Corse","Paris","Lyon","Marseille"],
+    "Netherlands": ["North Holland","South Holland","Utrecht","Gelderland","North Brabant",
+                    "Overijssel","Groningen","Friesland","Limburg","Drenthe","Flevoland","Zeeland",
+                    "Amsterdam","Rotterdam","The Hague","Eindhoven"],
+    "Japan": ["Tokyo","Osaka","Kanagawa","Aichi","Saitama","Chiba","Hyogo","Hokkaido","Fukuoka",
+              "Shizuoka","Ibaraki","Hiroshima","Kyoto","Miyagi","Niigata","Nagano","Tochigi",
+              "Gunma","Okayama","Fukushima","Kumamoto","Kagoshima","Ehime","Yamaguchi","Okinawa"],
+    "South Korea": ["Seoul","Busan","Incheon","Daegu","Daejeon","Gwangju","Ulsan","Gyeonggi",
+                    "Gangwon","North Chungcheong","South Chungcheong","North Jeolla","South Jeolla",
+                    "North Gyeongsang","South Gyeongsang","Jeju"],
+    "Saudi Arabia": ["Riyadh","Mecca","Madinah","Eastern Province","Asir","Tabuk","Qassim",
+                     "Hail","Jizan","Najran","Al Bahah","Northern Borders","Al Jawf","NEOM"],
+    "UAE": ["Abu Dhabi","Dubai","Sharjah","Ajman","Umm Al Quwain","Ras Al Khaimah","Fujairah"],
+    "Indonesia": ["Jakarta","West Java","East Java","Central Java","Banten","North Sumatra",
+                  "South Sulawesi","East Kalimantan","Bali","Riau","South Sumatra","Yogyakarta"],
+    "Poland": ["Masovian","Lesser Poland","Silesian","Greater Poland","Łódź","Lower Silesian",
+               "Kuyavian-Pomeranian","Lublin","Subcarpathian","Warmian-Masurian","Pomeranian",
+               "West Pomeranian","Opole","Lubusz","Świętokrzyskie","Podlaskie","Warsaw","Krakow"],
+    "Ireland": ["Dublin","Cork","Galway","Limerick","Waterford","Kildare","Meath","Wicklow","Louth"],
+    "Sweden": ["Stockholm","Västra Götaland","Skåne","Östergötland","Uppsala","Dalarna","Jönköping"],
+    "Singapore": ["Central Region","North Region","North-East Region","East Region","West Region"],
+    "South Africa": ["Gauteng","Western Cape","KwaZulu-Natal","Eastern Cape","Limpopo",
+                     "Mpumalanga","North West","Free State","Northern Cape",
+                     "Johannesburg","Cape Town","Durban","Pretoria"],
+    "Nigeria": ["Lagos","Kano","Rivers","Kaduna","Oyo","Anambra","Abuja","Delta","Edo","Kwara"],
+    "Kenya": ["Nairobi","Mombasa","Kisumu","Nakuru","Eldoret","Kiambu","Machakos"],
+    "Egypt": ["Cairo","Alexandria","Giza","Luxor","Aswan","Port Said","Suez","Hurghada","Sharm el-Sheikh"],
+    "Israel": ["Tel Aviv","Jerusalem","Haifa","Rishon LeZion","Petah Tikva","Ashdod","Beer Sheva","Netanya"],
+    "Qatar": ["Doha","Al Wakrah","Al Khor","Lusail","Al Rayyan"],
+    "Bahrain": ["Capital","Muharraq","Northern","Southern"],
+    "Kuwait": ["Capital","Hawalli","Ahmadi","Jahra","Farwaniya","Mubarak Al-Kabeer"],
+    "Oman": ["Muscat","Dhofar","Musandam","Al Batinah","Al Dhahirah","Al Dakhiliyah","Al Sharqiyah","Al Wusta","Al Buraimi"],
+    "Chile": ["Santiago Metropolitan","Valparaíso","Biobío","Araucanía","Los Lagos","Antofagasta"],
+    "Colombia": ["Bogotá","Antioquia","Valle del Cauca","Atlántico","Cundinamarca","Bolivar","Santander"],
+    "Argentina": ["Buenos Aires","Córdoba","Santa Fe","Mendoza","Tucumán","Entre Ríos","Salta","Misiones"],
+    "Peru": ["Lima","Arequipa","La Libertad","Piura","Lambayeque","Junín","Cusco","Áncash"],
+    "Morocco": ["Casablanca-Settat","Rabat-Salé-Kénitra","Marrakech-Safi","Fès-Meknès","Tanger-Tétouan-Al Hoceïma"],
+    "Rwanda": ["Kigali","Northern","Southern","Eastern","Western"],
+    "Ethiopia": ["Addis Ababa","Oromia","Amhara","Tigray","SNNPR","Somali","Afar"],
+    "Ghana": ["Greater Accra","Ashanti","Western","Central","Eastern","Northern","Upper East","Upper West","Volta","Brong-Ahafo"],
+    "Tanzania": ["Dar es Salaam","Dodoma","Arusha","Mwanza","Mbeya","Morogoro","Tanga","Zanzibar"],
+    "New Zealand": ["Auckland","Wellington","Canterbury","Waikato","Bay of Plenty","Manawatū-Whanganī","Hawke's Bay"],
+    "Vietnam": ["Hanoi","Ho Chi Minh City","Hai Phong","Da Nang","Can Tho","Binh Duong"],
+    "Philippines": ["Metro Manila","Cebu","Davao","Laguna","Cavite","Rizal","Bulacan","Pampanga"],
+    "Thailand": ["Bangkok","Nonthaburi","Samut Prakan","Chiang Mai","Khon Kaen","Nakhon Ratchasima","Phuket"],
+    "Taiwan": ["Taipei","New Taipei","Taichung","Kaohsiung","Taoyuan","Tainan","Hsinchu"],
+    "Hong Kong": ["Hong Kong Island","Kowloon","New Territories","Lantau Island"],
+    "Spain": ["Madrid","Catalonia","Andalusia","Valencia","Galicia","Castile and León","Basque Country","Canary Islands"],
+    "Italy": ["Lombardy","Lazio","Campania","Sicily","Veneto","Emilia-Romagna","Puglia","Piedmont","Tuscany","Milan","Rome"],
+    "Belgium": ["Brussels","Flanders","Wallonia","Antwerp","Ghent","Liège","Bruges"],
+    "Switzerland": ["Zurich","Bern","Vaud","Geneva","Aargau","St. Gallen","Lucerne","Ticino","Valais","Basle"],
+    "Austria": ["Vienna","Lower Austria","Upper Austria","Styria","Tyrol","Carinthia","Salzburg","Vorarlberg","Burgenland"],
+    "Portugal": ["Lisbon","Porto","Braga","Setúbal","Aveiro","Leiria","Viseu","Coimbra"],
+    "Romania": ["Bucharest","Cluj","Iași","Timișoara","Constanța","Galați","Craiova","Brașov"],
+    "Czech Republic": ["Prague","Central Bohemia","South Moravian","Moravian-Silesian","Plzeň","Ústí nad Labem","Liberec","Hradec Králové"],
+    "Norway": ["Oslo","Viken","Innlandet","Vestfold og Telemark","Agder","Rogaland","Vestland","Møre og Romsdal","Trøndelag","Nordland"],
+    "Denmark": ["Capital","Zealand","Southern Denmark","Central Jutland","North Jutland","Copenhagen"],
+    "Finland": ["Uusimaa","Pirkanmaa","Southwest Finland","North Ostrobothnia","Central Finland","South Savo","North Karelia","Helsinki"],
+}
+
+# Ensure all countries in COUNTRY_STATES are mapped in COUNTRY_TO_REGION
+_EXTRA_COUNTRY_MAP = {
+    "Spain": "Europe", "Italy": "Europe", "Belgium": "Europe",
+    "Switzerland": "Europe", "Austria": "Europe", "Portugal": "Europe",
+    "Romania": "Europe", "Czech Republic": "Europe", "Norway": "Europe",
+    "Denmark": "Europe", "Finland": "Europe", "Sweden": "Europe",
+    "New Zealand": "Asia Pacific", "Vietnam": "Asia Pacific",
+    "Philippines": "Asia Pacific", "Thailand": "Asia Pacific",
+    "Taiwan": "Asia Pacific", "Hong Kong": "Asia Pacific",
+}
+for _c, _r in _EXTRA_COUNTRY_MAP.items():
+    COUNTRY_TO_REGION.setdefault(_c, _r)
+
+
 TOPIC_KEYWORDS = {
     "Hyperscale": ["hyperscale","microsoft","google","amazon","aws","meta",
                    "apple","oracle","alibaba","tencent","bytedance",
@@ -1666,88 +1801,189 @@ def main():
                 unsafe_allow_html=True,
             )
 
-        st.markdown("**\U0001f4c4 HTML Scrape Depth**")
-        max_pages = st.slider("", 1, 10, 3, label_visibility="collapsed",
-                              help="Pages per HTML source (~28 articles/page)")
-        st.markdown(
-            f'<div style="font-size:.7rem;color:#1a2e50;margin-top:-.4rem;margin-bottom:.6rem;">'
-            f'~{max_pages * 28 * len(SCRAPE_SOURCES)} max HTML articles</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("**\U0001f4e1 Sources**")
-        use_html = st.checkbox("HTML Scrapers (DCD regions)", value=True)
-        use_rss  = st.checkbox("RSS Feeds (DCK, DCF, PRN, BIZ, Reuters)", value=True)
-        use_gn   = st.checkbox("Google News (5 queries)", value=True)
+        # Scrape depth always maxed out; sources always all active
+        max_pages = 10
+        use_html  = True
+        use_rss   = True
+        use_gn    = True
 
         st.divider()
 
         if "df_full" in st.session_state and st.session_state.df_full is not None:
             df_full = st.session_state.df_full
-            st.markdown("**\U0001f50d Refine Results**")
-            all_regions  = sorted(df_full["Region"].unique().tolist())
-            all_topics   = sorted(df_full["Topic"].unique().tolist())
-            all_sources  = sorted(df_full["Source"].unique().tolist())
-            all_sents    = sorted(df_full["Sentiment"].unique().tolist())
-            sel_regions  = st.multiselect("Regions", all_regions, default=all_regions)
-            sel_topics   = st.multiselect("Topics", all_topics, default=all_topics)
-            sel_sources  = st.multiselect("Sources", all_sources, default=all_sources)
-            sel_sents    = st.multiselect("Sentiment", all_sents, default=all_sents)
-            keyword      = st.text_input("Keyword", placeholder="Microsoft, 500MW, Texas...")
-            min_mw       = st.number_input("Min capacity (MW)", min_value=0, value=0, step=10)
 
-            st.markdown("**\U0001f4c6 Filter by Published Date**")
-            valid_dates = df_full[df_full["Date"] != "Unknown"]["Date"]
-            if not valid_dates.empty:
-                min_date = pd.to_datetime(valid_dates).min().date()
-                max_date = pd.to_datetime(valid_dates).max().date()
-                fc1, fc2 = st.columns(2)
-                with fc1:
-                    filt_from = st.date_input(
-                        "From", value=min_date,
-                        min_value=min_date, max_value=max_date,
-                        key="filt_from",
-                    )
-                with fc2:
-                    filt_to = st.date_input(
-                        "To", value=max_date,
-                        min_value=min_date, max_value=max_date,
-                        key="filt_to",
-                    )
-                use_date_filter = st.checkbox("Apply date filter", value=False)
+            # ── Clear All Filters button ──────────────────────────────────────
+            st.markdown(
+                '<div style="display:flex;justify-content:space-between;align-items:center;'
+                'margin-bottom:.4rem;">'
+                '<span style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                'font-size:.82rem;letter-spacing:.04em;">🔍 REFINE RESULTS</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters"):
+                for k in ["f_regions","f_countries","f_states","f_companies",
+                          "f_topics","f_sents","f_keyword","f_min_mw"]:
+                    if k in st.session_state:
+                        del st.session_state[k]
+                st.rerun()
+
+            # ── Helper: map typed-but-unlisted value to closest match ─────────
+            def _fuzzy_resolve(typed, candidates):
+                """Return candidates that contain the typed string (case-insensitive),
+                or fall back to headline-level matching done at filter-apply time."""
+                if not typed:
+                    return []
+                t = typed.strip().lower()
+                return [c for c in candidates if t in c.lower()]
+
+            all_regions_av  = sorted(df_full["Region"].unique().tolist())
+            all_countries_av = sorted(df_full["Country"].unique().tolist())
+            all_topics_av   = sorted(df_full["Topic"].unique().tolist())
+            all_sents_av    = sorted(df_full["Sentiment"].unique().tolist())
+
+            # Build company list from data
+            _all_co_raw = []
+            for v in df_full["Companies"]:
+                if v:
+                    _all_co_raw.extend([c.strip() for c in str(v).split(",")])
+            all_companies_av = sorted(set(c for c in _all_co_raw if c))
+
+            # ── 1. Region (multi-select, searchable) ──────────────────────────
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">🌐 Region</div>',
+                unsafe_allow_html=True,
+            )
+            sel_regions = st.multiselect(
+                "Region", all_regions_av, default=st.session_state.get("f_regions", []),
+                placeholder="All regions", label_visibility="collapsed", key="f_regions",
+            )
+
+            # ── 2. Country (multi-select, searchable, filtered by region) ─────
+            if sel_regions:
+                country_pool = sorted([c for c in all_countries_av
+                                       if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
             else:
-                filt_from = filt_to = None
-                use_date_filter = False
-
-            st.markdown("**\U0001f30d Country Filter**")
-            all_countries = sorted(df_full["Country"].unique().tolist())
-            country_search = st.text_input(
-                "Search country", placeholder="e.g. United States, India...",
-                key="country_search_input",
-            )
-            if country_search.strip():
-                matched = [c for c in all_countries if country_search.strip().lower() in c.lower()]
+                country_pool = all_countries_av
+            # Also include all world countries not yet in data (user may type one)
+            all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
+            if sel_regions:
+                world_pool = sorted([c for c in all_world_countries
+                                     if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
             else:
-                matched = all_countries
-            sel_countries = st.multiselect(
-                "Select countries", matched, default=matched,
-                help="Showing countries matching your search above",
+                world_pool = all_world_countries
+
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">🌍 Country</div>',
+                unsafe_allow_html=True,
+            )
+            sel_countries_raw = st.multiselect(
+                "Country", world_pool,
+                default=[c for c in st.session_state.get("f_countries", []) if c in world_pool],
+                placeholder="All countries", label_visibility="collapsed", key="f_countries",
+            )
+            # Accept typed values not in list too
+            sel_countries = sel_countries_raw if sel_countries_raw else []
+
+            # ── 3. State (multi-select, filtered by selected countries) ───────
+            state_pool = []
+            countries_for_states = sel_countries if sel_countries else world_pool
+            for c in countries_for_states:
+                state_pool.extend(COUNTRY_STATES.get(c, []))
+            state_pool = sorted(set(state_pool))
+
+            if state_pool:
+                st.markdown(
+                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                    'text-transform:uppercase;margin:.9rem 0 .2rem;">📍 State / Province</div>',
+                    unsafe_allow_html=True,
+                )
+                valid_defaults_state = [s for s in st.session_state.get("f_states", []) if s in state_pool]
+                sel_states = st.multiselect(
+                    "State", state_pool, default=valid_defaults_state,
+                    placeholder="All states/provinces", label_visibility="collapsed",
+                    key="f_states",
+                )
+            else:
+                sel_states = []
+                # clear stale state selection
+                st.session_state.pop("f_states", None)
+
+            # ── 4. Company (multi-select + free-type searchable) ──────────────
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">🏢 Company</div>',
+                unsafe_allow_html=True,
+            )
+            # Merge known companies list with those in data
+            full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
+            valid_defaults_co = [c for c in st.session_state.get("f_companies", []) if c in full_co_pool]
+            sel_companies = st.multiselect(
+                "Company", full_co_pool, default=valid_defaults_co,
+                placeholder="All companies — type to search", label_visibility="collapsed",
+                key="f_companies",
             )
 
-            st.markdown("**\U0001f3e2 Company Search**")
-            company_search = st.text_input(
-                "Search company", placeholder="e.g. Microsoft, Equinix, AWS...",
-                key="company_search_input",
+            # ── 5. Topic (multi-select) ───────────────────────────────────────
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">🏷️ Topic</div>',
+                unsafe_allow_html=True,
+            )
+            sel_topics = st.multiselect(
+                "Topic", all_topics_av, default=st.session_state.get("f_topics", []),
+                placeholder="All topics", label_visibility="collapsed", key="f_topics",
             )
 
+            # ── 6. Sentiment / Project Status (multi-select) ──────────────────
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">📊 Project Status</div>',
+                unsafe_allow_html=True,
+            )
+            sel_sents = st.multiselect(
+                "Status", all_sents_av, default=st.session_state.get("f_sents", []),
+                placeholder="All statuses", label_visibility="collapsed", key="f_sents",
+            )
+
+            # ── 7. Keyword (free text) ────────────────────────────────────────
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">🔤 Keyword</div>',
+                unsafe_allow_html=True,
+            )
+            keyword = st.text_input(
+                "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
+                label_visibility="collapsed", key="f_keyword",
+            )
+
+            # ── 8. Min Capacity (MW) ──────────────────────────────────────────
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
+                unsafe_allow_html=True,
+            )
+            min_mw = st.number_input(
+                "Min MW", min_value=0, value=st.session_state.get("f_min_mw", 0),
+                step=10, label_visibility="collapsed", key="f_min_mw",
+            )
+
+            # Collect into session_state filters
             st.session_state.filters = {
-                "regions": sel_regions, "topics": sel_topics,
-                "sources": sel_sources, "sents": sel_sents,
-                "keyword": keyword, "min_mw": min_mw,
-                "date_from": filt_from if use_date_filter else None,
-                "date_to":   filt_to   if use_date_filter else None,
-                "countries": sel_countries,
-                "company_search": company_search.strip(),
+                "regions":        sel_regions,
+                "topics":         sel_topics,
+                "sources":        [],           # not user-facing, always all
+                "sents":          sel_sents,
+                "keyword":        keyword,
+                "min_mw":         min_mw,
+                "date_from":      None,
+                "date_to":        None,
+                "countries":      sel_countries,
+                "states":         sel_states,
+                "company_search": "",           # replaced by sel_companies below
+                "companies":      sel_companies,
             }
 
         st.divider()
@@ -1893,24 +2129,62 @@ def main():
 
     filters = st.session_state.get("filters", {})
     df = df_full.copy()
+
+    # Region filter
     if filters.get("regions"):
         df = df[df["Region"].isin(filters["regions"])]
+
+    # Country filter — also fuzzy-match typed values not in list
+    if filters.get("countries"):
+        sel_c = filters["countries"]
+        def _country_match(row_country):
+            for sc in sel_c:
+                if sc.lower() == row_country.lower():
+                    return True
+                if sc.lower() in row_country.lower() or row_country.lower() in sc.lower():
+                    return True
+            return False
+        df = df[df["Country"].apply(_country_match)]
+
+    # State filter — match against headline text (states are detected via COUNTRY_KEYWORDS)
+    if filters.get("states"):
+        state_kw = [s.lower() for s in filters["states"]]
+        def _state_match(headline):
+            hl = str(headline).lower()
+            return any(sk in hl for sk in state_kw)
+        df = df[df["Headline"].apply(_state_match)]
+
+    # Topic filter
     if filters.get("topics"):
         df = df[df["Topic"].isin(filters["topics"])]
-    if filters.get("sources"):
-        df = df[df["Source"].isin(filters["sources"])]
+
+    # Sentiment filter
     if filters.get("sents"):
         df = df[df["Sentiment"].isin(filters["sents"])]
-    if filters.get("date_from") and filters.get("date_to"):
-        df_dates = df[df["Date"] != "Unknown"].copy()
-        df_dates["_dt"] = pd.to_datetime(df_dates["Date"], errors="coerce")
-        mask = (df_dates["_dt"] >= pd.Timestamp(filters["date_from"])) &                (df_dates["_dt"] <= pd.Timestamp(filters["date_to"]))
-        df_dates = df_dates[mask].drop(columns=["_dt"])
-        df_unk = df[df["Date"] == "Unknown"]
-        df = pd.concat([df_dates, df_unk], ignore_index=True)
+
+    # Company filter (multi-select list) — match Companies column AND headline
+    if filters.get("companies"):
+        cos = [c.lower() for c in filters["companies"]]
+        def _co_match(row):
+            co_field = str(row.get("Companies", "")).lower()
+            hl = str(row.get("Headline", "")).lower()
+            return any(c in co_field or c in hl for c in cos)
+        df = df[df.apply(_co_match, axis=1)]
+
+    # Legacy company_search (free-text, kept for backward compat)
+    if filters.get("company_search"):
+        cs = filters["company_search"].lower()
+        df = df[
+            df["Companies"].str.lower().str.contains(cs, na=False) |
+            df["Headline"].str.lower().str.contains(cs, na=False)
+        ]
+
+    # Keyword filter
     if filters.get("keyword"):
         kw = filters["keyword"].lower()
         df = df[df["Headline"].str.lower().str.contains(kw, na=False)]
+
+    # Min capacity filter
     if filters.get("min_mw", 0) > 0:
         def extract_mw_val(cap):
             if not cap:
@@ -1921,14 +2195,6 @@ def main():
             v = float(m.group(1))
             return v * 1000 if m.group(2).upper() == "GW" else v
         df = df[df["Capacity"].apply(extract_mw_val) >= filters["min_mw"]]
-    if filters.get("countries"):
-        df = df[df["Country"].isin(filters["countries"])]
-    if filters.get("company_search"):
-        cs = filters["company_search"].lower()
-        df = df[
-            df["Companies"].str.lower().str.contains(cs, na=False) |
-            df["Headline"].str.lower().str.contains(cs, na=False)
-        ]
     df = df.reset_index(drop=True)
 
     scan_ts = st.session_state.get("scan_time", "\u2014")
@@ -2087,14 +2353,18 @@ def main():
         st.markdown('<div class="sec-head">\U0001f9e0 Market Intelligence Summary</div>', unsafe_allow_html=True)
 
         filter_summary_parts = []
+        if filters.get("regions"):
+            filter_summary_parts.append("Regions: " + ", ".join(filters["regions"]))
         if filters.get("countries") and len(filters["countries"]) < len(df_full["Country"].unique()):
             filter_summary_parts.append("Countries: " + ", ".join(filters["countries"][:5]) + ("..." if len(filters["countries"]) > 5 else ""))
-        if filters.get("company_search"):
-            filter_summary_parts.append(f"Company: {filters['company_search']}")
+        if filters.get("states"):
+            filter_summary_parts.append("States: " + ", ".join(filters["states"][:5]))
+        if filters.get("companies"):
+            filter_summary_parts.append("Companies: " + ", ".join(filters["companies"][:5]))
         if filters.get("topics") and len(filters["topics"]) < len(df_full["Topic"].unique()):
             filter_summary_parts.append("Topics: " + ", ".join(filters["topics"]))
-        if filters.get("date_from") and filters.get("date_to"):
-            filter_summary_parts.append(f"Date: {filters['date_from']} to {filters['date_to']}")
+        if filters.get("sents") and len(filters["sents"]) < len(df_full["Sentiment"].unique()):
+            filter_summary_parts.append("Status: " + ", ".join(filters["sents"]))
         if filters.get("keyword"):
             filter_summary_parts.append(f"Keyword: {filters['keyword']}")
         scan_date_range = f"{df['Date'].min()} to {df['Date'].max()}" if not df.empty and df["Date"].min() != "Unknown" else "all dates"
