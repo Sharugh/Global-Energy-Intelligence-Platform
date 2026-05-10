@@ -2,10 +2,37 @@ import streamlit as st
 import re
 import io
 import time
+import math
+import textwrap
 import feedparser
+from collections import Counter
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
+
+# ── Word (.docx) export ──────────────────────────────────────────────────────
+try:
+    from docx import Document as DocxDocument
+    from docx.shared import Pt, RGBColor, Inches, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    _DOCX_OK = True
+except ImportError:
+    _DOCX_OK = False
+
+# ── PDF export ───────────────────────────────────────────────────────────────
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors as rl_colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    HRFlowable, KeepTogether)
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
+    _PDF_OK = True
+except ImportError:
+    _PDF_OK = False
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -710,6 +737,400 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb):
         filtered.append(item)
 
     return filtered
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  FREE / BUILT-IN INTELLIGENCE SUMMARISER  (no API key, no external ML libs)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_STOPWORDS = {
+    "a","an","the","and","or","but","in","on","at","to","for","of","with",
+    "is","are","was","were","be","been","being","have","has","had","do","does",
+    "did","will","would","could","should","may","might","shall","can","that",
+    "this","these","those","its","it","i","we","they","he","she","by","from",
+    "as","into","about","over","up","after","before","during","data","center",
+    "datacenter","centers","new","says","said","says","say","also","more","than",
+}
+
+def _tfidf_scores(headlines):
+    """Lightweight TF-IDF over headline tokens → sentence score dict."""
+    tokenize = lambda h: [w.lower() for w in re.findall(r"[a-zA-Z]{3,}", h)
+                          if w.lower() not in _STOPWORDS]
+    tokenized = [tokenize(h) for h in headlines]
+    # IDF
+    N = len(headlines)
+    df_counts = Counter()
+    for toks in tokenized:
+        for t in set(toks):
+            df_counts[t] += 1
+    idf = {t: math.log((N + 1) / (c + 1)) + 1 for t, c in df_counts.items()}
+    # TF-IDF score per sentence
+    scores = []
+    for toks in tokenized:
+        if not toks:
+            scores.append(0.0)
+            continue
+        tf = Counter(toks)
+        s = sum(tf[t] * idf.get(t, 1) for t in toks) / len(toks)
+        scores.append(s)
+    return scores
+
+
+def generate_local_summary(df, sel_desc, date_range):
+    """
+    Pure-Python market intelligence briefing — no API key required.
+    Uses TF-IDF scoring, rule-based extraction and structured aggregation
+    from the already-enriched article DataFrame.
+    """
+    headlines = df["Headline"].tolist()
+    scores    = _tfidf_scores(headlines)
+    df2 = df.copy()
+    df2["_score"] = scores
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+    def top_headlines(sub, n=5):
+        return sub.nlargest(n, "_score")["Headline"].tolist()
+
+    def bullet_list(items):
+        return "\n".join(f"• {it}" for it in items)
+
+    # ── 1. Executive Summary ─────────────────────────────────────────────────
+    total        = len(df2)
+    top_regions  = df2["Region"].value_counts().head(3).index.tolist()
+    top_topics   = df2["Topic"].value_counts().head(3).index.tolist()
+    top_sents    = df2["Sentiment"].value_counts().head(2).index.tolist()
+    mw_rows      = df2[df2["Capacity"] != ""]["Capacity"].tolist()
+    deal_rows    = df2[df2["Deal Size"] != ""]["Deal Size"].tolist()
+    all_companies = []
+    for v in df2["Companies"]:
+        if v:
+            all_companies.extend([c.strip() for c in str(v).split(",")])
+    top_cos      = [co for co, _ in Counter(all_companies).most_common(5)]
+
+    exec_summary = (
+        f"This briefing analyses {total} data center industry articles "
+        f"covering the period {date_range} ({sel_desc}). "
+        f"Activity is concentrated in {', '.join(top_regions)}, with the dominant themes "
+        f"being {', '.join(top_topics)}. "
+        f"The most common project statuses observed are {' and '.join(top_sents)}. "
+        + (f"Capacity announcements include: {'; '.join(mw_rows[:6])}. " if mw_rows else "")
+        + (f"Deal flow highlights: {'; '.join(deal_rows[:6])}." if deal_rows else "")
+    )
+
+    # ── 2. Key Themes ────────────────────────────────────────────────────────
+    theme_bullets = []
+    for topic, count in df2["Topic"].value_counts().items():
+        pct = round(count / total * 100)
+        sub = df2[df2["Topic"] == topic]
+        ex = sub.nlargest(1, "_score")["Headline"].values
+        ex_str = f' (e.g. "{ex[0][:90]}…")' if len(ex) else ""
+        theme_bullets.append(f"{topic} — {count} articles ({pct}%){ex_str}")
+
+    # ── 3. Major Projects & Deals ─────────────────────────────────────────────
+    proj_df = df2[(df2["Capacity"] != "") | (df2["Deal Size"] != "")].copy()
+    proj_bullets = []
+    for _, r in proj_df.nlargest(10, "_score").iterrows():
+        parts = [r["Headline"][:110]]
+        if r.get("Capacity"):  parts.append(f"Capacity: {r['Capacity']}")
+        if r.get("Deal Size"): parts.append(f"Deal: {r['Deal Size']}")
+        if r.get("Country"):   parts.append(r["Country"])
+        if r.get("Companies"): parts.append(r["Companies"])
+        proj_bullets.append(" | ".join(parts))
+    if not proj_bullets:
+        proj_bullets = top_headlines(df2, 8)
+
+    # ── 4. Regulatory & Permitting ────────────────────────────────────────────
+    reg_df  = df2[df2["Topic"] == "Permits"]
+    reg_bullets = top_headlines(reg_df, 6) if not reg_df.empty else ["No specific permitting or regulatory articles detected in current selection."]
+
+    # ── 5. Power & Infrastructure ─────────────────────────────────────────────
+    pwr_df  = df2[df2["Topic"] == "Power"]
+    pwr_bullets = top_headlines(pwr_df, 6) if not pwr_df.empty else ["No specific power/infrastructure articles detected in current selection."]
+
+    # ── 6. Company Activity ───────────────────────────────────────────────────
+    co_bullets = []
+    for co, cnt in Counter(all_companies).most_common(12):
+        co_arts = df2[df2["Companies"].str.contains(re.escape(co), na=False, case=False)]
+        topics_seen = co_arts["Topic"].value_counts().head(2).index.tolist()
+        co_bullets.append(f"{co} — {cnt} mention(s), focus: {', '.join(topics_seen) if topics_seen else 'General'}")
+    if not co_bullets:
+        co_bullets = ["No named companies detected — expand date range or adjust filters."]
+
+    # ── 7. Regional Breakdown ─────────────────────────────────────────────────
+    region_bullets = []
+    for region, rdf in df2.groupby("Region"):
+        top_countries = rdf["Country"].value_counts().head(3).index.tolist()
+        region_bullets.append(f"{region} ({len(rdf)} articles) — top markets: {', '.join(top_countries)}")
+
+    # ── 8. Market Outlook (signal-based) ─────────────────────────────────────
+    proposed = len(df2[df2["Sentiment"] == "Proposed"])
+    approved = len(df2[df2["Sentiment"] == "Approved"])
+    under_c  = len(df2[df2["Sentiment"] == "Under Construction"])
+    opened   = len(df2[df2["Sentiment"] == "Opened / Live"])
+    challenged = len(df2[df2["Sentiment"] == "Challenged"])
+
+    outlook_bullets = [
+        f"Pipeline signal: {proposed} proposed vs {approved} approved projects → "
+        + ("strong forward momentum." if proposed > approved else "approvals keeping pace with proposals."),
+        f"Construction activity: {under_c} projects under construction, {opened} recently opened.",
+        f"Regulatory friction: {challenged} articles flagged with moratoriums, lawsuits, or denials — "
+        + ("elevated headwinds." if challenged > 3 else "manageable friction level."),
+    ]
+    if top_cos:
+        outlook_bullets.append(f"Watch closely: {', '.join(top_cos[:4])} — highest activity levels in this period.")
+    if mw_rows:
+        outlook_bullets.append(f"Capacity wave: {len(mw_rows)} articles cite explicit MW/GW figures — supply pipeline is active.")
+
+    # ── Assemble markdown ─────────────────────────────────────────────────────
+    lines = [
+        "## Executive Summary\n",
+        exec_summary, "\n\n",
+        "## Key Themes & Trends\n",
+        bullet_list(theme_bullets), "\n\n",
+        "## Major Projects & Deals\n",
+        bullet_list(proj_bullets), "\n\n",
+        "## Regulatory & Permitting Landscape\n",
+        bullet_list(reg_bullets), "\n\n",
+        "## Power & Infrastructure\n",
+        bullet_list(pwr_bullets), "\n\n",
+        "## Company Activity Highlights\n",
+        bullet_list(co_bullets), "\n\n",
+        "## Regional Breakdown\n",
+        bullet_list(region_bullets), "\n\n",
+        "## Market Outlook & Forward Signals\n",
+        bullet_list(outlook_bullets), "\n",
+    ]
+    return "".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  WORD (.docx) EXPORT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _set_cell_bg(cell, hex_color):
+    """Set table cell background colour."""
+    tc   = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    shd  = OxmlElement("w:shd")
+    shd.set(qn("w:val"),   "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"),  hex_color)
+    tcPr.append(shd)
+
+
+def build_briefing_docx(summary_text, sel_desc, date_range, df):
+    """Return bytes of a polished Word briefing document."""
+    if not _DOCX_OK:
+        return None
+    buf = io.BytesIO()
+    doc = DocxDocument()
+
+    # Page margins
+    for section in doc.sections:
+        section.top_margin    = Inches(1.0)
+        section.bottom_margin = Inches(1.0)
+        section.left_margin   = Inches(1.15)
+        section.right_margin  = Inches(1.15)
+
+    # ── Cover block ──────────────────────────────────────────────────────────
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = p.add_run("GLOBAL DATA CENTER INTELLIGENCE BRIEFING")
+    run.bold = True
+    run.font.size = Pt(22)
+    run.font.color.rgb = RGBColor(0x00, 0x47, 0xE1)
+    run.font.name = "Calibri"
+
+    sub = doc.add_paragraph()
+    sub.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    sr = sub.add_run(f"Selection: {sel_desc}   |   Period: {date_range}")
+    sr.font.size  = Pt(9)
+    sr.font.color.rgb = RGBColor(0x6A, 0x80, 0xA8)
+    sr.font.name  = "Calibri"
+
+    dr = sub.add_run(f"\nGenerated: {datetime.now().strftime('%d %b %Y, %H:%M')}   |   Articles analysed: {len(df)}")
+    dr.font.size  = Pt(9)
+    dr.font.color.rgb = RGBColor(0x6A, 0x80, 0xA8)
+    dr.font.name  = "Calibri"
+
+    doc.add_paragraph()  # spacer
+
+    # ── Stats summary table ──────────────────────────────────────────────────
+    stats = [
+        ("Total Articles", str(len(df))),
+        ("Top Region",     df["Region"].value_counts().index[0] if not df.empty else "—"),
+        ("Top Topic",      df["Topic"].value_counts().index[0]  if not df.empty else "—"),
+        ("With Capacity",  str(len(df[df["Capacity"] != ""]))),
+        ("With Deal Size", str(len(df[df["Deal Size"] != ""]))),
+    ]
+    tbl = doc.add_table(rows=1, cols=len(stats))
+    tbl.style = "Table Grid"
+    hdr_cells = tbl.rows[0].cells
+    for i, (label, val) in enumerate(stats):
+        hdr_cells[i].text = ""
+        p2 = hdr_cells[i].paragraphs[0]
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r1 = p2.add_run(label + "\n")
+        r1.font.size = Pt(7.5); r1.font.bold = True
+        r1.font.color.rgb = RGBColor(0xB8, 0xC8, 0xE0); r1.font.name = "Calibri"
+        r2 = p2.add_run(val)
+        r2.font.size = Pt(13); r2.font.bold = True
+        r2.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF); r2.font.name = "Calibri"
+        _set_cell_bg(hdr_cells[i], "0F1E36")
+
+    doc.add_paragraph()
+
+    # ── Parse and write markdown sections ────────────────────────────────────
+    ACCENT = RGBColor(0x00, 0x47, 0xE1)
+    BODY   = RGBColor(0x1A, 0x1A, 0x2E)
+    BULLET = RGBColor(0x2A, 0x3E, 0x60)
+
+    for line in summary_text.splitlines():
+        line = line.rstrip()
+        if line.startswith("## "):
+            heading = line[3:]
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(14)
+            p.paragraph_format.space_after  = Pt(4)
+            run = p.add_run(heading.upper())
+            run.bold = True
+            run.font.size = Pt(11)
+            run.font.color.rgb = ACCENT
+            run.font.name = "Calibri"
+            # underline via border
+            pPr = p._p.get_or_add_pPr()
+            pBdr = OxmlElement("w:pBdr")
+            bottom = OxmlElement("w:bottom")
+            bottom.set(qn("w:val"),   "single")
+            bottom.set(qn("w:sz"),    "4")
+            bottom.set(qn("w:space"), "1")
+            bottom.set(qn("w:color"), "0047E1")
+            pBdr.append(bottom)
+            pPr.append(pBdr)
+        elif line.startswith("• "):
+            p = doc.add_paragraph(style="List Bullet")
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(line[2:])
+            run.font.size = Pt(9.5)
+            run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x2E)
+            run.font.name = "Calibri"
+        elif line.strip():
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(4)
+            run = p.add_run(line)
+            run.font.size = Pt(10)
+            run.font.color.rgb = BODY
+            run.font.name = "Calibri"
+
+    # ── Footer note ───────────────────────────────────────────────────────────
+    doc.add_paragraph()
+    fp = doc.add_paragraph()
+    fr = fp.add_run(
+        "This briefing was generated automatically using built-in NLP analysis of "
+        "publicly available news headlines. Always verify against primary sources."
+    )
+    fr.font.size  = Pt(8)
+    fr.font.italic = True
+    fr.font.color.rgb = RGBColor(0xA0, 0xA0, 0xA8)
+    fr.font.name  = "Calibri"
+
+    doc.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PDF EXPORT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def build_briefing_pdf(summary_text, sel_desc, date_range, df):
+    """Return bytes of a styled PDF briefing document."""
+    if not _PDF_OK:
+        return None
+    buf = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=inch * 1.1, rightMargin=inch * 1.1,
+        topMargin=inch * 1.0,  bottomMargin=inch * 1.0,
+    )
+
+    NAVY  = rl_colors.HexColor("#0047E1")
+    DARK  = rl_colors.HexColor("#0F1E36")
+    GREY  = rl_colors.HexColor("#6A80A8")
+    WHITE = rl_colors.white
+    BODY  = rl_colors.HexColor("#1A1A2E")
+
+    styles = getSampleStyleSheet()
+
+    s_title = ParagraphStyle("DCTitle",
+        fontSize=20, textColor=NAVY, fontName="Helvetica-Bold",
+        spaceAfter=4, leading=24)
+    s_sub = ParagraphStyle("DCSub",
+        fontSize=8.5, textColor=GREY, fontName="Helvetica",
+        spaceAfter=14, leading=13)
+    s_head = ParagraphStyle("DCHead",
+        fontSize=11, textColor=NAVY, fontName="Helvetica-Bold",
+        spaceBefore=16, spaceAfter=5, leading=14,
+        borderPadding=(0, 0, 3, 0))
+    s_bullet = ParagraphStyle("DCBullet",
+        fontSize=9.5, textColor=BODY, fontName="Helvetica",
+        spaceAfter=3, leading=13, leftIndent=14,
+        bulletIndent=2, bulletFontName="Helvetica", bulletFontSize=9)
+    s_body = ParagraphStyle("DCBody",
+        fontSize=10, textColor=BODY, fontName="Helvetica",
+        spaceAfter=6, leading=14)
+    s_footer = ParagraphStyle("DCFooter",
+        fontSize=7.5, textColor=GREY, fontName="Helvetica-Oblique",
+        spaceBefore=18, leading=11)
+
+    story = []
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    story.append(Paragraph("GLOBAL DATA CENTER INTELLIGENCE BRIEFING", s_title))
+    story.append(Paragraph(
+        f"<b>Selection:</b> {sel_desc}   |   <b>Period:</b> {date_range}<br/>"
+        f"Generated: {datetime.now().strftime('%d %b %Y, %H:%M')}   |   "
+        f"Articles analysed: {len(df)}",
+        s_sub))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=NAVY, spaceAfter=10))
+
+    # ── Stats row (manual layout) ─────────────────────────────────────────────
+    stats_labels = ["Total Articles", "Top Region", "Top Topic", "w/ Capacity", "w/ Deal Size"]
+    stats_vals   = [
+        str(len(df)),
+        df["Region"].value_counts().index[0] if not df.empty else "—",
+        df["Topic"].value_counts().index[0]  if not df.empty else "—",
+        str(len(df[df["Capacity"] != ""])),
+        str(len(df[df["Deal Size"] != ""])),
+    ]
+    stat_line = "   ·   ".join(f"<b>{l}:</b> {v}" for l, v in zip(stats_labels, stats_vals))
+    story.append(Paragraph(stat_line, ParagraphStyle("statrow",
+        fontSize=8.5, textColor=GREY, fontName="Helvetica",
+        spaceAfter=14, leading=12)))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=GREY, spaceAfter=6))
+
+    # ── Markdown sections ─────────────────────────────────────────────────────
+    for line in summary_text.splitlines():
+        line = line.rstrip()
+        if line.startswith("## "):
+            story.append(Paragraph(line[3:].upper(), s_head))
+            story.append(HRFlowable(width="100%", thickness=0.8, color=NAVY, spaceAfter=4))
+        elif line.startswith("• "):
+            story.append(Paragraph(f"• {line[2:]}", s_bullet))
+        elif line.strip():
+            story.append(Paragraph(line, s_body))
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    story.append(HRFlowable(width="100%", thickness=0.5, color=GREY, spaceBefore=14, spaceAfter=4))
+    story.append(Paragraph(
+        "This briefing was generated automatically using built-in NLP analysis of "
+        "publicly available news headlines. Always verify against primary sources.",
+        s_footer))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf.read()
 
 
 def build_excel(df):
@@ -1696,111 +2117,99 @@ def main():
             col_gen1, col_gen2 = st.columns([3, 1])
             with col_gen1:
                 st.markdown(
-                    '<div style="font-size:.82rem;color:#3a5480;line-height:1.6;">'  
-                    'The AI will analyse all filtered articles and generate a structured market intelligence '  
-                    'briefing covering key themes, major players, capacity pipeline, regulatory developments, '  
-                    'and forward-looking signals.</div>',
+                    '<div style="font-size:.82rem;color:#3a5480;line-height:1.6;">'
+                    'Analyses all filtered articles using built-in TF-IDF NLP and structured '
+                    'rule-based extraction — no API key required. Generates a structured market '
+                    'intelligence briefing covering key themes, major players, capacity pipeline, '
+                    'regulatory developments, company activity, and forward-looking signals.<br>'
+                    '<span style="color:#00b4ff;">Download as Word (.docx) or PDF for a polished, '
+                    'formatted report.</span></div>',
                     unsafe_allow_html=True,
                 )
             with col_gen2:
-                gen_btn = st.button("\U0001f9e0 Generate Summary", use_container_width=True, type="primary")
+                gen_btn = st.button("🧠 Generate Briefing", use_container_width=True, type="primary")
 
             if gen_btn or st.session_state.get("intel_summary"):
                 if gen_btn:
-                    headlines_block = ""
-                    for _, row in df.iterrows():
-                        headlines_block += (
-                            f"- [{row['Date']}] [{row['Country']}] [{row['Topic']}] "
-                            f"[{row.get('Sentiment', '')}] {row['Headline']}"
-                        )
-                        if row.get("Capacity"):
-                            headlines_block += f" | Capacity: {row['Capacity']}"
-                        if row.get("Deal Size"):
-                            headlines_block += f" | Deal: {row['Deal Size']}"
-                        if row.get("Companies"):
-                            headlines_block += f" | Companies: {row['Companies']}"
-                        headlines_block += "\n"
-
-                    prompt = f"""You are a senior data center market intelligence analyst at Wood Mackenzie. 
-You have been given {len(df)} news articles about data center construction and investment activity.
-
-Selection context: {sel_desc}
-Date range covered: {scan_date_range}
-
-Here are all the articles:
-{headlines_block}
-
-Write a structured market intelligence briefing with the following sections. Be specific, cite company names, locations, capacity figures, and deal sizes from the articles. Be analytical, not just descriptive — identify patterns, trends, and what it means for the market.
-
-## Executive Summary
-3-4 sentence high-level overview of what is happening in this market during this period.
-
-## Key Themes & Trends
-The 4-6 most significant patterns emerging from these articles. What is driving activity? What is changing?
-
-## Major Projects & Deals
-The most significant individual projects, investments, and deals. Include company, location, capacity or deal size where available.
-
-## Regulatory & Permitting Landscape
-Any moratoriums, approvals, rejections, legal challenges, or policy developments visible in the data.
-
-## Power & Infrastructure
-Key observations about power sourcing, capacity announcements, utility deals, and energy infrastructure.
-
-## Company Activity Highlights
-Which companies are most active? What strategies are visible? Any notable market entries or exits?
-
-## Market Outlook
-Based on the activity in these articles, what signals exist about near-term market direction? What should an analyst watch?
-
-Write in a professional, analytical tone. Be concise but specific. Use bullet points within sections."""
-
-                    with st.spinner("Generating market intelligence briefing..."):
+                    with st.spinner("Analysing articles with built-in NLP…"):
                         try:
-                            import requests as _req
-                            resp = _req.post(
-                                "https://api.anthropic.com/v1/messages",
-                                headers={"Content-Type": "application/json"},
-                                json={
-                                    "model": "claude-sonnet-4-20250514",
-                                    "max_tokens": 2000,
-                                    "messages": [{"role": "user", "content": prompt}],
-                                },
-                                timeout=60,
-                            )
-                            resp.raise_for_status()
-                            data = resp.json()
-                            summary_text = "".join(
-                                block.get("text", "") for block in data.get("content", [])
-                                if block.get("type") == "text"
-                            )
+                            summary_text = generate_local_summary(df, sel_desc, scan_date_range)
                             st.session_state.intel_summary = summary_text
                             st.session_state.intel_context = sel_desc
+                            st.session_state.intel_df     = df.copy()
+                            st.session_state.intel_range  = scan_date_range
                         except Exception as e:
                             st.error(f"Could not generate summary: {e}")
                             st.session_state.intel_summary = None
 
                 if st.session_state.get("intel_summary"):
                     context_label = st.session_state.get("intel_context", "")
+                    _sum_df    = st.session_state.get("intel_df", df)
+                    _sum_range = st.session_state.get("intel_range", scan_date_range)
+
                     brief_hdr = (
                         f'<div style="background:#0b1628;border:1px solid #0047e1;border-radius:10px;'
                         f'padding:1.2rem 1.5rem;margin-top:.8rem;">'
                         f'<div style="font-family:monospace;font-size:.65rem;letter-spacing:.12em;'
                         f'color:#0047e1;text-transform:uppercase;margin-bottom:.7rem;">'
-                        f'🧠 AI Market Intelligence Briefing  ·  {context_label}</div>'
+                        f'🧠 Market Intelligence Briefing  ·  {context_label}</div>'
                     )
                     st.markdown(brief_hdr, unsafe_allow_html=True)
                     st.markdown(st.session_state.intel_summary)
                     st.markdown('</div>', unsafe_allow_html=True)
 
+                    # ── Download buttons ──────────────────────────────────────
                     ts_intel = datetime.now().strftime("%Y%m%d_%H%M")
-                    st.download_button(
-                        "\U0001f4e5 Download Briefing (.txt)",
-                        data=st.session_state.intel_summary.encode(),
-                        file_name=f"DC_Intel_Briefing_{ts_intel}.txt",
-                        mime="text/plain",
-                        use_container_width=False,
-                    )
+                    dl_col1, dl_col2, dl_col3 = st.columns(3)
+
+                    with dl_col1:
+                        st.download_button(
+                            "📥 Download (.txt)",
+                            data=st.session_state.intel_summary.encode(),
+                            file_name=f"DC_Intel_Briefing_{ts_intel}.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                        )
+
+                    with dl_col2:
+                        docx_bytes = build_briefing_docx(
+                            st.session_state.intel_summary,
+                            context_label, _sum_range, _sum_df,
+                        )
+                        if docx_bytes:
+                            st.download_button(
+                                "📄 Download Word (.docx)",
+                                data=docx_bytes,
+                                file_name=f"DC_Intel_Briefing_{ts_intel}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True,
+                            )
+                        else:
+                            st.markdown(
+                                '<div style="font-size:.75rem;color:#3a5480;padding:.5rem 0;">'
+                                'Add <code>python-docx</code> to requirements.txt for Word export.</div>',
+                                unsafe_allow_html=True,
+                            )
+
+                    with dl_col3:
+                        pdf_bytes = build_briefing_pdf(
+                            st.session_state.intel_summary,
+                            context_label, _sum_range, _sum_df,
+                        )
+                        if pdf_bytes:
+                            st.download_button(
+                                "📑 Download PDF",
+                                data=pdf_bytes,
+                                file_name=f"DC_Intel_Briefing_{ts_intel}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                            )
+                        else:
+                            st.markdown(
+                                '<div style="font-size:.75rem;color:#3a5480;padding:.5rem 0;">'
+                                'Add <code>reportlab</code> to requirements.txt for PDF export.</div>',
+                                unsafe_allow_html=True,
+                            )
 
     with tab6:
         st.markdown('<div class="sec-head">Export Data</div>', unsafe_allow_html=True)
