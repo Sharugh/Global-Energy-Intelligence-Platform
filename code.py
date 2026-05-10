@@ -70,8 +70,12 @@ CUSTOM_CSS = """
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .stApp { background: #060a10; color: #e8edf5; }
 
+/* ── Sidebar shell ─────────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] { background: #0a0f1a !important; border-right: 1px solid #151f35; }
 [data-testid="stSidebar"] * { color: #b8c8e0 !important; }
+[data-testid="stSidebar"] hr { border-color: #151f35 !important; }
+
+/* Sidebar Run button */
 [data-testid="stSidebar"] .stButton button {
     background: linear-gradient(135deg, #0047e1, #00b4ff) !important;
     color: #fff !important; border: none !important; border-radius: 8px !important;
@@ -80,8 +84,143 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     padding: 0.65rem 1rem !important; transition: opacity .2s;
 }
 [data-testid="stSidebar"] .stButton button:hover { opacity: .82; }
-[data-testid="stSidebar"] hr { border-color: #151f35 !important; }
 
+/* ── Sidebar — multiselect control box ────────────────────────────────────── */
+[data-testid="stSidebar"] [data-baseweb="select"] {
+    background: #0b1628 !important;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] > div:first-child {
+    background: #0b1628 !important;
+    border: 1px solid #1e3050 !important;
+    border-radius: 8px !important;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] > div:first-child:focus-within {
+    border-color: #0047e1 !important;
+    box-shadow: 0 0 0 2px rgba(0,71,225,0.18) !important;
+}
+/* Placeholder text */
+[data-testid="stSidebar"] [data-baseweb="select"] [data-testid="stMarkdownContainer"],
+[data-testid="stSidebar"] [data-baseweb="select"] span {
+    color: #3a5480 !important;
+}
+/* Selected tag pills inside multiselect */
+[data-testid="stSidebar"] [data-baseweb="tag"] {
+    background: #0f2245 !important;
+    border: 1px solid #0047e1 !important;
+    border-radius: 5px !important;
+}
+[data-testid="stSidebar"] [data-baseweb="tag"] span {
+    color: #7eb8ff !important;
+}
+[data-testid="stSidebar"] [data-baseweb="tag"] [role="presentation"] svg {
+    fill: #3a5480 !important;
+}
+/* The input inside multiselect */
+[data-testid="stSidebar"] [data-baseweb="select"] input {
+    background: transparent !important;
+    color: #ccdaf5 !important;
+    caret-color: #0047e1 !important;
+}
+
+/* ── Dropdown menu (popover) — dark background ────────────────────────────── */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[role="listbox"],
+ul[data-baseweb="menu"] {
+    background: #0d1a2e !important;
+    border: 1px solid #1e3050 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+}
+/* Each option row */
+[data-baseweb="menu"] li,
+[role="option"],
+[data-baseweb="menu"] [role="option"] {
+    background: #0d1a2e !important;
+    color: #b8c8e0 !important;
+}
+[data-baseweb="menu"] li:hover,
+[role="option"]:hover,
+[data-baseweb="menu"] [role="option"]:hover {
+    background: #0f2245 !important;
+    color: #ffffff !important;
+}
+/* Highlighted/active option */
+[data-baseweb="menu"] [aria-selected="true"],
+[role="option"][aria-selected="true"] {
+    background: #0f2245 !important;
+    color: #00b4ff !important;
+}
+/* Search input inside dropdown */
+[data-baseweb="popover"] input,
+[data-baseweb="menu"] input {
+    background: #060a10 !important;
+    border: 1px solid #1e3050 !important;
+    color: #ccdaf5 !important;
+    border-radius: 6px !important;
+}
+
+/* ── Sidebar text input ────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] .stTextInput input {
+    background: #0b1628 !important;
+    border: 1px solid #1e3050 !important;
+    border-radius: 8px !important;
+    color: #d0dff0 !important;
+}
+[data-testid="stSidebar"] .stTextInput input:focus {
+    border-color: #0047e1 !important;
+    box-shadow: 0 0 0 2px rgba(0,71,225,0.18) !important;
+}
+
+/* ── Sidebar number input ─────────────────────────────────────────────────── */
+[data-testid="stSidebar"] input[type="number"] {
+    background: #0b1628 !important;
+    border: 1px solid #1e3050 !important;
+    border-radius: 8px !important;
+    color: #d0dff0 !important;
+}
+
+/* ── Sidebar date inputs ──────────────────────────────────────────────────── */
+[data-testid="stSidebar"] [data-testid="stDateInput"] input {
+    background: #0b1628 !important;
+    border: 1px solid #1e3050 !important;
+    color: #d0dff0 !important;
+    border-radius: 8px !important;
+}
+
+/* ── Main content selects / multiselects ──────────────────────────────────── */
+.stMultiSelect [data-baseweb="select"] { background: #0b1628 !important; border-color: #152038 !important; }
+.stSelectbox [data-baseweb="select"] > div { background: #0b1628 !important; border-color: #152038 !important; }
+.stTextInput input {
+    background: #0b1628 !important; border: 1px solid #152038 !important;
+    border-radius: 8px !important; color: #d0dff0 !important;
+}
+.stTextInput input:focus { border-color: #0047e1 !important; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    background: #0b1628 !important; border-radius: 10px !important;
+    padding: 4px !important; gap: 3px !important; border: 1px solid #152038;
+}
+.stTabs [data-baseweb="tab"] {
+    background: transparent !important; color: #3a5480 !important;
+    border-radius: 7px !important; font-family: 'Syne', sans-serif !important;
+    font-weight: 600 !important; font-size: .8rem !important;
+    letter-spacing: .04em !important; padding: .45rem 1.1rem !important;
+}
+.stTabs [aria-selected="true"] { background: #0047e1 !important; color: #fff !important; }
+.stTabs [data-baseweb="tab-panel"] { padding-top: 1.1rem !important; }
+
+/* ── Download buttons ─────────────────────────────────────────────────────── */
+.stDownloadButton button {
+    background: linear-gradient(135deg, #002d0a, #005214) !important;
+    color: #00e676 !important; border: 1px solid #00a846 !important;
+    border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
+    font-weight: 700 !important; letter-spacing: .04em !important;
+}
+.stDownloadButton button:hover { opacity: .82 !important; }
+
+/* ── Banner ───────────────────────────────────────────────────────────────── */
 .gl-banner {
     background: linear-gradient(135deg, #07111f 0%, #0b1d3a 45%, #07111f 100%);
     border: 1px solid #132040; border-radius: 16px;
@@ -113,6 +252,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .banner-sub { font-size: .85rem; color: #6a80a8; font-weight: 300; }
 .banner-ts { font-family: 'DM Mono', monospace; font-size: .68rem; color: #2a3e60; margin-top: .7rem; letter-spacing: .05em; }
 
+/* ── Section headings & pills ─────────────────────────────────────────────── */
 .sec-head {
     font-family: 'Syne', sans-serif; font-size: .9rem; font-weight: 700;
     color: #b8c8e0; letter-spacing: .07em; text-transform: uppercase;
@@ -128,33 +268,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .pill b { color: #fff; }
 .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #0047e1; flex-shrink: 0; }
 
-.stTabs [data-baseweb="tab-list"] {
-    background: #0b1628 !important; border-radius: 10px !important;
-    padding: 4px !important; gap: 3px !important; border: 1px solid #152038;
-}
-.stTabs [data-baseweb="tab"] {
-    background: transparent !important; color: #3a5480 !important;
-    border-radius: 7px !important; font-family: 'Syne', sans-serif !important;
-    font-weight: 600 !important; font-size: .8rem !important;
-    letter-spacing: .04em !important; padding: .45rem 1.1rem !important;
-}
-.stTabs [aria-selected="true"] { background: #0047e1 !important; color: #fff !important; }
-.stTabs [data-baseweb="tab-panel"] { padding-top: 1.1rem !important; }
-
-.stDownloadButton button {
-    background: linear-gradient(135deg, #002d0a, #005214) !important;
-    color: #00e676 !important; border: 1px solid #00a846 !important;
-    border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
-    font-weight: 700 !important; letter-spacing: .04em !important;
-}
-.stDownloadButton button:hover { opacity: .82 !important; }
-.stTextInput input {
-    background: #0b1628 !important; border: 1px solid #152038 !important;
-    border-radius: 8px !important; color: #d0dff0 !important;
-}
-.stTextInput input:focus { border-color: #0047e1 !important; }
-.stMultiSelect [data-baseweb="select"] { background: #0b1628 !important; border-color: #152038 !important; }
-.stSelectbox [data-baseweb="select"] > div { background: #0b1628 !important; border-color: #152038 !important; }
 hr { border-color: #152038 !important; }
 #MainMenu, footer, header { visibility: hidden; }
 </style>
@@ -913,129 +1026,394 @@ def _tfidf_scores(headlines):
 
 def generate_local_summary(df, sel_desc, date_range):
     """
-    Pure-Python market intelligence briefing — no API key required.
-    Uses TF-IDF scoring, rule-based extraction and structured aggregation
-    from the already-enriched article DataFrame.
+    Wood Mackenzie-grade market intelligence briefing.
+    Produces deeply analytical, prose-rich sections with quantified signals,
+    company deep-dives, deal flow analysis, and forward-looking commentary —
+    modelled on top-tier energy/infrastructure research houses.
     """
     headlines = df["Headline"].tolist()
     scores    = _tfidf_scores(headlines)
     df2 = df.copy()
     df2["_score"] = scores
 
-    # ── helpers ──────────────────────────────────────────────────────────────
-    def top_headlines(sub, n=5):
-        return sub.nlargest(n, "_score")["Headline"].tolist()
+    total = len(df2)
+    if total == 0:
+        return "No articles in the selected view. Adjust filters and regenerate."
 
-    def bullet_list(items):
-        return "\n".join(f"• {it}" for it in items)
+    # ── Core aggregations ─────────────────────────────────────────────────────
+    top_regions  = df2["Region"].value_counts()
+    top_topics   = df2["Topic"].value_counts()
+    top_sents    = df2["Sentiment"].value_counts()
+    top_countries= df2["Country"].value_counts()
 
-    # ── 1. Executive Summary ─────────────────────────────────────────────────
-    total        = len(df2)
-    top_regions  = df2["Region"].value_counts().head(3).index.tolist()
-    top_topics   = df2["Topic"].value_counts().head(3).index.tolist()
-    top_sents    = df2["Sentiment"].value_counts().head(2).index.tolist()
-    mw_rows      = df2[df2["Capacity"] != ""]["Capacity"].tolist()
-    deal_rows    = df2[df2["Deal Size"] != ""]["Deal Size"].tolist()
-    all_companies = []
+    mw_df    = df2[df2["Capacity"] != ""].copy()
+    deal_df  = df2[df2["Deal Size"] != ""].copy()
+    mw_vals  = mw_df["Capacity"].tolist()
+    deal_vals= deal_df["Deal Size"].tolist()
+
+    # Build full company counter from Companies column
+    all_companies_list = []
     for v in df2["Companies"]:
         if v:
-            all_companies.extend([c.strip() for c in str(v).split(",")])
-    top_cos      = [co for co, _ in Counter(all_companies).most_common(5)]
+            all_companies_list.extend([c.strip() for c in str(v).split(",") if c.strip()])
+    co_counter = Counter(all_companies_list)
+    top_cos    = [co for co, _ in co_counter.most_common(20)]
 
-    exec_summary = (
-        f"This briefing analyses {total} data center industry articles "
-        f"covering the period {date_range} ({sel_desc}). "
-        f"Activity is concentrated in {', '.join(top_regions)}, with the dominant themes "
-        f"being {', '.join(top_topics)}. "
-        f"The most common project statuses observed are {' and '.join(top_sents)}. "
-        + (f"Capacity announcements include: {'; '.join(mw_rows[:6])}. " if mw_rows else "")
-        + (f"Deal flow highlights: {'; '.join(deal_rows[:6])}." if deal_rows else "")
+    # Sentiment counts
+    proposed   = int(top_sents.get("Proposed", 0))
+    approved   = int(top_sents.get("Approved", 0))
+    under_c    = int(top_sents.get("Under Construction", 0))
+    opened     = int(top_sents.get("Opened / Live", 0))
+    challenged = int(top_sents.get("Challenged", 0))
+    news_c     = int(top_sents.get("News", 0))
+
+    def pct(n): return f"{round(n/total*100)}%" if total else "0%"
+    def hl(sub, n=3):
+        """Return top n scored headlines from a sub-dataframe."""
+        if sub.empty: return []
+        return sub.nlargest(n, "_score")["Headline"].tolist()
+
+    # ── Prose helpers ─────────────────────────────────────────────────────────
+    def region_prose():
+        parts = []
+        for reg, cnt in top_regions.items():
+            pct_val = pct(cnt)
+            top_c   = df2[df2["Region"]==reg]["Country"].value_counts().head(4).index.tolist()
+            parts.append(f"{reg} ({cnt} articles, {pct_val}) led by {', '.join(top_c)}")
+        return "; ".join(parts) + "."
+
+    def topic_prose():
+        parts = []
+        for top, cnt in top_topics.items():
+            parts.append(f"{top} ({cnt} articles, {pct(cnt)})")
+        return ", ".join(parts)
+
+    # ── 1. EXECUTIVE SUMMARY ─────────────────────────────────────────────────
+    dominant_region  = top_regions.index[0] if not top_regions.empty else "Global"
+    dominant_topic   = top_topics.index[0]  if not top_topics.empty else "General"
+    dominant_country = top_countries.index[0] if not top_countries.empty else "—"
+
+    momentum_signal = (
+        "strongly positive" if proposed > approved * 1.5
+        else "balanced" if abs(proposed - approved) <= 2
+        else "approval-constrained"
     )
 
-    # ── 2. Key Themes ────────────────────────────────────────────────────────
-    theme_bullets = []
-    for topic, count in df2["Topic"].value_counts().items():
-        pct = round(count / total * 100)
+    capacity_total_mw = 0
+    for cap in mw_vals:
+        m = re.search(r"([\d,.]+)\s*(GW|MW)", str(cap), re.I)
+        if m:
+            v = float(m.group(1).replace(",", ""))
+            capacity_total_mw += v * 1000 if m.group(2).upper() == "GW" else v
+
+    exec_lines = [
+        f"This intelligence briefing synthesises {total} data centre industry articles "
+        f"published between {date_range}, filtered to: {sel_desc}. "
+        f"The analysis draws on headlines sourced from trade press, RSS feeds, and news aggregators, "
+        f"auto-enriched with topic classification, project status, capacity and deal-size extraction, "
+        f"and named-entity recognition across {df2['Country'].nunique()} countries.",
+
+        f"\nActivity is geographically concentrated in {dominant_region}, with {dominant_country} "
+        f"representing the single most active market in the filtered dataset. "
+        f"Thematically, {dominant_topic} stories dominate at {pct(int(top_topics.iloc[0]))} of total "
+        f"coverage, followed by {', '.join(str(t) for t in top_topics.index[1:3])}.",
+
+        f"\nThe project pipeline presents a {momentum_signal} outlook: {proposed} proposed projects "
+        f"against {approved} approvals, with {under_c} actively under construction and {opened} "
+        f"recently commissioned. Regulatory friction accounts for {challenged} challenged or contested "
+        f"articles ({pct(challenged)} of the dataset). "
+        + (f"Identified capacity in announced or proposed projects totals approximately "
+           f"{capacity_total_mw:,.0f} MW across {len(mw_df)} discrete announcements. "
+           if capacity_total_mw > 0 else "")
+        + (f"Disclosed deal flow spans {len(deal_df)} transactions including: "
+           f"{'; '.join(deal_vals[:6])}{'.' if deal_vals else ''}"
+           if deal_vals else ""),
+    ]
+    exec_summary = " ".join(exec_lines)
+
+    # ── 2. KEY THEMES & TRENDS ────────────────────────────────────────────────
+    theme_lines = []
+    for topic, cnt in top_topics.items():
         sub = df2[df2["Topic"] == topic]
-        ex = sub.nlargest(1, "_score")["Headline"].values
-        ex_str = f' (e.g. "{ex[0][:90]}…")' if len(ex) else ""
-        theme_bullets.append(f"{topic} — {count} articles ({pct}%){ex_str}")
+        ex  = hl(sub, 2)
+        ex_str = ""
+        if ex:
+            ex_str = f' Representative coverage includes: "{ex[0][:120]}"'
+            if len(ex) > 1:
+                ex_str += f'; and "{ex[1][:100]}".'
+            else:
+                ex_str += "."
+        theme_lines.append(
+            f"• **{topic}** — {cnt} articles ({pct(cnt)}). {ex_str}"
+        )
 
-    # ── 3. Major Projects & Deals ─────────────────────────────────────────────
-    proj_df = df2[(df2["Capacity"] != "") | (df2["Deal Size"] != "")].copy()
+    # ── 3. MAJOR PROJECTS & DEALS ─────────────────────────────────────────────
     proj_bullets = []
-    for _, r in proj_df.nlargest(10, "_score").iterrows():
-        parts = [r["Headline"][:110]]
-        if r.get("Capacity"):  parts.append(f"Capacity: {r['Capacity']}")
-        if r.get("Deal Size"): parts.append(f"Deal: {r['Deal Size']}")
-        if r.get("Country"):   parts.append(r["Country"])
-        if r.get("Companies"): parts.append(r["Companies"])
-        proj_bullets.append(" | ".join(parts))
+    # First: deal-size articles ranked by deal value then score
+    deal_sub = deal_df.nlargest(min(8, len(deal_df)), "_score") if not deal_df.empty else pd.DataFrame()
+    for _, r in deal_sub.iterrows():
+        parts = [f"**{r['Headline'][:130]}**"]
+        tags  = []
+        if r.get("Deal Size"): tags.append(f"Deal: {r['Deal Size']}")
+        if r.get("Capacity"):  tags.append(f"Capacity: {r['Capacity']}")
+        if r.get("Country"):   tags.append(f"Market: {r['Country']}")
+        if r.get("Companies"): tags.append(f"Companies: {r['Companies']}")
+        if tags: parts.append(" · ".join(tags))
+        proj_bullets.append("• " + " | ".join(parts))
+
+    # Then: capacity-only articles
+    cap_only = mw_df[mw_df["Deal Size"] == ""].nlargest(min(8, len(mw_df)), "_score") if not mw_df.empty else pd.DataFrame()
+    for _, r in cap_only.iterrows():
+        parts = [f"**{r['Headline'][:130]}**"]
+        tags  = [f"Capacity: {r['Capacity']}", f"Market: {r['Country']}"]
+        if r.get("Companies"): tags.append(f"Companies: {r['Companies']}")
+        parts.append(" · ".join(tags))
+        proj_bullets.append("• " + " | ".join(parts))
+
     if not proj_bullets:
-        proj_bullets = top_headlines(df2, 8)
+        # Fall back to highest-scored articles
+        for _, r in df2.nlargest(8, "_score").iterrows():
+            proj_bullets.append(
+                f"• **{r['Headline'][:130]}** | Market: {r['Country']} · Topic: {r['Topic']}"
+            )
 
-    # ── 4. Regulatory & Permitting ────────────────────────────────────────────
+    # ── 4. REGULATORY & PERMITTING LANDSCAPE ──────────────────────────────────
     reg_df  = df2[df2["Topic"] == "Permits"]
-    reg_bullets = top_headlines(reg_df, 6) if not reg_df.empty else ["No specific permitting or regulatory articles detected in current selection."]
+    chall_df= df2[df2["Sentiment"] == "Challenged"]
+    appr_df = df2[df2["Sentiment"] == "Approved"]
 
-    # ── 5. Power & Infrastructure ─────────────────────────────────────────────
+    reg_intro = (
+        f"Permitting and regulatory dynamics account for {len(reg_df)} articles "
+        f"({pct(len(reg_df))}) in the current selection. "
+    )
+    if len(chall_df) > 0:
+        reg_intro += (
+            f"Contested or blocked projects number {len(chall_df)}, "
+            f"indicating {'elevated' if len(chall_df) > 3 else 'moderate'} community and regulatory "
+            f"resistance in this geography and period. "
+        )
+    if len(appr_df) > 0:
+        reg_intro += f"Approvals recorded: {len(appr_df)} projects cleared planning in the period. "
+    if reg_df.empty and chall_df.empty:
+        reg_intro += "No specific permitting friction or approval events detected in the current filter."
+
+    reg_bullets = ["• " + h for h in hl(pd.concat([reg_df, chall_df, appr_df]).drop_duplicates(), 8)]
+    if not reg_bullets:
+        reg_bullets = ["• No permitting-specific articles in current selection."]
+
+    # ── 5. POWER & INFRASTRUCTURE ─────────────────────────────────────────────
     pwr_df  = df2[df2["Topic"] == "Power"]
-    pwr_bullets = top_headlines(pwr_df, 6) if not pwr_df.empty else ["No specific power/infrastructure articles detected in current selection."]
+    pwr_intro = (
+        f"Power and energy infrastructure is a recurring theme across {len(pwr_df)} articles "
+        f"({pct(len(pwr_df))}), reflecting the sector's acute dependence on grid capacity, "
+        f"PPAs, and alternative generation sources. "
+    )
+    if capacity_total_mw > 0:
+        pwr_intro += (
+            f"Across all capacity-cited articles, aggregate announced load totals "
+            f"approximately {capacity_total_mw:,.0f} MW — a figure that underscores the scale "
+            f"of power procurement challenges facing operators in this market. "
+        )
+    pwr_bullets = ["• " + h for h in hl(pwr_df, 7)]
+    if not pwr_bullets:
+        pwr_bullets = ["• No dedicated power/infrastructure articles in current selection."]
 
-    # ── 6. Company Activity ───────────────────────────────────────────────────
-    co_bullets = []
-    for co, cnt in Counter(all_companies).most_common(12):
-        co_arts = df2[df2["Companies"].str.contains(re.escape(co), na=False, case=False)]
-        topics_seen = co_arts["Topic"].value_counts().head(2).index.tolist()
-        co_bullets.append(f"{co} — {cnt} mention(s), focus: {', '.join(topics_seen) if topics_seen else 'General'}")
-    if not co_bullets:
-        co_bullets = ["No named companies detected — expand date range or adjust filters."]
+    # ── 6. COMPANY ACTIVITY & COMPETITIVE LANDSCAPE ──────────────────────────
+    # Build richer per-company profiles
+    co_section_lines = []
 
-    # ── 7. Regional Breakdown ─────────────────────────────────────────────────
-    region_bullets = []
+    # Group by hyperscalers vs colo/operators vs investors
+    hyperscalers = {"Microsoft","Google","Amazon","AWS","Meta","Apple","Oracle","Alibaba",
+                    "Tencent","ByteDance","Baidu","Alphabet","OpenAI","Stargate","CoreWeave",
+                    "xAI","Anthropic","IBM","Huawei","Samsung","NVIDIA"}
+    colo_ops     = {"Equinix","Digital Realty","Iron Mountain","CoreSite","CyrusOne","NTT",
+                    "Vantage","Switch","EdgeConneX","Flexential","DataBank","QTS","Colt",
+                    "Global Switch","ChinaData","GDS","STACK","Aligned","Compass","Tract",
+                    "Yondr","Venari","Verne","NextDC","AirTrunk","atNorth","CtrlS","Yotta",
+                    "STT GDC","Keppel","Singtel","Telstra","Macquarie","VIRTUS","Kao",
+                    "Ascenty","Odata","Scala","Luminet","Etix","Nabiax","Bolder","DigiPlex",
+                    "Bulk Infrastructure","Green Mountain","365 Data Centers","DigiCo",
+                    "Cloudflare","Fastly","Akamai","Lumen","Zayo","Cogent","Pulsant","Iomart",
+                    "Telehouse","Interxion","euNetworks","DE-CIX","MEVSPACE","Beyond.pl","Atman",
+                    "Applied Digital","Hut 8","Core Scientific","Riot","Marathon","Iren",
+                    "CyrusOne","Flexential","DataBank","T5","Skybox","Stream","CloudHQ"}
+
+    mentioned_cos = [(co, cnt) for co, cnt in co_counter.most_common(30)]
+
+    if mentioned_cos:
+        # Narrative intro
+        co_intro_parts = []
+        hs_mentioned  = [(co,c) for co,c in mentioned_cos if co in hyperscalers]
+        col_mentioned = [(co,c) for co,c in mentioned_cos if co in colo_ops]
+        other_mentioned=[(co,c) for co,c in mentioned_cos if co not in hyperscalers and co not in colo_ops]
+
+        if hs_mentioned:
+            co_intro_parts.append(
+                f"Hyperscaler activity is led by "
+                f"{', '.join(co+f' ({c} mentions)' for co,c in hs_mentioned[:5])}, "
+                f"signalling continued large-scale capacity expansion in this market."
+            )
+        if col_mentioned:
+            co_intro_parts.append(
+                f"Among operators and colocation providers, "
+                f"{', '.join(co+f' ({c} mentions)' for co,c in col_mentioned[:5])} "
+                f"feature prominently, reflecting active build, partnership, or M&A dynamics."
+            )
+        if other_mentioned:
+            co_intro_parts.append(
+                f"Additional notable participants include "
+                f"{', '.join(co+f' ({c} mentions)' for co,c in other_mentioned[:5])}, "
+                f"encompassing investors, developers, utilities, and technology vendors."
+            )
+
+        co_section_lines.append("\n".join(co_intro_parts))
+        co_section_lines.append("")
+
+        # Per-company detail bullets
+        for co, cnt in mentioned_cos[:20]:
+            co_arts = df2[
+                df2["Companies"].str.contains(re.escape(co), na=False, case=False) |
+                df2["Headline"].str.contains(re.escape(co), na=False, case=False)
+            ]
+            topics_seen    = co_arts["Topic"].value_counts().head(3).index.tolist()
+            sents_seen     = co_arts["Sentiment"].value_counts().head(2).index.tolist()
+            countries_seen = co_arts["Country"].value_counts().head(3).index.tolist()
+            cap_arts       = co_arts[co_arts["Capacity"] != ""]["Capacity"].tolist()
+            deal_arts      = co_arts[co_arts["Deal Size"] != ""]["Deal Size"].tolist()
+
+            detail_parts = [f"focus: {', '.join(topics_seen) if topics_seen else 'General'}"]
+            if countries_seen and countries_seen != ["Global"]:
+                detail_parts.append(f"markets: {', '.join(countries_seen)}")
+            if sents_seen:
+                detail_parts.append(f"status signals: {', '.join(sents_seen)}")
+            if cap_arts:
+                detail_parts.append(f"capacity cited: {'; '.join(cap_arts[:3])}")
+            if deal_arts:
+                detail_parts.append(f"deal flow: {'; '.join(deal_arts[:2])}")
+
+            co_section_lines.append(
+                f"• **{co}** — {cnt} article{'s' if cnt>1 else ''} | "
+                + " | ".join(detail_parts)
+            )
+    else:
+        co_section_lines.append(
+            "• No named company entities detected in the current filtered view. "
+            "Consider broadening the date range, region, or topic filters to surface company-level signals."
+        )
+
+    # ── 7. REGIONAL BREAKDOWN (detailed) ─────────────────────────────────────
+    region_lines = []
     for region, rdf in df2.groupby("Region"):
-        top_countries = rdf["Country"].value_counts().head(3).index.tolist()
-        region_bullets.append(f"{region} ({len(rdf)} articles) — top markets: {', '.join(top_countries)}")
+        top_c      = rdf["Country"].value_counts().head(5).index.tolist()
+        top_t      = rdf["Topic"].value_counts().head(3).index.tolist()
+        cap_in_reg = rdf[rdf["Capacity"] != ""]["Capacity"].tolist()
+        deals_reg  = rdf[rdf["Deal Size"] != ""]["Deal Size"].tolist()
+        prop_reg   = len(rdf[rdf["Sentiment"]=="Proposed"])
+        appr_reg   = len(rdf[rdf["Sentiment"]=="Approved"])
+        chall_reg  = len(rdf[rdf["Sentiment"]=="Challenged"])
 
-    # ── 8. Market Outlook (signal-based) ─────────────────────────────────────
-    proposed = len(df2[df2["Sentiment"] == "Proposed"])
-    approved = len(df2[df2["Sentiment"] == "Approved"])
-    under_c  = len(df2[df2["Sentiment"] == "Under Construction"])
-    opened   = len(df2[df2["Sentiment"] == "Opened / Live"])
-    challenged = len(df2[df2["Sentiment"] == "Challenged"])
+        region_lines.append(f"• **{region}** — {len(rdf)} articles ({pct(len(rdf))})")
+        region_lines.append(
+            f"  Lead markets: {', '.join(top_c)}. "
+            f"Dominant themes: {', '.join(top_t)}. "
+            f"Pipeline: {prop_reg} proposed, {appr_reg} approved, {chall_reg} challenged."
+            + (f" Capacity cited: {'; '.join(cap_in_reg[:4])}." if cap_in_reg else "")
+            + (f" Deal flow: {'; '.join(deals_reg[:3])}." if deals_reg else "")
+        )
+
+    # ── 8. MARKET OUTLOOK & FORWARD SIGNALS ───────────────────────────────────
+    pipeline_signal = (
+        "strongly positive — new proposal volume significantly outpaces current approvals, "
+        "suggesting continued permitting and planning activity over the next 12–24 months"
+        if proposed > approved * 1.5
+        else "broadly balanced — approvals are broadly keeping pace with new project announcements, "
+        "indicating a market in active but orderly expansion"
+        if abs(proposed - approved) <= 3
+        else "approval-constrained — the gap between proposals and approvals suggests permitting "
+        "timelines and grid connection queues may be limiting near-term delivery"
+    )
+
+    reg_risk = (
+        "elevated" if challenged > 4
+        else "moderate" if challenged > 1
+        else "low"
+    )
 
     outlook_bullets = [
-        f"Pipeline signal: {proposed} proposed vs {approved} approved projects → "
-        + ("strong forward momentum." if proposed > approved else "approvals keeping pace with proposals."),
-        f"Construction activity: {under_c} projects under construction, {opened} recently opened.",
-        f"Regulatory friction: {challenged} articles flagged with moratoriums, lawsuits, or denials — "
-        + ("elevated headwinds." if challenged > 3 else "manageable friction level."),
-    ]
-    if top_cos:
-        outlook_bullets.append(f"Watch closely: {', '.join(top_cos[:4])} — highest activity levels in this period.")
-    if mw_rows:
-        outlook_bullets.append(f"Capacity wave: {len(mw_rows)} articles cite explicit MW/GW figures — supply pipeline is active.")
+        f"• **Pipeline momentum:** {pipeline_signal}. "
+        f"With {proposed} proposed vs {approved} approved and {under_c} under construction, "
+        f"near-term delivery visibility {'is strong' if under_c >= 3 else 'remains limited'}.",
 
-    # ── Assemble markdown ─────────────────────────────────────────────────────
-    lines = [
-        "## Executive Summary\n",
-        exec_summary, "\n\n",
-        "## Key Themes & Trends\n",
-        bullet_list(theme_bullets), "\n\n",
-        "## Major Projects & Deals\n",
-        bullet_list(proj_bullets), "\n\n",
-        "## Regulatory & Permitting Landscape\n",
-        bullet_list(reg_bullets), "\n\n",
-        "## Power & Infrastructure\n",
-        bullet_list(pwr_bullets), "\n\n",
-        "## Company Activity Highlights\n",
-        bullet_list(co_bullets), "\n\n",
-        "## Regional Breakdown\n",
-        bullet_list(region_bullets), "\n\n",
-        "## Market Outlook & Forward Signals\n",
-        bullet_list(outlook_bullets), "\n",
+        f"• **Commissioning activity:** {opened} facility opening{'s' if opened != 1 else ''} recorded "
+        f"in the period, confirming active supply additions to the market.",
+
+        f"• **Regulatory risk:** {reg_risk.capitalize()} — {challenged} contested or challenged "
+        f"project{'s' if challenged != 1 else ''} in the dataset. "
+        + ("Community opposition, moratorium risk, and planning delays represent the primary "
+           "near-term threat to delivery timelines."
+           if challenged > 2
+           else "Regulatory environment appears broadly supportive of new capacity in this geography."),
+
+        f"• **Company watch:** {', '.join(top_cos[:6])} represent the highest-frequency participants "
+        f"in this period. Monitor for further capacity announcements, M&A, and permitting outcomes.",
     ]
-    return "".join(lines)
+
+    if mw_vals:
+        outlook_bullets.append(
+            f"• **Capacity pipeline:** {len(mw_df)} articles reference explicit MW or GW figures. "
+            f"Aggregate announced load stands at approximately {capacity_total_mw:,.0f} MW across "
+            f"disclosed projects. Actual delivered capacity will depend on permitting, grid "
+            f"connection, and financing milestones."
+        )
+    if deal_vals:
+        outlook_bullets.append(
+            f"• **Investment flow:** {len(deal_df)} deal-citing articles totalling disclosed "
+            f"transactions of {', '.join(deal_vals[:8])}. "
+            f"Deal density suggests active capital deployment into the sector."
+        )
+
+    # ── Assemble final document ────────────────────────────────────────────────
+    doc_parts = []
+
+    doc_parts += [
+        "## 1. Executive Summary\n\n",
+        exec_summary, "\n\n",
+    ]
+    doc_parts += [
+        "## 2. Key Themes & Market Dynamics\n\n",
+        f"Coverage across {total} articles spans the following thematic clusters: "
+        f"{topic_prose()}.\n\n",
+        "\n".join(theme_lines), "\n\n",
+    ]
+    doc_parts += [
+        "## 3. Major Projects, Deals & Capacity Announcements\n\n",
+        "\n".join(proj_bullets) if proj_bullets else "• No capacity or deal-cited articles in current selection.", "\n\n",
+    ]
+    doc_parts += [
+        "## 4. Regulatory & Permitting Landscape\n\n",
+        reg_intro + "\n\n",
+        "\n".join(reg_bullets), "\n\n",
+    ]
+    doc_parts += [
+        "## 5. Power & Infrastructure\n\n",
+        pwr_intro + "\n\n",
+        "\n".join(pwr_bullets), "\n\n",
+    ]
+    doc_parts += [
+        "## 6. Company Activity & Competitive Landscape\n\n",
+        "\n".join(co_section_lines), "\n\n",
+    ]
+    doc_parts += [
+        "## 7. Regional Breakdown\n\n",
+        "\n".join(region_lines), "\n\n",
+    ]
+    doc_parts += [
+        "## 8. Market Outlook & Forward Signals\n\n",
+        "\n".join(outlook_bullets), "\n",
+    ]
+
+    return "".join(doc_parts)
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
