@@ -603,190 +603,90 @@ KNOWN_COMPANIES = [
     "DE-CIX","Interxion","euNetworks","Telehouse","Iomart","Pulsant",
 ]
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  UPGRADED SCRAPER SECTION — drop-in replacement for code__2__.py
-#  Replaces everything from RSS_SOURCES / SCRAPE_SOURCES / scraper functions
-#  down to (but NOT including) the enrichment helpers and run_all_scrapers.
-#
-#  KEY IMPROVEMENTS vs original code__2__:
-#  1.  DCD now scraped via its Construction Channel URL
-#      (?term=the-data-center-construction-channel) — same trick that makes
-#      app__15__.py fetch more articles — PLUS additional DCD term URLs that
-#      cover approved / site-selection / extension / disclosed-projects / etc.
-#  2.  Minimum headline length lowered from 15 → 10 chars (matches app15)
-#      so short but valid headlines are no longer silently dropped.
-#  3.  <time datetime="..."> parsing added (already in code__2__ but now
-#      also used for DCD's own <time> tags, which carry ISO timestamps).
-#  4.  GNEWS_QUERIES expanded with project-lifecycle terms:
-#      site selection, extension, disclosed, approved, announced, permit, etc.
-#  5.  DataCenter Frontier added as a 5th HTML source (high quality, free).
-#  6.  Data Centre Magazine URL corrected to a more reliable section.
-# ═══════════════════════════════════════════════════════════════════════════════
 
-RSS_SOURCES = []   # All sources are HTML-scraped directly; no RSS feeds used
+# ─── DCD constants ─────────────────────────────────────────────────────────
+DCD_BASE     = "https://www.datacenterdynamics.com"
+DCD_CHAN_TERM = "the-data-center-construction-channel"
 
-# ── DCD Construction-Channel term IDs ────────────────────────────────────────
-# Each entry produces its own paginated scrape so articles from every lifecycle
-# stage are collected independently, then deduped.
-_DCD_BASE = "https://www.datacenterdynamics.com"
-_DCD_TERMS = [
-    # The primary construction channel — biggest volume, matches app__15__
-    "the-data-center-construction-channel",
-    # Project stages you specifically want
+# DCD region taxonomy terms → mapped to code2's Region labels
+# These are the actual URL ?term= slugs DCD uses in their site taxonomy
+DCD_REGION_TERMS = {
+    "north-america":  "North America",
+    "europe":         "Europe",
+    "asia-pacific":   "Asia Pacific",
+    "middle-east":    "Middle East",
+    "africa":         "Africa",
+    "latin-america":  "Latin America",
+}
+
+# DCD project-stage / topic terms for extra coverage
+DCD_EXTRA_TERMS = [
     "approved",
     "site-selection",
     "disclosed-projects",
     "project-announcement",
     "expansion",
     "extension",
-    # General DC news as a catch-all (bare listing)
-    # — keep priority 1 so DCD always wins dedup
-]
-# Build one SCRAPE_SOURCE entry per DCD term
-_DCD_SOURCES = [
-    {
-        "name":         "DataCenterDynamics",
-        "url":          f"{_DCD_BASE}/en/news/?term={term}",
-        "base":         _DCD_BASE,
-        "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$",
-        "type":         "html",
-        "priority":     1,
-    }
-    for term in _DCD_TERMS
-]
-# Also add the bare /en/news/ listing so we don't miss anything un-tagged
-_DCD_SOURCES.append({
-    "name":         "DataCenterDynamics",
-    "url":          f"{_DCD_BASE}/en/news/",
-    "base":         _DCD_BASE,
-    "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$",
-    "type":         "html",
-    "priority":     1,
-})
-
-SCRAPE_SOURCES = [
-    *_DCD_SOURCES,
-
-    # ── DataCenter Knowledge — build-design + data-centers sections ───────────
-    {
-        "name":         "DataCenter Knowledge",
-        "url":          "https://www.datacenterknowledge.com/build-design",
-        "base":         "https://www.datacenterknowledge.com",
-        "link_pattern": r"^/(build-design|data-centers|cloud)/[^?#]+$",
-        "type":         "html",
-        "priority":     2,
-    },
-    {
-        "name":         "DataCenter Knowledge",
-        "url":          "https://www.datacenterknowledge.com/data-centers",
-        "base":         "https://www.datacenterknowledge.com",
-        "link_pattern": r"^/(build-design|data-centers|cloud)/[^?#]+$",
-        "type":         "html",
-        "priority":     2,
-    },
-
-    # ── Data Center Frontier — news (new 5th source, high quality) ────────────
-    {
-        "name":         "DataCenterFrontier",
-        "url":          "https://datacenterfrontier.com/news/",
-        "base":         "https://datacenterfrontier.com",
-        "link_pattern": r"^/(news|construction|power|colocation|hyperscale)/[^?#]+$",
-        "type":         "html",
-        "priority":     3,
-    },
-
-    # ── Data Center World — news & insights ──────────────────────────────────
-    {
-        "name":         "Data Center World",
-        "url":          "https://datacenterworld.com/news-insights/",
-        "base":         "https://datacenterworld.com",
-        "link_pattern": r"^/(news-insights|news)/[^?#]+$",
-        "type":         "html",
-        "priority":     4,
-    },
-
-    # ── Data Centre Magazine — news ───────────────────────────────────────────
-    {
-        "name":         "Data Centre Magazine",
-        "url":          "https://datacentremagazine.com/data-centres",
-        "base":         "https://datacentremagazine.com",
-        "link_pattern": r"^/(data-centres|news|articles)/[^?#]+$",
-        "type":         "html",
-        "priority":     5,
-    },
 ]
 
-
-# ── Google News queries — project-lifecycle coverage ─────────────────────────
 GNEWS_QUERIES = [
-    # ── Construction / Physical build ────────────────────────────────────────
+    # Construction / physical build
     ("data center construction campus groundbreaking opening", "Google News"),
     ("data center broke ground topping out opens ribbon cutting", "Google News"),
     ("data center under construction building phase expansion", "Google News"),
-    ("data center facility development site acres square feet", "Google News"),
-
-    # ── Approvals / Permits / Regulatory ─────────────────────────────────────
+    # Approvals / permits / regulatory
     ("data center approved approval permit planning zoning", "Google News"),
     ("data center zoning rezoning moratorium ordinance vote hearing", "Google News"),
-    ("data center rejected denied blocked lawsuit opposition", "Google News"),
     ("data center project approval go-ahead green light county city", "Google News"),
-
-    # ── Site Selection / Disclosed Projects / Announced ───────────────────────
+    ("data center rejected denied blocked lawsuit opposition", "Google News"),
+    # Site selection / disclosed / announced
     ("data center site selection disclosed announced plans", "Google News"),
     ("data center project announced new campus planned", "Google News"),
-    ("data center site selected location chosen new market", "Google News"),
     ("data center disclosed project pipeline plans filed", "Google News"),
-
-    # ── Extension / Expansion ─────────────────────────────────────────────────
-    ("data center expansion extension phase two additional capacity", "Google News"),
-    ("data center campus expansion megawatt additional phase", "Google News"),
-
-    # ── Power & Energy ────────────────────────────────────────────────────────
+    # Extension / expansion
+    ("data center expansion extension phase additional capacity", "Google News"),
+    # Power & energy
     ("data center hyperscale investment billion megawatt gigawatt", "Google News"),
     ("data center power energy grid nuclear solar PPA", "Google News"),
     ("data center behind the meter power plant generator turbine", "Google News"),
     ("data center nuclear SMR geothermal hydrogen power", "Google News"),
     ("data center grid connection electricity capacity substation", "Google News"),
-
-    # ── Investment / Finance ──────────────────────────────────────────────────
+    # Investment / finance
     ("data center acquisition merger deal sale billion", "Google News"),
     ("data center REIT investment fund financing lease", "Google News"),
     ("data center IPO equity raise capital raise funding", "Google News"),
-
-    # ── Hyperscalers ──────────────────────────────────────────────────────────
+    # Hyperscalers
     ("Microsoft Google Amazon Meta Oracle data center campus", "Google News"),
     ("AWS Azure GCP hyperscale cloud data center region", "Google News"),
-
-    # ── Operators / Colos ─────────────────────────────────────────────────────
+    # Operators
     ("Equinix Digital Realty CyrusOne QTS NTT data center", "Google News"),
     ("EdgeConneX Vantage Compass Aligned DataBank data center", "Google News"),
     ("Yondr AirTrunk NextDC Macquarie atNorth data center", "Google News"),
     ("colocation datacenter AI GPU facility opens launched", "Google News"),
-
-    # ── AI / GPU ──────────────────────────────────────────────────────────────
+    # AI/GPU
     ("AI data center GPU campus hyperscale construction", "Google News"),
-    ("AI infrastructure data center campus build deploy", "Google News"),
-
-    # ── Sustainability ────────────────────────────────────────────────────────
-    ("data center sustainability carbon net zero renewable cooling", "Google News"),
-
-    # ── Regions ───────────────────────────────────────────────────────────────
+    # Regions
     ("data center Middle East Africa Asia Pacific expansion", "Google News"),
     ("data center Europe Germany Netherlands Ireland Frankfurt", "Google News"),
     ("data center India Singapore Malaysia Southeast Asia", "Google News"),
     ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
 ]
 
+RSS_SOURCES = []   # All sources are HTML-scraped directly
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  SCRAPER FUNCTIONS  (paste these in, replacing the originals)
-# ─────────────────────────────────────────────────────────────────────────────
+
+# ─── Date parser (app15 style — fast and clean) ────────────────────────────
+MONTHS = {
+    "jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+    "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12,
+}
 
 def parse_date_str(raw):
     if not raw:
         return None
     raw = str(raw).strip()
     raw = re.sub(r"\s+", " ", raw)
+    # ISO with timezone
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ",
                 "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z",
                 "%Y-%m-%d", "%d %b %Y", "%B %d, %Y", "%b %d, %Y"):
@@ -810,63 +710,61 @@ def parse_date_str(raw):
     return None
 
 
+# ─── HTTP fetcher (app15 style — cloudscraper first, fallback requests) ────
+_DCD_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.datacenterdynamics.com/",
+}
+
 def fetch_html(url, retries=2):
     for attempt in range(retries):
         try:
             if _USE_CS:
-                r = _CS.get(url, timeout=18)
+                r = _CS.get(url, timeout=20)
             else:
-                import requests as req
-                r = req.get(url, headers=_HEADERS, timeout=18)
+                r = _CS.get(url, headers=_DCD_HEADERS, timeout=20)
             r.raise_for_status()
             return BeautifulSoup(r.text, "html.parser")
         except Exception:
             if attempt == 0:
-                time.sleep(1.5)
+                time.sleep(2)
     return None
 
 
-def _extract_articles_from_soup(soup, source, base, pattern):
+# ─── Article parser (app15 logic + <time datetime> + ISO date fallback) ────
+def _parse_articles_from_soup(soup, source_name, base_url):
     """
-    Generic article extractor: walks all <a> tags matching pattern,
-    finds the best headline text, and climbs the DOM for a date.
-
-    IMPROVED vs original:
-    - Min headline length lowered to 10 (was 15) to match app__15__.py
-    - <time datetime="..."> parsed first before regex text scan
-    - ISO yyyy-mm-dd in text also checked
-    - Climbs 12 DOM levels (unchanged)
+    app15-style parser: finds all <a href="/en/news/..."> links,
+    extracts headline from h1-h4 inside the link, climbs DOM for date.
+    Works for DCD only (href pattern ^/en/news/).
+    Enhanced: also checks <time datetime="..."> and ISO dates in text.
     """
-    results = []
+    articles = []
     seen = set()
-    compiled = re.compile(pattern)
 
-    for a in soup.find_all("a", href=True):
-        href = a["href"].split("?")[0].rstrip("/")
-        if not compiled.search(href + "/") and not compiled.search(href):
-            continue
-        # Normalise href — DCD requires trailing slash
-        if "datacenterdynamics" in base and not href.endswith("/"):
-            href += "/"
-        if href in seen or len(href) < 10:
+    for a in soup.find_all("a", href=re.compile(r"^/en/(news|analysis|opinion)/[^?#]+/$")):
+        href = a["href"]
+        if href in seen:
             continue
         seen.add(href)
 
-        # Best headline: look for heading tag inside <a>, fall back to link text
-        h_tag = a.find(["h1", "h2", "h3", "h4", "h5"])
+        h_tag    = a.find(["h1", "h2", "h3", "h4", "h5"])
         headline = h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)
         headline = re.sub(r"\s+", " ", headline).strip()
-        # ↓ 10 chars not 15 — same threshold as app__15__.py
         if not headline or len(headline) < 10:
             continue
 
-        # Date: climb DOM up to 12 levels
         date_obj = None
         node = a.parent
         for _ in range(12):
             if node is None:
                 break
-            # 1. <time datetime="..."> — most reliable, used by DCD and DCF
+            # 1. <time datetime="...">  — most reliable on DCD
             time_tag = node.find("time")
             if time_tag:
                 dt_attr = time_tag.get("datetime", "")
@@ -900,141 +798,113 @@ def _extract_articles_from_soup(soup, source, base, pattern):
                 break
             node = node.parent
 
-        full_url = (base + href) if href.startswith("/") else href
-        results.append({
+        articles.append({
             "headline": headline,
-            "url":      full_url,
+            "url":      base_url + href,
             "date_obj": date_obj,
-            "source":   source,
+            "source":   source_name,
+            "_priority": 1,
         })
-    return results
+    return articles
 
 
-def _get_next_page_url(soup, current_url, page_num, source_name):
+# ─── DCD scraper: construction channel × region terms (app15 engine) ───────
+def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
     """
-    Detect next-page URL using site-specific logic.
-    Returns None if no next page found.
+    Scrapes DCD using:
+      ?term=the-data-center-construction-channel
+      &term=<region_slug>      (one per selected region, or all if none selected)
+      &term=<extra_stage_term> (approved / site-selection / etc.)
+      &page=N
+
+    This is exactly what makes app15 fetch more articles — DCD's own
+    pre-filtered construction channel returns only DC construction content,
+    so almost every article is relevant regardless of region.
+
+    region_terms: list of DCD slug strings from DCD_REGION_TERMS keys.
+                  Empty list = scrape ALL regions (no region term added).
     """
-    sn = source_name.lower()
+    # Warm up DCD session (app15 does this too — helps bypass Cloudflare)
+    fetch_html(DCD_BASE + "/en/")
 
-    if "datacenterdynamics" in sn or "datacenterdynamics" in current_url:
-        base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
-        sep = "&" if "?" in base_url else "?"
-        return f"{base_url}{sep}page={page_num}"
+    all_articles = []
+    seen_urls    = set()
 
-    if "datacenterknowledge" in sn or "datacenterknowledge" in current_url:
-        base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
-        sep = "&" if "?" in base_url else "?"
-        return f"{base_url}{sep}page={page_num}"
+    # Build the set of term combinations to scrape:
+    # 1. Construction channel + each selected region  (one URL per region)
+    # 2. Each extra stage term (no region filter — global)
+    # 3. Bare construction channel with no region (always included as catch-all)
 
-    if "datacenterfrontier" in sn or "datacenterfrontier" in current_url:
-        base_url = re.sub(r"/page/\d+/?$", "", current_url).rstrip("/")
-        return f"{base_url}/page/{page_num}/"
+    url_sets = []
 
-    if "datacenterworld" in sn or "datacenterworld" in current_url:
-        base_url = re.sub(r"/page/\d+/?$", "", current_url).rstrip("/")
-        return f"{base_url}/page/{page_num}/"
+    # If specific regions selected, add one URL per region
+    if region_terms:
+        for rterm in region_terms:
+            url_sets.append([DCD_CHAN_TERM, rterm])
+    else:
+        # No region filter — just the construction channel (global)
+        url_sets.append([DCD_CHAN_TERM])
 
-    if "datacentremagazine" in sn or "datacentremagazine" in current_url:
-        base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
-        sep = "&" if "?" in base_url else "?"
-        return f"{base_url}{sep}page={page_num}"
+    # Extra stage terms (approved, site-selection, etc.) — always global
+    for extra in DCD_EXTRA_TERMS:
+        url_sets.append([DCD_CHAN_TERM, extra])
 
-    # Generic fallback: look for a "Next" link
-    if soup:
-        next_link = soup.find("a", string=re.compile(r"next|›|»", re.I))
-        if next_link and next_link.get("href"):
-            href = next_link["href"]
-            if href.startswith("http"):
-                return href
-            from urllib.parse import urljoin
-            return urljoin(current_url, href)
+    total_fetches = len(url_sets) * max_pages
+    fetched       = [0]
 
-    return None
+    for terms in url_sets:
+        for page in range(1, max_pages + 1):
+            # Build URL: ?term=A&term=B&page=N
+            params = "&".join(f"term={t}" for t in terms)
+            if page > 1:
+                params += f"&page={page}"
+            url = f"{DCD_BASE}/en/news/?{params}"
 
+            fetched[0] += 1
+            if pbar:
+                pbar.progress(
+                    min(fetched[0] / total_fetches, 1.0),
+                    text=f"DCD: {', '.join(terms)} — page {page}/{max_pages}",
+                )
 
-def scrape_html_source(source, max_pages=10):
-    """
-    Scrape a single source up to max_pages pages.
-    Uses per-site pagination logic and the generic article extractor.
-    """
-    results   = []
-    seen_urls = set()
-    base      = source["base"]
-    pattern   = source["link_pattern"]
-    name      = source["name"]
-    start_url = source["url"]
-    priority  = source.get("priority", 99)
-
-    current_url = start_url
-    for page in range(1, max_pages + 1):
-        if page > 1:
-            current_url = _get_next_page_url(None, start_url, page, name)
-            if not current_url:
+            soup = fetch_html(url)
+            if not soup:
                 break
 
-        soup = fetch_html(current_url)
-        if not soup:
-            break
+            page_arts = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
+            new_on_page = 0
+            stop = False
 
-        page_articles = _extract_articles_from_soup(soup, name, base, pattern)
-        new_on_page   = 0
-        for art in page_articles:
-            norm_url = art["url"].rstrip("/")
-            if norm_url in seen_urls:
-                continue
-            seen_urls.add(norm_url)
-            art["_priority"] = priority
-            results.append(art)
-            new_on_page += 1
+            for art in page_arts:
+                norm_url = art["url"].rstrip("/")
+                if norm_url in seen_urls:
+                    continue
+                seen_urls.add(norm_url)
+                d = art["date_obj"]
+                if d and d < cutoff:
+                    stop = True
+                    break
+                all_articles.append(art)
+                new_on_page += 1
 
-        if new_on_page == 0:
-            break   # no new articles on this page — stop paginating
+            if stop or new_on_page == 0:
+                break
 
-        time.sleep(0.35)
+            time.sleep(0.5)
 
-    return results
-
-
-def fetch_rss(source):
-    results = []
-    try:
-        feed = feedparser.parse(source["url"])
-        for entry in feed.entries:
-            headline = entry.get("title", "").strip()
-            url = entry.get("link", "").strip()
-            if not headline or not url:
-                continue
-            pub = entry.get("published", "") or entry.get("updated", "")
-            date_obj = None
-            if hasattr(entry, "published_parsed") and entry.published_parsed:
-                try:
-                    date_obj = datetime(*entry.published_parsed[:6])
-                except Exception:
-                    pass
-            if not date_obj:
-                date_obj = parse_date_str(pub)
-            results.append({
-                "headline": headline,
-                "url":      url,
-                "date_obj": date_obj,
-                "source":   source["name"],
-                "_priority": source.get("priority", 99),
-            })
-    except Exception:
-        pass
-    return results
+    return all_articles
 
 
+# ─── Google News fetcher ───────────────────────────────────────────────────
 def fetch_google_news(query, source_label="Google News"):
     results = []
     try:
-        q = query.replace(" ", "+")
+        q   = query.replace(" ", "+")
         url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
         feed = feedparser.parse(url)
         for entry in feed.entries:
             headline = entry.get("title", "").strip()
-            url_val  = entry.get("link", "").strip()
+            url_val  = entry.get("link",  "").strip()
             if not headline or not url_val:
                 continue
             date_obj = None
@@ -1044,17 +914,76 @@ def fetch_google_news(query, source_label="Google News"):
                 except Exception:
                     pass
             results.append({
-                "headline": headline,
-                "url":      url_val,
-                "date_obj": date_obj,
-                "source":   source_label,
-                "_priority": 10,   # Google News lower priority than direct sources
+                "headline":  headline,
+                "url":       url_val,
+                "date_obj":  date_obj,
+                "source":    source_label,
+                "_priority": 10,
             })
     except Exception:
         pass
     return results
 
 
+# ─── run_all_scrapers: DCD primary + Google News supplement ────────────────
+def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
+    """
+    region_terms: list of DCD region slug strings (e.g. ["north-america","europe"]).
+                  Pass [] or None for global (no region filter on DCD).
+    """
+    if region_terms is None:
+        region_terms = []
+
+    raw = []
+
+    # ── Step 1: DCD (primary, high-volume, construction channel) ──────────
+    class _FakePbar:
+        def progress(self, frac, text=""): progress_cb(frac * 0.7, text)
+
+    dcd_arts = scrape_dcd(cutoff, max_html_pages, region_terms, pbar=_FakePbar())
+    raw.extend(dcd_arts)
+    progress_cb(0.70, f"DCD: {len(dcd_arts)} articles fetched")
+
+    # ── Step 2: Google News supplement (runs in parallel) ─────────────────
+    progress_cb(0.72, "Fetching Google News supplement…")
+    gn_results = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(fetch_google_news, q, lbl): lbl for q, lbl in GNEWS_QUERIES}
+        done = [0]
+        for f in as_completed(futures):
+            try:
+                gn_results.extend(f.result())
+            except Exception:
+                pass
+            done[0] += 1
+            progress_cb(0.72 + 0.25 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
+
+    raw.extend(gn_results)
+    progress_cb(0.98, "Filtering and deduplicating…")
+
+    # ── Step 3: date cutoff + DC relevance filter ─────────────────────────
+    filtered = []
+    for item in raw:
+        d = item.get("date_obj")
+        if d and d < cutoff:
+            continue
+        if not is_dc_relevant(item["headline"]):
+            continue
+        filtered.append(item)
+
+    return filtered
+
+
+# ─── Dummy SCRAPE_SOURCES (kept so the banner "N Sources Active" still works) ─
+SCRAPE_SOURCES = [
+    {"name": "DataCenterDynamics", "url": DCD_BASE + "/en/news/", "base": DCD_BASE,
+     "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$", "type": "html", "priority": 1},
+    {"name": "Google News (Construction)",  "url": "", "type": "gnews", "priority": 10},
+    {"name": "Google News (Approvals)",     "url": "", "type": "gnews", "priority": 10},
+    {"name": "Google News (Hyperscalers)",  "url": "", "type": "gnews", "priority": 10},
+    {"name": "Google News (Power/Energy)",  "url": "", "type": "gnews", "priority": 10},
+    {"name": "Google News (Investment)",    "url": "", "type": "gnews", "priority": 10},
+]
 def is_dc_relevant(text):
     t = text.lower()
     # Primary: any of these alone = relevant
@@ -1226,49 +1155,6 @@ def enrich(raw_item):
         "Companies": detect_companies(hl),
         "_date_obj": d,
     }
-
-
-def run_all_scrapers(max_html_pages, cutoff, progress_cb):
-    raw = []
-    total_tasks = len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES)
-    done = [0]
-
-    def tick(label=""):
-        done[0] += 1
-        progress_cb(done[0] / total_tasks, label)
-
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        html_futures = {
-            pool.submit(scrape_html_source, src, max_html_pages): src["name"]
-            for src in SCRAPE_SOURCES
-        }
-        rss_futures = {
-            pool.submit(fetch_rss, src): src["name"]
-            for src in RSS_SOURCES
-        }
-        gn_futures = {
-            pool.submit(fetch_google_news, q, lbl): lbl
-            for q, lbl in GNEWS_QUERIES
-        }
-
-        for f in as_completed({**html_futures, **rss_futures, **gn_futures}):
-            try:
-                items = f.result()
-                raw.extend(items)
-            except Exception:
-                pass
-            tick()
-
-    filtered = []
-    for item in raw:
-        d = item.get("date_obj")
-        if d and d < cutoff:
-            continue
-        if not is_dc_relevant(item["headline"]):
-            continue
-        filtered.append(item)
-
-    return filtered
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2780,30 +2666,21 @@ def main():
 
         pbar = st.progress(0.0, text="Initialising global scan...")
 
-        active_html  = SCRAPE_SOURCES
-        total_tasks  = len(active_html)
-        done_count   = [0]
-
         def progress_cb(frac, label=""):
-            pbar.progress(min(frac, 1.0), text=f"Scanning sources... {label}")
+            pbar.progress(min(frac, 1.0), text=f"Scanning… {label}")
 
-        raw = []
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            futures = {}
-            for src in active_html:
-                futures[pool.submit(scrape_html_source, src, max_pages)] = src["name"]
+        # Map user-selected regions → DCD region slug terms
+        # If the user hasn't selected any regions yet (filters cleared on go_btn),
+        # we pass [] which means "no region filter" = full global scan on DCD.
+        _region_map_reverse = {v: k for k, v in DCD_REGION_TERMS.items()}
+        _pre_selected_regions = st.session_state.get("filters", {}).get("regions", [])
+        region_terms = [
+            _region_map_reverse[r]
+            for r in _pre_selected_regions
+            if r in _region_map_reverse
+        ]
 
-            for f in as_completed(futures):
-                try:
-                    items = f.result()
-                    raw.extend(items)
-                except Exception:
-                    pass
-                done_count[0] += 1
-                pbar.progress(
-                    done_count[0] / max(total_tasks, 1),
-                    text=f"Fetched {futures[f]}... ({done_count[0]}/{total_tasks})",
-                )
+        raw = run_all_scrapers(max_pages, cutoff, progress_cb, region_terms=region_terms)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
 
@@ -2811,11 +2688,7 @@ def main():
         filtered = []
         for item in raw:
             d = item.get("date_obj")
-            if d and d < cutoff:
-                continue
             if d and d > cutoff_end_val:
-                continue
-            if not is_dc_relevant(item["headline"]):
                 continue
             filtered.append(item)
 
