@@ -78,6 +78,9 @@ CUSTOM_CSS = """
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .stApp { background: #060a10; color: #e8edf5; }
 
+/* ── Global hover transitions ──────────────────────────────────────────────── */
+* { transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease, opacity 0.15s ease, transform 0.15s ease; }
+
 /* ── Sidebar shell ─────────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] { background: #0a0f1a !important; border-right: 1px solid #151f35; }
 [data-testid="stSidebar"] * { color: #b8c8e0 !important; }
@@ -278,6 +281,105 @@ ul[data-baseweb="menu"] {
 
 hr { border-color: #152038 !important; }
 #MainMenu, footer, header { visibility: hidden; }
+
+/* ── Hover card effect (applied to .hover-card class in HTML) ─────────────── */
+.hover-card {
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease !important;
+}
+.hover-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: #0047e1 !important;
+    box-shadow: 0 6px 28px rgba(0, 71, 225, 0.18) !important;
+}
+
+/* ── Tooltip-style hover on pills ─────────────────────────────────────────── */
+.pill:hover {
+    border-color: #0047e1 !important;
+    background: #0f2245 !important;
+    color: #ccdaf5 !important;
+    cursor: default;
+}
+
+/* ── Section heading hover ──────────────────────────────────────────────────── */
+.sec-head:hover {
+    border-left-color: #00b4ff !important;
+    color: #fff !important;
+    cursor: default;
+}
+
+/* ── KPI card hover ─────────────────────────────────────────────────────────── */
+.kpi-card {
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease !important;
+}
+.kpi-card:hover {
+    transform: translateY(-3px) !important;
+    border-color: #0047e1 !important;
+    box-shadow: 0 8px 32px rgba(0, 71, 225, 0.22) !important;
+}
+
+/* ── Table row hover ─────────────────────────────────────────────────────────── */
+.dc-table tr:hover td {
+    background: #0f2245 !important;
+}
+
+/* ── Tab hover ───────────────────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
+    background: rgba(0,71,225,0.12) !important;
+    color: #ccdaf5 !important;
+}
+
+/* ── Sidebar button hover ───────────────────────────────────────────────────── */
+[data-testid="stSidebar"] .stButton button:hover {
+    opacity: .82;
+    box-shadow: 0 4px 16px rgba(0, 71, 225, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Download button hover ──────────────────────────────────────────────────── */
+.stDownloadButton button:hover {
+    opacity: .82 !important;
+    box-shadow: 0 4px 14px rgba(0, 168, 70, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Feature card hover ─────────────────────────────────────────────────────── */
+.feature-card {
+    transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+    cursor: default;
+}
+.feature-card:hover {
+    transform: translateY(-4px) !important;
+    border-color: #0047e1 !important;
+    box-shadow: 0 10px 36px rgba(0, 71, 225, 0.18) !important;
+}
+
+/* ── Saved scan row hover ─────────────────────────────────────────────────── */
+.saved-scan-card {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
+}
+.saved-scan-card:hover {
+    border-color: #a855f7 !important;
+    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15) !important;
+}
+
+/* ── Article card hover ─────────────────────────────────────────────────────── */
+.article-card-wrap {
+    transition: border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
+}
+.article-card-wrap:hover {
+    border-color: #0047e1 !important;
+    box-shadow: 0 6px 28px rgba(0, 71, 225, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Score badge hover ───────────────────────────────────────────────────────── */
+.score-badge {
+    transition: filter 0.15s ease, transform 0.15s ease !important;
+}
+.score-badge:hover {
+    filter: brightness(1.3) !important;
+    transform: scale(1.05) !important;
+}
 </style>
 """
 
@@ -2388,25 +2490,27 @@ def dark_table(df_in, max_rows=300):
     heads = "".join(f'<th style="{th}">{c}</th>' for c in df_in.columns)
     return (
         '<div style="overflow-x:auto;border-radius:10px;border:1px solid #152038;margin-bottom:1rem;">'
-        f'<table style="width:100%;border-collapse:collapse;background:#060a10;">'
+        f'<table class="dc-table" style="width:100%;border-collapse:collapse;background:#060a10;">'
         f'<thead><tr>{heads}</tr></thead>'
         f'<tbody>{rows}</tbody></table></div>'
     )
 
 
-def article_card(headline, date, url, source, country, topic, capacity, deal, sentiment):
+def article_card(headline, date, url, source, country, topic, capacity, deal, sentiment, ai_score=None):
     tc = TOPIC_COLORS.get(topic, "#2e4470")
     sc_meta = SOURCE_META.get(source, SOURCE_META["Unknown"])
     cap_html = (
         f'<span style="background:rgba(255,170,0,0.12);color:#ffaa00;'
         f'border:1px solid rgba(255,170,0,0.3);border-radius:4px;'
-        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;">'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;" '
+        f'title="Capacity announced">'
         f'\u26a1 {capacity}</span>'
     ) if capacity else ""
     deal_html = (
         f'<span style="background:rgba(0,230,118,0.1);color:#00e676;'
         f'border:1px solid rgba(0,230,118,0.25);border-radius:4px;'
-        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;">'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;" '
+        f'title="Deal value">'
         f'{deal}</span>'
     ) if deal else ""
     sent_c = {
@@ -2414,30 +2518,58 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
         "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
     }.get(sentiment, "#2e4470")
     arrow = "\u2197"
+
+    # AI score badge (optional)
+    score_badge_html = ""
+    if ai_score is not None:
+        sc_color = (
+            "#ff6400" if ai_score >= 40
+            else "#ffaa00" if ai_score >= 25
+            else "#00b4ff" if ai_score >= 15
+            else "#3a5480"
+        )
+        score_badge_html = (
+            f'<span class="score-badge" style="background:{sc_color}22;color:{sc_color};'
+            f'border:1px solid {sc_color}44;border-radius:4px;'
+            f'padding:2px 7px;font-family:monospace;font-size:.62rem;font-weight:bold;" '
+            f'title="AI Signal Score — higher = more market significant">&#9733; {ai_score}</span>'
+        )
+
+    # High signal indicator strip
+    is_high_signal = ai_score is not None and ai_score >= 30
+    border_color = "#ffaa00" if is_high_signal else "#152038"
+    top_strip = (
+        f'<div style="position:absolute;top:0;left:0;right:0;height:2px;'
+        f'background:linear-gradient(90deg,#ffaa00,#ff6400);border-radius:2px 2px 0 0;"></div>'
+        if is_high_signal else ""
+    )
+
     return (
-        f'<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
+        f'<div class="article-card-wrap" style="background:#0b1628;border:1px solid {border_color};border-radius:10px;'
         f'padding:.85rem 1.1rem;display:flex;justify-content:space-between;'
-        f'align-items:flex-start;gap:.9rem;margin-bottom:.45rem;">'
+        f'align-items:flex-start;gap:.9rem;margin-bottom:.45rem;position:relative;">'
+        f'{top_strip}'
         f'<div style="flex:1;min-width:0;">'
         f'<a href="{url}" target="_blank" '
         f'style="color:#ccdaf5;text-decoration:none;font-family:Inter,sans-serif;'
-        f'font-size:.86rem;font-weight:500;line-height:1.5;">{headline}</a>'
+        f'font-size:.86rem;font-weight:500;line-height:1.5;" '
+        f'title="Open article in new tab">{headline}</a>'
         f'<div style="margin-top:.35rem;display:flex;gap:.4rem;flex-wrap:wrap;">'
-        f'<span style="font-family:monospace;font-size:.62rem;color:#2a3e60;">\U0001f4c5 {date}</span>'
-        f'<span style="font-family:monospace;font-size:.62rem;color:#4a6490;">\U0001f30d {country}</span>'
+        f'<span style="font-family:monospace;font-size:.62rem;color:#2a3e60;" title="Publication date">\U0001f4c5 {date}</span>'
+        f'<span style="font-family:monospace;font-size:.62rem;color:#4a6490;" title="Country detected">\U0001f30d {country}</span>'
         f'</div></div>'
         f'<div style="display:flex;flex-direction:column;align-items:flex-end;'
         f'gap:.28rem;flex-shrink:0;white-space:nowrap;">'
         f'<span style="background:{sc_meta["color"]}22;color:{sc_meta["color"]};'
         f'border:1px solid {sc_meta["color"]}44;border-radius:4px;'
-        f'padding:2px 6px;font-family:monospace;font-size:.62rem;">{sc_meta["short"]}</span>'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;" title="Source: {source}">{sc_meta["short"]}</span>'
         f'<span style="background:{tc}22;color:{tc};border:1px solid {tc}44;'
-        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{topic}</span>'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;" title="Topic: {topic}">{topic}</span>'
         f'<span style="background:{sent_c}18;color:{sent_c};border:1px solid {sent_c}44;'
-        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{sentiment}</span>'
-        f'{cap_html}{deal_html}'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;" title="Project status">{sentiment}</span>'
+        f'{cap_html}{deal_html}{score_badge_html}'
         f'<a href="{url}" target="_blank" '
-        f'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;">'
+        f'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;" title="Open full article">'
         f'{arrow} open</a>'
         f'</div></div>'
     )
@@ -2455,8 +2587,9 @@ def kpi(label, value, accent="blue", delta=""):
     c1, c2 = accent_map.get(accent, accent_map["blue"])
     delta_html = f'<div style="font-size:.7rem;color:#2a3e60;margin-top:.25rem;">{delta}</div>' if delta else ""
     return (
-        f'<div style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;'
-        f'border-radius:12px;padding:1.1rem 1.3rem;position:relative;overflow:hidden;">'
+        f'<div class="kpi-card" style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;'
+        f'border-radius:12px;padding:1.1rem 1.3rem;position:relative;overflow:hidden;" '
+        f'title="{label}">'
         f'<div style="position:absolute;top:0;left:0;right:0;height:2px;'
         f'background:linear-gradient(90deg,{c1},{c2});"></div>'
         f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;'
@@ -2826,7 +2959,7 @@ def main():
         row_html = ""
         for icon, title, desc in features:
             row_html += (
-                f'<div style="flex:1;min-width:200px;background:#0b1628;border:1px solid #152038;'
+                f'<div class="feature-card" style="flex:1;min-width:200px;background:#0b1628;border:1px solid #152038;'
                 f'border-radius:10px;padding:1rem 1.15rem;">'
                 f'<div style="font-size:1.4rem;margin-bottom:.4rem;">{icon}</div>'
                 f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
@@ -3023,13 +3156,47 @@ def main():
         if df.empty:
             st.info("No articles match the current filters.")
         else:
+            # Pre-compute AI scores for the feed so high-signal articles show their badge
+            from collections import Counter as _Ctr_feed
+            _all_co_feed = []
+            for _v in df["Companies"]:
+                if _v:
+                    _all_co_feed.extend([c.strip() for c in str(_v).split(",") if c.strip()])
+            _co_freq_feed = dict(_Ctr_feed(_all_co_feed))
+
+            def _quick_score(row):
+                score = 0.0
+                hl = str(row.get("Headline", "")).lower()
+                sent_w = {"Opened / Live":10,"Approved":8,"Under Construction":6,"Proposed":4,"Challenged":5,"News":2}
+                score += sent_w.get(row.get("Sentiment","News"), 2)
+                cap = str(row.get("Capacity",""))
+                if cap:
+                    m = re.search(r"([\d,.]+)\s*(GW|MW)", cap, re.I)
+                    if m:
+                        v = float(m.group(1).replace(",",""))
+                        score += min((v*1000 if m.group(2).upper()=="GW" else v)/100, 15)
+                deal = str(row.get("Deal Size",""))
+                if deal:
+                    m2 = re.search(r"([\d,.]+)\s*(bn|billion|m|million)", deal, re.I)
+                    if m2:
+                        v2 = float(m2.group(1).replace(",",""))
+                        score += min((v2*(1000 if m2.group(2).lower() in ("bn","billion") else 1))/500, 12)
+                topic_w = {"Hyperscale":8,"AI / GPU":8,"Investment":7,"Power":6,"Colocation":5,"Construction":5,"Permits":4,"Sustainability":3,"General":1}
+                score += topic_w.get(row.get("Topic","General"),1)
+                bonus_kws = [("billion",4),("gigawatt",5),("gw",3),("nuclear",4),("hyperscale",3),("ai campus",5),("gpu",3),("acquisition",4),("merger",4),("ipo",5)]
+                for kw, pts in bonus_kws:
+                    if kw in hl: score += pts
+                return round(score, 1)
+
             for _, row in df.iterrows():
+                _score = _quick_score(row)
                 st.markdown(
                     article_card(
                         row["Headline"], row["Date"], row["URL"],
                         row["Source"], row["Country"], row["Topic"],
                         row.get("Capacity", ""), row.get("Deal Size", ""),
                         row.get("Sentiment", "News"),
+                        ai_score=_score if _score >= 25 else None,  # only badge high-signal in feed
                     ),
                     unsafe_allow_html=True,
                 )
@@ -3480,8 +3647,8 @@ def main():
         st.markdown('<div class="sec-head">📈 Trend Comparison</div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Compare article volume and topic distribution across two time windows to detect '
-            'acceleration, deceleration, or topic shifts in the global data center market.</div>',
+            'Compare article volume and topic mix between two countries, companies, or time windows. '
+            'Detects acceleration, deceleration, and topic shifts in the global data center market.</div>',
             unsafe_allow_html=True,
         )
 
@@ -3491,41 +3658,124 @@ def main():
             st.info("No dated articles available for trend comparison.")
         else:
             df_trend["dt"] = pd.to_datetime(df_trend["Date"])
-            min_date = df_trend["dt"].min().date()
-            max_date = df_trend["dt"].max().date()
-            mid_date = min_date + (max_date - min_date) // 2
 
-            tc1, tc2 = st.columns(2)
-            with tc1:
-                st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">📅 Period A</div>', unsafe_allow_html=True)
-                period_a_start = st.date_input("A Start", value=min_date, key="trend_a_start")
-                period_a_end   = st.date_input("A End",   value=mid_date, key="trend_a_end")
-            with tc2:
-                st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">📅 Period B</div>', unsafe_allow_html=True)
-                period_b_start = st.date_input("B Start", value=mid_date, key="trend_b_start")
-                period_b_end   = st.date_input("B End",   value=max_date, key="trend_b_end")
+            compare_mode = st.radio(
+                "Compare mode",
+                ["📅 Time Periods", "🌍 Countries / Regions", "🏢 Companies"],
+                horizontal=True,
+                key="trend_compare_mode",
+            )
 
-            df_a = df_trend[(df_trend["dt"].dt.date >= period_a_start) & (df_trend["dt"].dt.date <= period_a_end)]
-            df_b = df_trend[(df_trend["dt"].dt.date >= period_b_start) & (df_trend["dt"].dt.date <= period_b_end)]
+            # ── MODE 1: Time periods ──────────────────────────────────────────
+            if compare_mode == "📅 Time Periods":
+                min_date = df_trend["dt"].min().date()
+                max_date = df_trend["dt"].max().date()
+                mid_date = min_date + (max_date - min_date) // 2
 
-            # KPI delta row
+                tc1, tc2 = st.columns(2)
+                with tc1:
+                    st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">📅 Period A</div>', unsafe_allow_html=True)
+                    period_a_start = st.date_input("A Start", value=min_date, key="trend_a_start")
+                    period_a_end   = st.date_input("A End",   value=mid_date, key="trend_a_end")
+                with tc2:
+                    st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">📅 Period B</div>', unsafe_allow_html=True)
+                    period_b_start = st.date_input("B Start", value=mid_date, key="trend_b_start")
+                    period_b_end   = st.date_input("B End",   value=max_date, key="trend_b_end")
+
+                df_a = df_trend[(df_trend["dt"].dt.date >= period_a_start) & (df_trend["dt"].dt.date <= period_a_end)]
+                df_b = df_trend[(df_trend["dt"].dt.date >= period_b_start) & (df_trend["dt"].dt.date <= period_b_end)]
+                label_a = f"Period A ({period_a_start}→{period_a_end})"
+                label_b = f"Period B ({period_b_start}→{period_b_end})"
+
+            # ── MODE 2: Country / Region comparison ───────────────────────────
+            elif compare_mode == "🌍 Countries / Regions":
+                all_countries_trend = sorted(df_trend["Country"].unique().tolist())
+                tc1, tc2 = st.columns(2)
+                with tc1:
+                    st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">🌍 Entity A</div>', unsafe_allow_html=True)
+                    entity_a = st.selectbox("Entity A", all_countries_trend, key="trend_entity_a",
+                                             index=0 if all_countries_trend else 0)
+                with tc2:
+                    st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">🌍 Entity B</div>', unsafe_allow_html=True)
+                    default_b = all_countries_trend[1] if len(all_countries_trend) > 1 else all_countries_trend[0]
+                    entity_b = st.selectbox("Entity B", all_countries_trend, key="trend_entity_b",
+                                             index=1 if len(all_countries_trend) > 1 else 0)
+                df_a = df_trend[df_trend["Country"] == entity_a]
+                df_b = df_trend[df_trend["Country"] == entity_b]
+                label_a = entity_a
+                label_b = entity_b
+
+            # ── MODE 3: Company comparison ────────────────────────────────────
+            else:
+                _all_co_trend = []
+                for v in df_trend["Companies"]:
+                    if v:
+                        _all_co_trend.extend([c.strip() for c in str(v).split(",") if c.strip()])
+                all_cos_trend = sorted(set(_all_co_trend)) if _all_co_trend else ["—"]
+                tc1, tc2 = st.columns(2)
+                with tc1:
+                    st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">🏢 Company A</div>', unsafe_allow_html=True)
+                    co_a = st.selectbox("Company A", all_cos_trend, key="trend_co_a", index=0)
+                with tc2:
+                    st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">🏢 Company B</div>', unsafe_allow_html=True)
+                    default_co_b = all_cos_trend[1] if len(all_cos_trend) > 1 else all_cos_trend[0]
+                    co_b = st.selectbox("Company B", all_cos_trend, key="trend_co_b",
+                                         index=1 if len(all_cos_trend) > 1 else 0)
+                df_a = df_trend[
+                    df_trend["Companies"].str.contains(re.escape(co_a), na=False, case=False) |
+                    df_trend["Headline"].str.contains(re.escape(co_a), na=False, case=False)
+                ]
+                df_b = df_trend[
+                    df_trend["Companies"].str.contains(re.escape(co_b), na=False, case=False) |
+                    df_trend["Headline"].str.contains(re.escape(co_b), na=False, case=False)
+                ]
+                label_a = co_a
+                label_b = co_b
+
+            # ── KPI delta row ─────────────────────────────────────────────────
             delta_arts = len(df_b) - len(df_a)
             delta_sign = "▲" if delta_arts >= 0 else "▼"
             delta_color = "#00e676" if delta_arts >= 0 else "#ff2d6b"
 
             kpi_trend = (
                 '<div style="display:flex;gap:.8rem;margin:1rem 0;flex-wrap:wrap;">'
-                + kpi("Period A Articles", len(df_a), "blue", f"{period_a_start} → {period_a_end}")
-                + kpi("Period B Articles", len(df_b), "cyan", f"{period_b_start} → {period_b_end}")
-                + f'<div style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;border-radius:12px;padding:1.1rem 1.3rem;">'
-                  f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">Volume Change</div>'
+                + kpi(f"{label_a}", len(df_a), "blue")
+                + kpi(f"{label_b}", len(df_b), "cyan")
+                + f'<div class="kpi-card" style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;border-radius:12px;padding:1.1rem 1.3rem;">'
+                  f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">Volume Delta</div>'
                   f'<div style="font-family:Syne,sans-serif;font-size:1.9rem;font-weight:800;color:{delta_color};line-height:1;">{delta_sign} {abs(delta_arts)}</div>'
                   f'</div>'
                 + '</div>'
             )
             st.markdown(kpi_trend, unsafe_allow_html=True)
 
-            # Topic comparison chart
+            # ── Article volume over time (side by side sparklines) ────────────
+            st.markdown('<div class="sec-head">Article Volume Over Time</div>', unsafe_allow_html=True)
+            fig_tl = go.Figure()
+            for sub_df, lbl, col in [(df_a, label_a, "#0047e1"), (df_b, label_b, "#ffaa00")]:
+                if not sub_df.empty:
+                    daily = sub_df.groupby(sub_df["dt"].dt.date).size().reset_index()
+                    daily.columns = ["Date", "Articles"]
+                    fig_tl.add_trace(go.Scatter(
+                        x=daily["Date"], y=daily["Articles"],
+                        name=lbl,
+                        mode="lines+markers",
+                        line=dict(color=col, width=2),
+                        marker=dict(color=col, size=4),
+                        fill="tozeroy",
+                        fillcolor=col.replace("#", "rgba(") + ",0.06)" if col.startswith("#") else col,
+                        hovertemplate=f"<b>{lbl}</b><br>%{{x}}<br>%{{y}} articles<extra></extra>",
+                    ))
+            _dark(fig_tl, 280)
+            fig_tl.update_layout(
+                showlegend=True,
+                legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+                title=dict(text="Article Volume Over Time — Side by Side", font=dict(color=_TITLE, size=13), x=0.01),
+            )
+            st.plotly_chart(fig_tl, use_container_width=True, config={"displayModeBar": False})
+
+            # ── Topic comparison chart ────────────────────────────────────────
+            st.markdown('<div class="sec-head">Topic Distribution</div>', unsafe_allow_html=True)
             topics_all = sorted(set(df_a["Topic"].unique()) | set(df_b["Topic"].unique()))
             a_counts = df_a["Topic"].value_counts()
             b_counts = df_b["Topic"].value_counts()
@@ -3534,16 +3784,16 @@ def main():
 
             fig_trend = go.Figure()
             fig_trend.add_trace(go.Bar(
-                name=f"Period A ({period_a_start}→{period_a_end})",
+                name=label_a,
                 x=topics_all, y=a_vals,
                 marker_color="#0047e1",
                 text=a_vals, textposition="outside",
                 textfont=dict(color=_TITLE, size=10),
             ))
             fig_trend.add_trace(go.Bar(
-                name=f"Period B ({period_b_start}→{period_b_end})",
+                name=label_b,
                 x=topics_all, y=b_vals,
-                marker_color="#00b4ff",
+                marker_color="#ffaa00",
                 text=b_vals, textposition="outside",
                 textfont=dict(color=_TITLE, size=10),
             ))
@@ -3552,24 +3802,75 @@ def main():
                 barmode="group",
                 showlegend=True,
                 legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
-                title=dict(text="Topic Volume: Period A vs Period B", font=dict(color=_TITLE, size=13), x=0.01),
+                title=dict(text="Topic Volume", font=dict(color=_TITLE, size=13), x=0.01),
             )
             st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False})
 
-            # Region comparison
-            regions_all = sorted(set(df_a["Region"].unique()) | set(df_b["Region"].unique()))
-            ra_vals = [int(df_a["Region"].value_counts().get(r, 0)) for r in regions_all]
-            rb_vals = [int(df_b["Region"].value_counts().get(r, 0)) for r in regions_all]
-            fig_reg_trend = go.Figure()
-            fig_reg_trend.add_trace(go.Bar(name=f"Period A", x=regions_all, y=ra_vals, marker_color="#0047e1"))
-            fig_reg_trend.add_trace(go.Bar(name=f"Period B", x=regions_all, y=rb_vals, marker_color="#ffaa00"))
-            _dark(fig_reg_trend, 300)
-            fig_reg_trend.update_layout(
+            # ── Sentiment comparison ──────────────────────────────────────────
+            st.markdown('<div class="sec-head">Sentiment / Status</div>', unsafe_allow_html=True)
+            sents_all = sorted(set(df_a["Sentiment"].unique()) | set(df_b["Sentiment"].unique()))
+            fig_sent = go.Figure()
+            fig_sent.add_trace(go.Bar(
+                name=label_a, x=sents_all,
+                y=[int(df_a["Sentiment"].value_counts().get(s, 0)) for s in sents_all],
+                marker_color="#0047e1",
+            ))
+            fig_sent.add_trace(go.Bar(
+                name=label_b, x=sents_all,
+                y=[int(df_b["Sentiment"].value_counts().get(s, 0)) for s in sents_all],
+                marker_color="#ff2d6b",
+            ))
+            _dark(fig_sent, 280)
+            fig_sent.update_layout(
                 barmode="group", showlegend=True,
                 legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
-                title=dict(text="Regional Volume: Period A vs Period B", font=dict(color=_TITLE, size=13), x=0.01),
+                title=dict(text="Project Status Comparison", font=dict(color=_TITLE, size=13), x=0.01),
             )
-            st.plotly_chart(fig_reg_trend, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_sent, use_container_width=True, config={"displayModeBar": False})
+
+            # ── Region comparison (only for time-period mode) ─────────────────
+            if compare_mode == "📅 Time Periods":
+                regions_all = sorted(set(df_a["Region"].unique()) | set(df_b["Region"].unique()))
+                ra_vals = [int(df_a["Region"].value_counts().get(r, 0)) for r in regions_all]
+                rb_vals = [int(df_b["Region"].value_counts().get(r, 0)) for r in regions_all]
+                fig_reg_trend = go.Figure()
+                fig_reg_trend.add_trace(go.Bar(name=label_a, x=regions_all, y=ra_vals, marker_color="#0047e1"))
+                fig_reg_trend.add_trace(go.Bar(name=label_b, x=regions_all, y=rb_vals, marker_color="#ffaa00"))
+                _dark(fig_reg_trend, 300)
+                fig_reg_trend.update_layout(
+                    barmode="group", showlegend=True,
+                    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+                    title=dict(text="Regional Volume: Period A vs Period B", font=dict(color=_TITLE, size=13), x=0.01),
+                )
+                st.plotly_chart(fig_reg_trend, use_container_width=True, config={"displayModeBar": False})
+
+            # ── Side-by-side article cards ────────────────────────────────────
+            st.markdown('<div class="sec-head">Side-by-Side Headlines</div>', unsafe_allow_html=True)
+            col_a_feed, col_b_feed = st.columns(2)
+            with col_a_feed:
+                st.markdown(
+                    f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#0047e1;'
+                    f'font-size:.85rem;margin-bottom:.5rem;">● {label_a} ({len(df_a)} articles)</div>',
+                    unsafe_allow_html=True,
+                )
+                for _, row in df_a.head(10).iterrows():
+                    st.markdown(article_card(
+                        row["Headline"], row["Date"], row["URL"], row["Source"],
+                        row["Country"], row["Topic"], row.get("Capacity",""), row.get("Deal Size",""),
+                        row.get("Sentiment","News"),
+                    ), unsafe_allow_html=True)
+            with col_b_feed:
+                st.markdown(
+                    f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#ffaa00;'
+                    f'font-size:.85rem;margin-bottom:.5rem;">● {label_b} ({len(df_b)} articles)</div>',
+                    unsafe_allow_html=True,
+                )
+                for _, row in df_b.head(10).iterrows():
+                    st.markdown(article_card(
+                        row["Headline"], row["Date"], row["URL"], row["Source"],
+                        row["Country"], row["Topic"], row.get("Capacity",""), row.get("Deal Size",""),
+                        row.get("Sentiment","News"),
+                    ), unsafe_allow_html=True)
 
     # ─── TAB: Capacity Pipeline Heatmap ─────────────────────────────────────
     with tab_heatmap:
@@ -3644,13 +3945,12 @@ def main():
         st.markdown('<div class="sec-head">💰 Deal Flow Tracker</div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Tracks disclosed and undisclosed deal signals across acquisitions, investments, '
-            'JVs, pre-leases, and financing events. Articles without explicit dollar values '
-            'are also surfaced where deal language is detected.</div>',
+            'All deal signals sorted largest-to-smallest. Tracks acquisitions, investments, JVs, '
+            'pre-leases, and financing events. Includes sparkline history per deal size category.</div>',
             unsafe_allow_html=True,
         )
 
-        # Deal signal keywords - captures deals even without published $values
+        # Deal signal keywords
         _deal_kws = [
             "acqui", "merger", "acquire", "bought", "purchase", "takeover",
             "joint venture", "jv ", " jv,", "partnership", "invest",
@@ -3669,32 +3969,92 @@ def main():
         if df_deal.empty:
             st.info("No deal-signal articles found in current filtered view.")
         else:
+            # Parse numeric deal value for sorting
+            def _parse_deal_usd(deal_str):
+                """Parse deal string to USD millions for sorting."""
+                if not deal_str:
+                    return 0
+                m = re.search(r"([\d,.]+)\s*(bn|billion|m|million|cr)", str(deal_str), re.I)
+                if not m:
+                    return 0
+                v = float(m.group(1).replace(",", ""))
+                unit = m.group(2).lower()
+                if unit in ("bn", "billion"):
+                    return v * 1000
+                if unit == "cr":
+                    return v * 0.12  # crore approx
+                return v
+
+            df_deal["_deal_usd_m"] = df_deal["Deal Size"].apply(_parse_deal_usd)
+            df_deal = df_deal.sort_values("_deal_usd_m", ascending=False).reset_index(drop=True)
+
             # KPIs
             disclosed = int((df_deal["Deal Size"] != "").sum())
             undisclosed = len(df_deal) - disclosed
+            total_usd = df_deal["_deal_usd_m"].sum()
             kpi_deal = (
                 '<div style="display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap;">'
                 + kpi("Total Deal Articles", len(df_deal), "blue")
-                + kpi("Disclosed Value", disclosed, "green", "with $bn/$m")
-                + kpi("Undisclosed / Language-only", undisclosed, "amber", "deal language, no value")
+                + kpi("Disclosed ($)", disclosed, "green", "with explicit value")
+                + kpi("Undisclosed", undisclosed, "amber", "deal language, no value")
+                + kpi("Total Disclosed (est.)", f"${total_usd:,.0f}m", "purple", "sum of parsed values")
                 + '</div>'
             )
             st.markdown(kpi_deal, unsafe_allow_html=True)
 
-            # Deal size distribution
-            deal_size_df = df_deal[df_deal["Deal Size"] != ""]["Deal Size"].value_counts().reset_index()
+            # ── Sparkline: disclosed deal sizes over time ─────────────────────
+            st.markdown('<div class="sec-head">Deal Volume Sparkline</div>', unsafe_allow_html=True)
+            df_deal_dated = df_deal[df_deal["Date"] != "Unknown"].copy()
+            if not df_deal_dated.empty:
+                df_deal_dated["dt"] = pd.to_datetime(df_deal_dated["Date"])
+                spark_daily = df_deal_dated.groupby(df_deal_dated["dt"].dt.date).agg(
+                    deals=("Headline", "count"),
+                    total_usd=("_deal_usd_m", "sum"),
+                ).reset_index()
+                spark_daily.columns = ["Date", "Deals", "Total_USD_m"]
+
+                fig_spark = go.Figure()
+                fig_spark.add_trace(go.Scatter(
+                    x=spark_daily["Date"], y=spark_daily["Deals"],
+                    name="Deal Articles",
+                    mode="lines+markers",
+                    line=dict(color="#a855f7", width=2),
+                    marker=dict(color="#a855f7", size=5),
+                    fill="tozeroy", fillcolor="rgba(168,85,247,0.07)",
+                    hovertemplate="<b>%{x}</b><br>%{y} deal articles<extra></extra>",
+                    yaxis="y1",
+                ))
+                fig_spark.add_trace(go.Bar(
+                    x=spark_daily["Date"], y=spark_daily["Total_USD_m"],
+                    name="Disclosed Volume ($m)",
+                    marker_color="rgba(0,230,118,0.35)",
+                    hovertemplate="<b>%{x}</b><br>$%{y:,.0f}m disclosed<extra></extra>",
+                    yaxis="y2",
+                ))
+                _dark(fig_spark, 260)
+                fig_spark.update_layout(
+                    title=dict(text="Daily Deal Activity + Disclosed Volume", font=dict(color=_TITLE, size=13), x=0.01),
+                    showlegend=True,
+                    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+                    yaxis=dict(title="Deal Articles", gridcolor=_GRID, linecolor=_GRID, tickfont=dict(color=_TEXT, size=9)),
+                    yaxis2=dict(title="$m", overlaying="y", side="right", tickfont=dict(color=_TEXT, size=9), gridcolor="transparent"),
+                )
+                st.plotly_chart(fig_spark, use_container_width=True, config={"displayModeBar": False})
+
+            # ── Deal size distribution chart ──────────────────────────────────
+            deal_size_df = df_deal[df_deal["Deal Size"] != ""]["Deal Size"].value_counts().head(20).reset_index()
             deal_size_df.columns = ["Deal Size", "Count"]
             if not deal_size_df.empty:
-                fig_deal = go.Figure(go.Bar(
+                fig_deal_dist = go.Figure(go.Bar(
                     x=deal_size_df["Deal Size"], y=deal_size_df["Count"],
                     marker_color="#a855f7",
                     text=deal_size_df["Count"], textposition="outside",
                     textfont=dict(color=_TITLE, size=10),
                     hovertemplate="<b>%{x}</b>: %{y} deals<extra></extra>",
                 ))
-                _dark(fig_deal, 280)
-                fig_deal.update_layout(title=dict(text="Disclosed Deal Sizes", font=dict(color=_TITLE, size=13), x=0.01))
-                st.plotly_chart(fig_deal, use_container_width=True, config={"displayModeBar": False})
+                _dark(fig_deal_dist, 280)
+                fig_deal_dist.update_layout(title=dict(text="Disclosed Deal Sizes (Most Frequent)", font=dict(color=_TITLE, size=13), x=0.01))
+                st.plotly_chart(fig_deal_dist, use_container_width=True, config={"displayModeBar": False})
 
             # Region deal breakdown
             reg_deal = df_deal.groupby("Region").size().reset_index()
@@ -3709,18 +4069,20 @@ def main():
             fig_reg_deal.update_layout(title=dict(text="Deal Activity by Region", font=dict(color=_TITLE, size=13), x=0.01))
             st.plotly_chart(fig_reg_deal, use_container_width=True, config={"displayModeBar": False})
 
-            # Full deal article list
-            st.markdown('<div class="sec-head">All Deal-Signal Articles</div>', unsafe_allow_html=True)
-            deal_display = df_deal[["Headline","Date","Deal Size","Companies","Country","Topic","Sentiment","URL"]].copy()
-            st.markdown(dark_table(deal_display), unsafe_allow_html=True)
+            # Full deal article table — sorted largest to smallest
+            st.markdown('<div class="sec-head">All Deal-Signal Articles (Largest → Smallest)</div>', unsafe_allow_html=True)
+            deal_display = df_deal[["Headline","Date","Deal Size","_deal_usd_m","Companies","Country","Topic","Sentiment","URL"]].copy()
+            deal_display["Est. USD ($m)"] = deal_display["_deal_usd_m"].apply(lambda x: f"${x:,.0f}m" if x > 0 else "—")
+            deal_display = deal_display.drop(columns=["_deal_usd_m"])
+            st.markdown(dark_table(deal_display[["Headline","Date","Deal Size","Est. USD ($m)","Companies","Country","Topic","Sentiment","URL"]]), unsafe_allow_html=True)
 
     # ─── TAB: Saved Scans ───────────────────────────────────────────────────
     with tab_saved:
         st.markdown('<div class="sec-head">💾 Saved Scans</div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Save the current filtered scan to session memory and compare across multiple runs. '
-            'Useful for tracking market changes between daily or weekly scans.</div>',
+            'Name and save scan results to session memory. Compare two saved scans side-by-side '
+            'to track market changes between daily or weekly runs.</div>',
             unsafe_allow_html=True,
         )
 
@@ -3737,8 +4099,6 @@ def main():
             if st.button("💾 Save Current Scan", use_container_width=True):
                 if not df.empty:
                     label_key = scan_label_input.strip() or f"Scan {len(st.session_state.saved_scans)+1}"
-                    from datetime import timezone as _tz2, timedelta as _td2
-                    _ist2 = timezone(_td2(hours=5, minutes=30)) if False else None
                     _ts_saved = datetime.now().strftime("%d %b %Y %H:%M")
                     st.session_state.saved_scans[label_key] = {
                         "df": df.copy(),
@@ -3774,9 +4134,86 @@ def main():
             scan_summary_df = pd.DataFrame(scan_rows)
             st.markdown(dark_table(scan_summary_df), unsafe_allow_html=True)
 
-            # Drill into a saved scan
+            scan_names = list(st.session_state.saved_scans.keys())
+
+            # ── Compare two saved scans ───────────────────────────────────────
+            if len(scan_names) >= 2:
+                st.markdown('<div class="sec-head">📊 Compare Two Saved Scans</div>', unsafe_allow_html=True)
+                cmp_c1, cmp_c2 = st.columns(2)
+                with cmp_c1:
+                    cmp_scan_a = st.selectbox("Scan A", scan_names, key="cmp_scan_a", index=0)
+                with cmp_c2:
+                    cmp_scan_b = st.selectbox("Scan B", scan_names, key="cmp_scan_b", index=min(1, len(scan_names)-1))
+
+                cmp_df_a = st.session_state.saved_scans[cmp_scan_a]["df"]
+                cmp_df_b = st.session_state.saved_scans[cmp_scan_b]["df"]
+
+                # KPI deltas
+                def _delta_kpi(label, val_a, val_b, fmt=str, accent="blue"):
+                    delta = val_b - val_a if isinstance(val_a, (int, float)) else 0
+                    delta_sign = "▲" if delta > 0 else ("▼" if delta < 0 else "–")
+                    delta_color = "#00e676" if delta > 0 else ("#ff2d6b" if delta < 0 else "#3a5480")
+                    return (
+                        f'<div class="kpi-card" style="flex:1;min-width:130px;background:#0b1628;'
+                        f'border:1px solid #152038;border-radius:12px;padding:1rem 1.2rem;position:relative;">'
+                        f'<div style="font-family:monospace;font-size:.6rem;letter-spacing:.12em;'
+                        f'text-transform:uppercase;color:#2a3e60;margin-bottom:.35rem;">{label}</div>'
+                        f'<div style="display:flex;gap:.6rem;align-items:baseline;">'
+                        f'<span style="font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#0047e1;">{fmt(val_a)}</span>'
+                        f'<span style="font-family:monospace;font-size:.7rem;color:#2a3e60;">→</span>'
+                        f'<span style="font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#ffaa00;">{fmt(val_b)}</span>'
+                        f'</div>'
+                        f'<div style="font-size:.7rem;color:{delta_color};margin-top:.2rem;font-family:monospace;">'
+                        f'{delta_sign} {abs(delta)}</div>'
+                        f'</div>'
+                    )
+
+                cmp_kpi_row = (
+                    '<div style="display:flex;gap:.7rem;margin:1rem 0;flex-wrap:wrap;">'
+                    + _delta_kpi("Articles", len(cmp_df_a), len(cmp_df_b))
+                    + _delta_kpi("Deals", int((cmp_df_a["Deal Size"]!="").sum()), int((cmp_df_b["Deal Size"]!="").sum()))
+                    + _delta_kpi("Capacity", int((cmp_df_a["Capacity"]!="").sum()), int((cmp_df_b["Capacity"]!="").sum()))
+                    + _delta_kpi("Countries", int(cmp_df_a["Country"].nunique()), int(cmp_df_b["Country"].nunique()))
+                    + '</div>'
+                )
+                st.markdown(cmp_kpi_row, unsafe_allow_html=True)
+
+                # Topic comparison
+                topics_cmp = sorted(set(cmp_df_a["Topic"].unique()) | set(cmp_df_b["Topic"].unique()))
+                fig_cmp = go.Figure()
+                fig_cmp.add_trace(go.Bar(
+                    name=cmp_scan_a, x=topics_cmp,
+                    y=[int(cmp_df_a["Topic"].value_counts().get(t, 0)) for t in topics_cmp],
+                    marker_color="#0047e1",
+                ))
+                fig_cmp.add_trace(go.Bar(
+                    name=cmp_scan_b, x=topics_cmp,
+                    y=[int(cmp_df_b["Topic"].value_counts().get(t, 0)) for t in topics_cmp],
+                    marker_color="#ffaa00",
+                ))
+                _dark(fig_cmp, 300)
+                fig_cmp.update_layout(
+                    barmode="group", showlegend=True,
+                    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+                    title=dict(text="Topic Comparison: Scan A vs Scan B", font=dict(color=_TITLE, size=13), x=0.01),
+                )
+                st.plotly_chart(fig_cmp, use_container_width=True, config={"displayModeBar": False})
+
+                # Side-by-side headlines
+                st.markdown('<div class="sec-head">Side-by-Side Headlines</div>', unsafe_allow_html=True)
+                col_cmp_a, col_cmp_b = st.columns(2)
+                with col_cmp_a:
+                    st.markdown(f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#0047e1;font-size:.85rem;margin-bottom:.5rem;">● {cmp_scan_a}</div>', unsafe_allow_html=True)
+                    for _, row in cmp_df_a.head(8).iterrows():
+                        st.markdown(article_card(row["Headline"],row["Date"],row["URL"],row["Source"],row["Country"],row["Topic"],row.get("Capacity",""),row.get("Deal Size",""),row.get("Sentiment","News")), unsafe_allow_html=True)
+                with col_cmp_b:
+                    st.markdown(f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#ffaa00;font-size:.85rem;margin-bottom:.5rem;">● {cmp_scan_b}</div>', unsafe_allow_html=True)
+                    for _, row in cmp_df_b.head(8).iterrows():
+                        st.markdown(article_card(row["Headline"],row["Date"],row["URL"],row["Source"],row["Country"],row["Topic"],row.get("Capacity",""),row.get("Deal Size",""),row.get("Sentiment","News")), unsafe_allow_html=True)
+
+            # Drill into a single saved scan
             st.markdown('<div class="sec-head">Browse a Saved Scan</div>', unsafe_allow_html=True)
-            sel_scan = st.selectbox("Select scan", list(st.session_state.saved_scans.keys()), key="saved_scan_select")
+            sel_scan = st.selectbox("Select scan", scan_names, key="saved_scan_select")
             saved_df = st.session_state.saved_scans[sel_scan]["df"]
             for _, row in saved_df.head(50).iterrows():
                 st.markdown(
@@ -3799,10 +4236,9 @@ def main():
         st.markdown('<div class="sec-head">🤖 AI-Powered Headline Scoring</div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Every article in the current view is scored for market significance using a built-in '
-            'multi-signal model. Signals include: deal size, capacity MW/GW mentioned, '
-            'company prominence, sentiment (Opened/Approved = higher), topic weight, '
-            'and TF-IDF keyword rarity. No API key required.</div>',
+            'Every article is scored for market significance using a built-in multi-signal model. '
+            'Signals: deal size, capacity (MW/GW), company prominence, sentiment, topic weight, '
+            'keyword rarity. Articles scoring 30+ are flagged 🔴 High Signal. No API key required.</div>',
             unsafe_allow_html=True,
         )
 
@@ -3825,12 +4261,11 @@ def main():
                 # 2. Capacity signal
                 cap = str(row.get("Capacity", ""))
                 if cap:
-                    import re as _re
-                    m = _re.search(r"([\d,.]+)\s*(GW|MW)", cap, _re.I)
+                    m = re.search(r"([\d,.]+)\s*(GW|MW)", cap, re.I)
                     if m:
                         v = float(m.group(1).replace(",", ""))
                         mw = v * 1000 if m.group(2).upper() == "GW" else v
-                        score += min(mw / 100, 15)  # cap at +15
+                        score += min(mw / 100, 15)
 
                 # 3. Deal size signal
                 deal = str(row.get("Deal Size", ""))
@@ -3841,12 +4276,12 @@ def main():
                         mult = 1000 if m2.group(2).lower() in ("bn", "billion") else 1
                         score += min((v2 * mult) / 500, 12)
 
-                # 4. Company prominence (well-known = higher)
+                # 4. Company prominence
                 companies = str(row.get("Companies", ""))
                 for co in companies.split(","):
                     co = co.strip()
-                    if co in {"Microsoft", "Google", "Amazon", "AWS", "Meta", "Apple", "Oracle",
-                               "NVIDIA", "Equinix", "Digital Realty", "NTT"}:
+                    if co in {"Microsoft","Google","Amazon","AWS","Meta","Apple","Oracle",
+                               "NVIDIA","Equinix","Digital Realty","NTT"}:
                         score += 5
                         break
                     elif co and co in co_frequency_map:
@@ -3884,6 +4319,21 @@ def main():
             df_scored["AI Score"] = df_scored.apply(lambda r: _ai_score(r, co_freq_map), axis=1)
             df_scored = df_scored.sort_values("AI Score", ascending=False).reset_index(drop=True)
 
+            # Signal tier summary
+            high_signal = int((df_scored["AI Score"] >= 30).sum())
+            medium_signal = int(((df_scored["AI Score"] >= 15) & (df_scored["AI Score"] < 30)).sum())
+            low_signal = int((df_scored["AI Score"] < 15).sum())
+
+            kpi_score_row = (
+                '<div style="display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap;">'
+                + kpi("🔴 High Signal (30+)", high_signal, "amber", "major deals, large capacity")
+                + kpi("🟡 Medium Signal (15-29)", medium_signal, "blue")
+                + kpi("⚪ Low Signal (<15)", low_signal, "cyan")
+                + kpi("Max Score", df_scored["AI Score"].max() if not df_scored.empty else 0, "purple")
+                + '</div>'
+            )
+            st.markdown(kpi_score_row, unsafe_allow_html=True)
+
             # Score distribution chart
             score_bins = pd.cut(df_scored["AI Score"], bins=[0, 10, 20, 30, 40, 50, 200],
                                  labels=["0-10", "10-20", "20-30", "30-40", "40-50", "50+"])
@@ -3902,38 +4352,32 @@ def main():
             fig_score.update_layout(title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13), x=0.01))
             st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
 
-            # Top 20 highest scored articles
-            st.markdown('<div class="sec-head">🏆 Top Scored Articles (Highest Market Significance)</div>', unsafe_allow_html=True)
-            top_scored = df_scored.head(20)
+            # High-signal articles with orange top-strip
+            st.markdown('<div class="sec-head">🔴 High Signal Articles (Score ≥ 30)</div>', unsafe_allow_html=True)
+            top_scored = df_scored[df_scored["AI Score"] >= 30].head(25)
+            if top_scored.empty:
+                st.info("No articles scored 30+ in current view. Try a broader scan.")
+            else:
+                for _, row in top_scored.iterrows():
+                    st.markdown(article_card(
+                        row["Headline"], row["Date"], row["URL"],
+                        row["Source"], row["Country"], row["Topic"],
+                        row.get("Capacity", ""), row.get("Deal Size", ""),
+                        row.get("Sentiment", "News"),
+                        ai_score=row["AI Score"],
+                    ), unsafe_allow_html=True)
 
-            for _, row in top_scored.iterrows():
-                score_val = row["AI Score"]
-                score_color = (
-                    "#ff6400" if score_val >= 40
-                    else "#ffaa00" if score_val >= 25
-                    else "#00b4ff" if score_val >= 15
-                    else "#3a5480"
-                )
-                score_badge = (
-                    f'<span style="background:{score_color}22;color:{score_color};'
-                    f'border:1px solid {score_color}44;border-radius:4px;'
-                    f'padding:2px 8px;font-family:monospace;font-size:.68rem;font-weight:bold;">'
-                    f'★ {score_val}</span>'
-                )
-                card_html = article_card(
+            # Medium signal
+            st.markdown('<div class="sec-head">🟡 Medium Signal Articles (15–29)</div>', unsafe_allow_html=True)
+            med_scored = df_scored[(df_scored["AI Score"] >= 15) & (df_scored["AI Score"] < 30)].head(20)
+            for _, row in med_scored.iterrows():
+                st.markdown(article_card(
                     row["Headline"], row["Date"], row["URL"],
                     row["Source"], row["Country"], row["Topic"],
                     row.get("Capacity", ""), row.get("Deal Size", ""),
                     row.get("Sentiment", "News"),
-                )
-                # Inject score badge into card
-                card_html = card_html.replace(
-                    '<a href="' + row["URL"] + '" target="_blank" '
-                    'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;">',
-                    score_badge + '<br><a href="' + row["URL"] + '" target="_blank" '
-                    'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;">',
-                )
-                st.markdown(card_html, unsafe_allow_html=True)
+                    ai_score=row["AI Score"],
+                ), unsafe_allow_html=True)
 
             # Full scored table
             st.markdown('<div class="sec-head">Full Scored Article Table</div>', unsafe_allow_html=True)
