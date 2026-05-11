@@ -3763,7 +3763,9 @@ def main():
                         line=dict(color=col, width=2),
                         marker=dict(color=col, size=4),
                         fill="tozeroy",
-                        fillcolor=col.replace("#", "rgba(") + ",0.06)" if col.startswith("#") else col,
+                        fillcolor="rgba({},{},{},0.06)".format(
+                            int(col[1:3], 16), int(col[3:5], 16), int(col[5:7], 16)
+                        ) if col.startswith("#") else col,
                         hovertemplate=f"<b>{lbl}</b><br>%{{x}}<br>%{{y}} articles<extra></extra>",
                     ))
             _dark(fig_tl, 280)
