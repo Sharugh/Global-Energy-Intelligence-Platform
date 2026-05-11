@@ -10,6 +10,14 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
 
+# ── Platform metadata ─────────────────────────────────────────────────────────
+# _PLAT_VER   : internal build version string
+# _PLAT_TOKEN : encoded authorship/license identifier — do not modify
+_PLAT_VER   = "1.0.0"
+_PLAT_TOKEN = "\x53\x68\x61\x72\x75\x67\x68\x20\x41"   # platform license key
+# Copyright (c) Sharugh A. All rights reserved. Unauthorised redistribution
+# or removal of authorship metadata is prohibited under applicable IP law.
+
 # ── Word (.docx) export ──────────────────────────────────────────────────────
 try:
     from docx import Document as DocxDocument
@@ -2091,62 +2099,94 @@ def chart_world_map(df):
 
     z_max = max(int(cc["Count"].max()), 1)
 
-    _MAP_BG    = "#f0f4fa"   # bright page background for map only
-    _MAP_OCEAN = "#c8d8ee"   # light steel-blue ocean
-    _MAP_LAND  = "#e8ede0"   # soft sage for countries with no data
-    _MAP_FRAME = "#aabbd0"
+    # ── Palette matched to the app's dark UI ─────────────────────────────────
+    _M_BG    = "#060e1c"   # near-black page bg — same feel as .stApp
+    _M_OCEAN = "#07111f"   # deep navy ocean — slightly lighter than bg
+    _M_LAND  = "#0d1b30"   # midnight-blue for zero-data land masses
+    _M_GRID  = "#152038"   # subtle border matching app grid colour
+
+    # Heat scale: deep navy (zero) → electric cyan → cobalt blue → neon gold (max)
+    # Matches the app's accent palette (#0047e1 blue, #00b4ff cyan, #ffaa00 amber)
+    _COLORSCALE = [
+        [0.000, "#07111f"],   # zero  — ocean/bg level (invisible baseline)
+        [0.05,  "#0a2040"],   # trace — barely there
+        [0.15,  "#0d3a70"],   # low   — deep cobalt
+        [0.30,  "#0047e1"],   # low-mid — brand blue
+        [0.50,  "#00b4ff"],   # mid   — electric cyan
+        [0.70,  "#00e5c8"],   # high  — teal-mint
+        [0.85,  "#ffaa00"],   # very high — amber
+        [1.000, "#ff6400"],   # max   — vivid orange-gold peak
+    ]
 
     fig = go.Figure(go.Choropleth(
         locations=cc["ISO"],
         z=cc["Count"],
         text=cc["Country"],
-        # Bright heat scale: white → yellow → orange → red → deep crimson
-        colorscale=[
-            [0.000, "#f7f7f7"],   # zero / very low — near white
-            [0.10,  "#fff176"],   # low — light yellow
-            [0.30,  "#ffca28"],   # low-medium — amber
-            [0.50,  "#ff8f00"],   # medium — deep orange
-            [0.70,  "#e53935"],   # high — red
-            [0.87,  "#b71c1c"],   # very high — dark red
-            [1.000, "#4a0000"],   # maximum — deep crimson
-        ],
+        colorscale=_COLORSCALE,
         autocolorscale=False,
         reversescale=False,
         zauto=False,
         zmin=0,
         zmax=z_max,
-        marker=dict(line=dict(color="#9eb5cc", width=0.6)),
+        marker=dict(line=dict(color="#152038", width=0.6)),
         colorbar=dict(
-            bgcolor="#ffffff", bordercolor=_MAP_FRAME, borderwidth=1,
-            tickfont=dict(color="#334466", size=10),
-            title=dict(text="Articles", font=dict(color="#334466", size=11)),
-            len=0.65, thickness=12,
+            bgcolor="#0b1628",
+            bordercolor="#152038",
+            borderwidth=1,
+            tickfont=dict(color="#6a80a8", size=10, family="DM Mono, monospace"),
+            title=dict(
+                text="Articles",
+                font=dict(color="#b8c8e0", size=11, family="Syne, sans-serif"),
+            ),
+            len=0.6,
+            thickness=14,
             tickformat="d",
+            x=1.01,
         ),
-        hovertemplate="<b>%{text}</b><br>Articles: %{z}<extra></extra>",
+        hovertemplate=(
+            "<b style='color:#fff;font-size:13px;'>%{text}</b><br>"
+            "<span style='color:#00b4ff;'>Articles: %{z}</span>"
+            "<extra></extra>"
+        ),
         showscale=True,
     ))
+
     fig.update_geos(
-        bgcolor=_MAP_BG,
-        landcolor=_MAP_LAND,
-        oceancolor=_MAP_OCEAN,
-        lakecolor=_MAP_OCEAN,
-        rivercolor=_MAP_OCEAN,
-        framecolor=_MAP_FRAME,
-        showland=True, showocean=True, showlakes=True, showrivers=True,
-        showcountries=True, countrycolor="#9eb5cc",
-        showframe=True,
+        bgcolor=_M_BG,
+        landcolor=_M_LAND,
+        oceancolor=_M_OCEAN,
+        lakecolor=_M_OCEAN,
+        rivercolor=_M_OCEAN,
+        framecolor=_M_GRID,
+        showland=True,
+        showocean=True,
+        showlakes=True,
+        showrivers=False,
+        showcountries=True,
+        countrycolor="#152038",
+        showcoastlines=True,
+        coastlinecolor="#1a2e50",
+        showframe=False,
         projection_type="natural earth",
+        lataxis_range=[-60, 85],
     )
+
     fig.update_layout(
-        paper_bgcolor=_MAP_BG, plot_bgcolor=_MAP_BG,
-        height=480,
-        margin=dict(l=0, r=0, t=36, b=0),
+        paper_bgcolor=_M_BG,
+        plot_bgcolor=_M_BG,
+        height=520,
+        margin=dict(l=0, r=60, t=44, b=0),
         title=dict(
-            text="Global Data Center Activity",
-            font=dict(color="#1a2a44", size=14, family=_FONT), x=0.01,
+            text="<b>Global Data Center Activity</b>",
+            font=dict(color="#b8c8e0", size=14, family="Syne, sans-serif"),
+            x=0.01, y=0.98,
         ),
-        geo=dict(bgcolor=_MAP_BG),
+        geo=dict(bgcolor=_M_BG),
+        hoverlabel=dict(
+            bgcolor="#0b1628",
+            bordercolor="#0047e1",
+            font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
+        ),
     )
     return fig
 
@@ -2328,48 +2368,60 @@ def main():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
     # ── Timezone detection via browser JS ────────────────────────────────────
-    # Inject JS once to capture timezone and reload with ?tz= param
+    # Reads the browser IANA tz and writes it into query params.
+    # Default fallback = Asia/Kolkata (IST, UTC+5:30).
     tz_js = """
     <script>
     (function() {
-        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        var params = new URLSearchParams(window.location.search);
-        if (!params.get('tz')) {
-            params.set('tz', tz);
-            var newUrl = window.location.pathname + '?' + params.toString();
-            window.history.replaceState({}, '', newUrl);
-        }
+        try {
+            var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+            var params = new URLSearchParams(window.location.search);
+            if (!params.get('tz') || params.get('tz') === 'UTC') {
+                params.set('tz', tz);
+                window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+            }
+        } catch(e) {}
     })();
     </script>
     """
     st.markdown(tz_js, unsafe_allow_html=True)
 
-    # Read tz from query params (Streamlit passes them as st.query_params)
+    _DEFAULT_TZ = "Asia/Kolkata"
     try:
-        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-        _tz_str = st.query_params.get("tz", "UTC")
+        from zoneinfo import ZoneInfo
+        _tz_raw = st.query_params.get("tz", _DEFAULT_TZ)
+        if not _tz_raw or _tz_raw in ("UTC", "undefined", "null", ""):
+            _tz_raw = _DEFAULT_TZ
         try:
-            _user_tz = ZoneInfo(_tz_str)
+            _user_tz = ZoneInfo(_tz_raw)
+            _tz_str  = _tz_raw
         except Exception:
-            _user_tz = ZoneInfo("UTC")
-            _tz_str  = "UTC"
+            _user_tz = ZoneInfo(_DEFAULT_TZ)
+            _tz_str  = _DEFAULT_TZ
     except ImportError:
         _user_tz = None
-        _tz_str  = "UTC"
+        _tz_str  = _DEFAULT_TZ
 
     def now_local():
-        """Return current datetime in user's detected timezone."""
-        from datetime import timezone
-        utc_now = datetime.now(timezone.utc)
+        from datetime import timezone as _dt_tz
+        utc_now = datetime.now(_dt_tz.utc)
         if _user_tz:
             return utc_now.astimezone(_user_tz)
         return utc_now
 
     def fmt_local(dt=None):
-        """Format a datetime for display with timezone label."""
         d = dt or now_local()
-        tz_label = _tz_str.split("/")[-1].replace("_", " ") if _tz_str != "UTC" else "UTC"
-        return d.strftime(f"%A, %d %B %Y  ·  %H:%M") + f" {tz_label}"
+        parts    = _tz_str.split("/")
+        tz_label = parts[-1].replace("_", " ") if len(parts) > 1 else _tz_str
+        offset   = d.strftime("%z")
+        if offset:
+            sign  = offset[0]
+            hh    = offset[1:3]
+            mm    = offset[3:5]
+            off_s = f"UTC{sign}{hh}:{mm}" if mm != "00" else f"UTC{sign}{hh}"
+        else:
+            off_s = ""
+        return d.strftime("%A, %d %B %Y  \u00b7  %H:%M") + f"  {tz_label} ({off_s})"
 
     with st.sidebar:
         st.markdown(
@@ -2378,7 +2430,10 @@ def main():
             'color:#1a2e50;text-transform:uppercase;margin-bottom:.25rem;">Intelligence Platform</div>'
             '<div style="font-family:Syne,sans-serif;font-size:1.15rem;font-weight:800;color:#fff;">DC Intel</div>'
             '<div style="font-family:monospace;font-size:.6rem;color:#1a2e50;margin-top:.15rem;">'
-            'Global Construction Monitor</div></div>',
+            'Global Construction Monitor</div>'
+            '<div style="font-family:monospace;font-size:.55rem;color:#0f1e36;margin-top:.5rem;'
+            'letter-spacing:.06em;">&#169; Sharugh A &nbsp;&middot;&nbsp; All rights reserved</div>'
+            '</div>',
             unsafe_allow_html=True,
         )
         st.divider()
@@ -2613,6 +2668,8 @@ def main():
         go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
 
     now_str = fmt_local()
+    # _sa_sig is the platform authorship token — do not modify
+    _sa_sig = "\u00a9 Sharugh A"
     st.markdown(
         f'<div class="gl-banner">'
         f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} Sources Active</div>'
@@ -2620,7 +2677,10 @@ def main():
         f'<div class="banner-sub">Real-time aggregation across trade press, RSS feeds & Google News \u00b7 '
         f'Auto-tagged by region, topic, company & capacity \u00b7 '
         f'Deduplicated across all sources</div>'
-        f'<div class="banner-ts">\U0001f550 {now_str}</div>'
+        f'<div class="banner-ts">\U0001f550 {now_str}'
+        f'<span style="margin-left:1.8rem;color:#0d1e38;font-size:.6rem;letter-spacing:.08em;">'
+        f'Built by Sharugh A &nbsp;\u00b7&nbsp; Licensed &nbsp;\u00b7&nbsp; All rights reserved'
+        f'</span></div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -3354,6 +3414,18 @@ def main():
             dark_table(df[[c for c in display_cols if c in df.columns]]),
             unsafe_allow_html=True,
         )
+
+    # ── Platform footer ───────────────────────────────────────────────────────
+    st.markdown(
+        '<div style="margin-top:3rem;padding:1.2rem 0 .6rem;border-top:1px solid #101b2e;'
+        'text-align:center;">'
+        '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
+        'color:#0d1e38;text-transform:uppercase;">'
+        'DC Intel &nbsp;\u00b7&nbsp; Global Construction Intelligence Platform &nbsp;\u00b7&nbsp; '
+        'Built by Sharugh A &nbsp;\u00b7&nbsp; \u00a9 All rights reserved'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
