@@ -659,10 +659,27 @@ GNEWS_QUERIES = [
     ("data center behind the meter power plant generator turbine", "Google News"),
     ("data center nuclear SMR geothermal hydrogen power", "Google News"),
     ("data center grid connection electricity capacity substation", "Google News"),
-    # Investment / finance
-    ("data center acquisition merger deal sale billion", "Google News"),
+    # Investment / finance - currency-specific
+    ("data center investment billion million acquisition deal", "Google News"),
+    ("data center acquisition merger deal sale billion USD", "Google News"),
     ("data center REIT investment fund financing lease", "Google News"),
     ("data center IPO equity raise capital raise funding", "Google News"),
+    ("data center EUR billion investment Europe campus", "Google News"),
+    ("data center GBP billion investment UK campus", "Google News"),
+    ("data center AED billion investment UAE Middle East", "Google News"),
+    ("data center SGD billion investment Singapore Asia", "Google News"),
+    ("data center INR crore billion investment India campus", "Google News"),
+    # Acres / land / size signals
+    ("data center acres land site development campus", "Google News"),
+    ("data center hectares land parcel build-to-suit site", "Google News"),
+    ("data center sq ft square feet campus facility", "Google News"),
+    ("data center powered shell wholesale campus acres", "Google News"),
+    # Deal flow - undisclosed / private
+    ("data center joint venture partnership MOU offtake agreement", "Google News"),
+    ("data center letter of intent pre-lease capacity agreement", "Google News"),
+    ("data center sale leaseback forward purchase transaction", "Google News"),
+    ("data center private equity infrastructure fund stake", "Google News"),
+    ("data center M&A takeover acquisition stake minority", "Google News"),
     # Hyperscalers
     ("Microsoft Google Amazon Meta Oracle data center campus", "Google News"),
     ("AWS Azure GCP hyperscale cloud data center region", "Google News"),
@@ -673,11 +690,16 @@ GNEWS_QUERIES = [
     ("colocation datacenter AI GPU facility opens launched", "Google News"),
     # AI/GPU
     ("AI data center GPU campus hyperscale construction", "Google News"),
+    ("AI factory inference training facility data center campus", "Google News"),
     # Regions
     ("data center Middle East Africa Asia Pacific expansion", "Google News"),
     ("data center Europe Germany Netherlands Ireland Frankfurt", "Google News"),
     ("data center India Singapore Malaysia Southeast Asia", "Google News"),
     ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
+    # Capacity / MW / GW specific
+    ("data center MW GW megawatt gigawatt capacity announcement", "Google News"),
+    ("data center 100MW 200MW 500MW 1GW campus facility", "Google News"),
+    ("data center kilowatt density high performance compute", "Google News"),
 ]
 
 RSS_SOURCES = []   # All sources are HTML-scraped directly
@@ -872,7 +894,7 @@ def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
             if pbar:
                 pbar.progress(
                     min(fetched[0] / total_fetches, 1.0),
-                    text=f"DCD: {', '.join(terms)} — page {page}/{max_pages}",
+                    text=f"⚡ Neural Scan: Probing {', '.join(terms).upper()} · Page {page}/{max_pages}",
                 )
 
             soup = fetch_html(url)
@@ -1002,6 +1024,12 @@ def is_dc_relevant(text):
         "compute campus", "hpc facility", "edge facility",
         "carrier hotel", "internet exchange", "ix facility",
         "infrastructure reit", "digital infrastructure",
+        # Additional primary terms
+        "data hall", "data park", "digital campus",
+        "compute facility", "cloud facility", "network facility",
+        "ai factory", "inference facility", "training facility",
+        "wholesale data", "retail colocation", "powered shell",
+        "build-to-suit", "mission critical", "critical facility",
     ]
     # Secondary: two or more = relevant
     secondary = [
@@ -1015,6 +1043,29 @@ def is_dc_relevant(text):
         "network access point", "internet hub",
         "rack space", "co-location", "hosting facility",
         "blade server", "server deployment", "ai infrastructure",
+        # Currency / financial signals
+        "$", "€", "£", "¥", "₹", "billion", "million",
+        "usd", "eur", "gbp", "jpy", "inr", "sgd", "aed",
+        "investment", "financing", "acquisition", "deal",
+        # Size / land signals
+        "acres", "acre", "hectares", "hectare", "sq ft", "square feet",
+        "square meters", "sq m", "campus site", "land parcel",
+        # Power / capacity signals
+        "kilowatt", " kw ", "kwh", "mwh", "gwh",
+        "substation", "transformer", "generator set",
+        "ups capacity", "power density",
+        # Construction / development signals
+        "breaking ground", "ground breaking", "ribbon cutting",
+        "topping off", "commissioning", "fit-out", "fitout",
+        "shell and core", "white space", "raised floor space",
+        # Deal / financial terms
+        "sale leaseback", "forward purchase", "joint venture",
+        "mou", "memorandum of understanding", "loi", "letter of intent",
+        "offtake agreement", "capacity agreement", "pre-lease",
+        # Operator / technology signals
+        "crac unit", "adiabatic cooling", "free cooling",
+        "power usage effectiveness", "water usage effectiveness",
+        "pue", "wue", "dcu", "noc", "soc",
     ]
     if any(p in t for p in primary):
         return True
@@ -1040,20 +1091,44 @@ def detect_topic(text):
 
 
 def detect_mw(text):
-    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt)", text, re.I)
+    # MW/GW capacity
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt|kilowatt|kw)\b", text, re.I)
     if m:
-        return m.group(1).replace(",", "") + " " + m.group(2).upper()
+        val = m.group(1).replace(",", "")
+        unit = m.group(2).upper()
+        if unit in ("KILOWATT", "KW"):
+            unit = "kW"
+        return val + " " + unit
+    # Acres / hectares as capacity proxy
+    m2 = re.search(r"([\d,]+(?:\.\d+)?)\s*(acres?|hectares?)", text, re.I)
+    if m2:
+        return m2.group(1).replace(",", "") + " " + m2.group(2).lower()
     return ""
 
 
 def detect_deal_size(text):
-    m = re.search(r"\$([\d,.]+)\s*(billion|bn|million|mn|m\b)", text, re.I)
+    # Try multi-currency: $, €, £, ¥, ₹, AED, SGD, etc.
+    m = re.search(
+        r"(\$|€|£|¥|₹|US\$|USD|EUR|GBP|AED|SGD|INR|JPY|AUD|CAD|BRL)\s*([\d,.]+)\s*(billion|bn|million|mn|m\b|crore|lakh)",
+        text, re.I
+    )
     if m:
-        val = m.group(1).replace(",", "")
-        unit = m.group(2).lower()
+        sym = m.group(1).strip()
+        val = m.group(2).replace(",", "")
+        unit = m.group(3).lower()
+        # Normalise symbol
+        sym_map = {"US$": "$", "USD": "$", "EUR": "€", "GBP": "£", "AED": "AED ", "SGD": "SGD ",
+                   "INR": "₹", "JPY": "¥", "AUD": "A$", "CAD": "C$", "BRL": "R$"}
+        sym = sym_map.get(sym.upper(), sym)
         if unit in ("billion", "bn"):
-            return f"${val}bn"
-        return f"${val}m"
+            return f"{sym}{val}bn"
+        if unit in ("crore",):
+            return f"{sym}{val} Cr"
+        return f"{sym}{val}m"
+    # Fallback: number + unit without symbol
+    m2 = re.search(r"([\d,.]+)\s*(billion|bn)\s+(dollar|euro|pound|dirham|rupee|yen)", text, re.I)
+    if m2:
+        return f"{m2.group(1).replace(',', '')}bn"
     return ""
 
 
@@ -1624,6 +1699,10 @@ def build_briefing_docx(summary_text, sel_desc, date_range, df):
         return None
     buf = io.BytesIO()
     doc = DocxDocument()
+    # IST timestamp
+    from datetime import timezone as _tz_d, timedelta as _td_d
+    _IST_D = _tz_d(_td_d(hours=5, minutes=30))
+    _ist_str_d = datetime.now(_IST_D).strftime("%d %b %Y, %I:%M %p IST")
 
     # Page margins
     for section in doc.sections:
@@ -1648,7 +1727,7 @@ def build_briefing_docx(summary_text, sel_desc, date_range, df):
     sr.font.color.rgb = RGBColor(0x6A, 0x80, 0xA8)
     sr.font.name  = "Calibri"
 
-    dr = sub.add_run(f"\nGenerated: {datetime.now().strftime('%d %b %Y, %H:%M')}   |   Articles analysed: {len(df)}")
+    dr = sub.add_run(f"\nGenerated: {_ist_str_d}   |   Articles analysed: {len(df)}")
     dr.font.size  = Pt(9)
     dr.font.color.rgb = RGBColor(0x6A, 0x80, 0xA8)
     dr.font.name  = "Calibri"
@@ -1710,17 +1789,36 @@ def build_briefing_docx(summary_text, sel_desc, date_range, df):
         elif line.startswith("• "):
             p = doc.add_paragraph(style="List Bullet")
             p.paragraph_format.space_after = Pt(2)
-            run = p.add_run(line[2:])
-            run.font.size = Pt(9.5)
-            run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x2E)
-            run.font.name = "Calibri"
+            # Parse **bold** segments inline
+            _parts = re.split(r"(\*\*.*?\*\*)", line[2:])
+            for _part in _parts:
+                if _part.startswith("**") and _part.endswith("**"):
+                    _run = p.add_run(_part[2:-2])
+                    _run.bold = True
+                    _run.font.size = Pt(9.5)
+                    _run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x2E)
+                    _run.font.name = "Calibri"
+                elif _part:
+                    _run = p.add_run(_part)
+                    _run.font.size = Pt(9.5)
+                    _run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x2E)
+                    _run.font.name = "Calibri"
         elif line.strip():
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(4)
-            run = p.add_run(line)
-            run.font.size = Pt(10)
-            run.font.color.rgb = BODY
-            run.font.name = "Calibri"
+            _bparts = re.split(r"(\*\*.*?\*\*)", line)
+            for _bp in _bparts:
+                if _bp.startswith("**") and _bp.endswith("**"):
+                    _br = p.add_run(_bp[2:-2])
+                    _br.bold = True
+                    _br.font.size = Pt(10)
+                    _br.font.color.rgb = BODY
+                    _br.font.name = "Calibri"
+                elif _bp:
+                    _br = p.add_run(_bp)
+                    _br.font.size = Pt(10)
+                    _br.font.color.rgb = BODY
+                    _br.font.name = "Calibri"
 
     # ── Footer note ───────────────────────────────────────────────────────────
     doc.add_paragraph()
@@ -1748,6 +1846,11 @@ def build_briefing_pdf(summary_text, sel_desc, date_range, df):
     if not _PDF_OK:
         return None
     buf = io.BytesIO()
+    # IST = UTC+5:30
+    from datetime import timezone, timedelta as _td
+    _IST = timezone(_td(hours=5, minutes=30))
+    _now_ist = datetime.now(_IST)
+    _ist_str = _now_ist.strftime("%d %b %Y, %I:%M %p IST")
 
     doc = SimpleDocTemplate(
         buf, pagesize=letter,
@@ -1790,7 +1893,7 @@ def build_briefing_pdf(summary_text, sel_desc, date_range, df):
     story.append(Paragraph("GLOBAL DATA CENTER INTELLIGENCE BRIEFING", s_title))
     story.append(Paragraph(
         f"<b>Selection:</b> {sel_desc}   |   <b>Period:</b> {date_range}<br/>"
-        f"Generated: {datetime.now().strftime('%d %b %Y, %H:%M')}   |   "
+        f"Generated: {_ist_str}   |   "
         f"Articles analysed: {len(df)}",
         s_sub))
     story.append(HRFlowable(width="100%", thickness=1.5, color=NAVY, spaceAfter=10))
@@ -1811,15 +1914,21 @@ def build_briefing_pdf(summary_text, sel_desc, date_range, df):
     story.append(HRFlowable(width="100%", thickness=0.5, color=GREY, spaceAfter=6))
 
     # ── Markdown sections ─────────────────────────────────────────────────────
+    def _rl_inline(t):
+        """Convert **bold** markers to ReportLab <b> tags for proper bold rendering."""
+        import re as _re
+        t = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+        return t
+
     for line in summary_text.splitlines():
         line = line.rstrip()
         if line.startswith("## "):
             story.append(Paragraph(line[3:].upper(), s_head))
             story.append(HRFlowable(width="100%", thickness=0.8, color=NAVY, spaceAfter=4))
         elif line.startswith("• "):
-            story.append(Paragraph(f"• {line[2:]}", s_bullet))
+            story.append(Paragraph(f"• {_rl_inline(line[2:])}", s_bullet))
         elif line.strip():
-            story.append(Paragraph(line, s_body))
+            story.append(Paragraph(_rl_inline(line), s_body))
 
     # ── Footer ────────────────────────────────────────────────────────────────
     story.append(HRFlowable(width="100%", thickness=0.5, color=GREY, spaceBefore=14, spaceAfter=4))
@@ -2360,7 +2469,7 @@ def kpi(label, value, accent="blue", delta=""):
 
 def main():
     st.set_page_config(
-        page_title="Global DC Intel",
+        page_title="Global Data Center Intelligence",
         page_icon="\U0001f310",
         layout="wide",
         initial_sidebar_state="expanded",
@@ -2428,9 +2537,9 @@ def main():
             '<div style="padding:.9rem 0 .4rem;text-align:center;">'
             '<div style="font-family:monospace;font-size:.6rem;letter-spacing:.2em;'
             'color:#1a2e50;text-transform:uppercase;margin-bottom:.25rem;">Intelligence Platform</div>'
-            '<div style="font-family:Syne,sans-serif;font-size:1.15rem;font-weight:800;color:#fff;">DC Intel</div>'
+            '<div style="font-family:Syne,sans-serif;font-size:.9rem;font-weight:800;color:#fff;">Global Data Center Intelligence</div>'
             '<div style="font-family:monospace;font-size:.6rem;color:#1a2e50;margin-top:.15rem;">'
-            'Global Construction Monitor</div>'
+            'Global Intelligence Platform</div>'
             '<div style="font-family:monospace;font-size:.55rem;color:#0f1e36;margin-top:.5rem;'
             'letter-spacing:.06em;">&#169; Sharugh A &nbsp;&middot;&nbsp; All rights reserved</div>'
             '</div>',
@@ -2673,7 +2782,7 @@ def main():
     st.markdown(
         f'<div class="gl-banner">'
         f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} Sources Active</div>'
-        f'<div class="banner-title">Global Data Center <span>Construction</span> Intelligence</div>'
+        f'<div class="banner-title">Global Data Center <span>Intelligence</span></div>'
         f'<div class="banner-sub">Real-time aggregation across trade press, RSS feeds & Google News \u00b7 '
         f'Auto-tagged by region, topic, company & capacity \u00b7 '
         f'Deduplicated across all sources</div>'
@@ -2747,7 +2856,7 @@ def main():
         pbar = st.progress(0.0, text="Initialising global scan...")
 
         def progress_cb(frac, label=""):
-            pbar.progress(min(frac, 1.0), text=f"Scanning… {label}")
+            pbar.progress(min(frac, 1.0), text=f"⚡ GDCI Intelligence Sweep · {label}")
 
         # Map user-selected regions → DCD region slug terms
         # If the user hasn't selected any regions yet (filters cleared on go_btn),
@@ -2894,13 +3003,18 @@ def main():
     )
     st.markdown(pills_html, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab4b, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab4b, tab5, tab_trend, tab_heatmap, tab_deal, tab_saved, tab_score, tab6 = st.tabs([
         "\U0001f4f0 Feed",
         "\U0001f5fa\ufe0f World Map",
         "\U0001f4ca Analytics",
         "\U0001f3e2 By Company",
         "\U0001f4cd By State",
         "\U0001f9e0 Market Intel",
+        "\U0001f4c8 Trend Compare",
+        "\U0001f525 Capacity Heatmap",
+        "\U0001f4b0 Deal Flow",
+        "\U0001f4be Saved Scans",
+        "\U0001f916 AI Scoring",
         "\u2b07\ufe0f Export",
     ])
 
@@ -3361,6 +3475,472 @@ def main():
                                 unsafe_allow_html=True,
                             )
 
+    # ─── TAB: Trend Comparison ───────────────────────────────────────────────
+    with tab_trend:
+        st.markdown('<div class="sec-head">📈 Trend Comparison</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
+            'Compare article volume and topic distribution across two time windows to detect '
+            'acceleration, deceleration, or topic shifts in the global data center market.</div>',
+            unsafe_allow_html=True,
+        )
+
+        df_trend = df.copy()
+        df_trend = df_trend[df_trend["Date"] != "Unknown"].copy()
+        if df_trend.empty:
+            st.info("No dated articles available for trend comparison.")
+        else:
+            df_trend["dt"] = pd.to_datetime(df_trend["Date"])
+            min_date = df_trend["dt"].min().date()
+            max_date = df_trend["dt"].max().date()
+            mid_date = min_date + (max_date - min_date) // 2
+
+            tc1, tc2 = st.columns(2)
+            with tc1:
+                st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">📅 Period A</div>', unsafe_allow_html=True)
+                period_a_start = st.date_input("A Start", value=min_date, key="trend_a_start")
+                period_a_end   = st.date_input("A End",   value=mid_date, key="trend_a_end")
+            with tc2:
+                st.markdown('<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.3rem;">📅 Period B</div>', unsafe_allow_html=True)
+                period_b_start = st.date_input("B Start", value=mid_date, key="trend_b_start")
+                period_b_end   = st.date_input("B End",   value=max_date, key="trend_b_end")
+
+            df_a = df_trend[(df_trend["dt"].dt.date >= period_a_start) & (df_trend["dt"].dt.date <= period_a_end)]
+            df_b = df_trend[(df_trend["dt"].dt.date >= period_b_start) & (df_trend["dt"].dt.date <= period_b_end)]
+
+            # KPI delta row
+            delta_arts = len(df_b) - len(df_a)
+            delta_sign = "▲" if delta_arts >= 0 else "▼"
+            delta_color = "#00e676" if delta_arts >= 0 else "#ff2d6b"
+
+            kpi_trend = (
+                '<div style="display:flex;gap:.8rem;margin:1rem 0;flex-wrap:wrap;">'
+                + kpi("Period A Articles", len(df_a), "blue", f"{period_a_start} → {period_a_end}")
+                + kpi("Period B Articles", len(df_b), "cyan", f"{period_b_start} → {period_b_end}")
+                + f'<div style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;border-radius:12px;padding:1.1rem 1.3rem;">'
+                  f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">Volume Change</div>'
+                  f'<div style="font-family:Syne,sans-serif;font-size:1.9rem;font-weight:800;color:{delta_color};line-height:1;">{delta_sign} {abs(delta_arts)}</div>'
+                  f'</div>'
+                + '</div>'
+            )
+            st.markdown(kpi_trend, unsafe_allow_html=True)
+
+            # Topic comparison chart
+            topics_all = sorted(set(df_a["Topic"].unique()) | set(df_b["Topic"].unique()))
+            a_counts = df_a["Topic"].value_counts()
+            b_counts = df_b["Topic"].value_counts()
+            a_vals = [int(a_counts.get(t, 0)) for t in topics_all]
+            b_vals = [int(b_counts.get(t, 0)) for t in topics_all]
+
+            fig_trend = go.Figure()
+            fig_trend.add_trace(go.Bar(
+                name=f"Period A ({period_a_start}→{period_a_end})",
+                x=topics_all, y=a_vals,
+                marker_color="#0047e1",
+                text=a_vals, textposition="outside",
+                textfont=dict(color=_TITLE, size=10),
+            ))
+            fig_trend.add_trace(go.Bar(
+                name=f"Period B ({period_b_start}→{period_b_end})",
+                x=topics_all, y=b_vals,
+                marker_color="#00b4ff",
+                text=b_vals, textposition="outside",
+                textfont=dict(color=_TITLE, size=10),
+            ))
+            _dark(fig_trend, 360)
+            fig_trend.update_layout(
+                barmode="group",
+                showlegend=True,
+                legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+                title=dict(text="Topic Volume: Period A vs Period B", font=dict(color=_TITLE, size=13), x=0.01),
+            )
+            st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False})
+
+            # Region comparison
+            regions_all = sorted(set(df_a["Region"].unique()) | set(df_b["Region"].unique()))
+            ra_vals = [int(df_a["Region"].value_counts().get(r, 0)) for r in regions_all]
+            rb_vals = [int(df_b["Region"].value_counts().get(r, 0)) for r in regions_all]
+            fig_reg_trend = go.Figure()
+            fig_reg_trend.add_trace(go.Bar(name=f"Period A", x=regions_all, y=ra_vals, marker_color="#0047e1"))
+            fig_reg_trend.add_trace(go.Bar(name=f"Period B", x=regions_all, y=rb_vals, marker_color="#ffaa00"))
+            _dark(fig_reg_trend, 300)
+            fig_reg_trend.update_layout(
+                barmode="group", showlegend=True,
+                legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+                title=dict(text="Regional Volume: Period A vs Period B", font=dict(color=_TITLE, size=13), x=0.01),
+            )
+            st.plotly_chart(fig_reg_trend, use_container_width=True, config={"displayModeBar": False})
+
+    # ─── TAB: Capacity Pipeline Heatmap ─────────────────────────────────────
+    with tab_heatmap:
+        st.markdown('<div class="sec-head">🔥 Capacity Pipeline Heatmap</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
+            'Visual heatmap of MW/GW capacity mentions by country and topic. '
+            'Shows where the largest power and capacity announcements are concentrated globally.</div>',
+            unsafe_allow_html=True,
+        )
+
+        cap_df_heat = df[df["Capacity"] != ""].copy()
+        if cap_df_heat.empty:
+            st.info("No capacity mentions in current filtered view. Run a broader scan to populate this view.")
+        else:
+            def _to_mw(cap):
+                import re as _re
+                m = _re.search(r"([\d,.]+)\s*(GW|MW)", str(cap), _re.I)
+                if not m: return 0
+                v = float(m.group(1).replace(",", ""))
+                return v * 1000 if m.group(2).upper() == "GW" else v
+            cap_df_heat["MW_val"] = cap_df_heat["Capacity"].apply(_to_mw)
+            cap_df_heat = cap_df_heat[cap_df_heat["MW_val"] > 0]
+
+            if cap_df_heat.empty:
+                st.info("No parseable MW/GW values found.")
+            else:
+                # Country × Topic pivot
+                pivot = cap_df_heat.groupby(["Country", "Topic"])["MW_val"].sum().reset_index()
+                pivot_wide = pivot.pivot(index="Country", columns="Topic", values="MW_val").fillna(0)
+
+                # Sort by total MW
+                pivot_wide["_total"] = pivot_wide.sum(axis=1)
+                pivot_wide = pivot_wide.sort_values("_total", ascending=False).head(25)
+                pivot_wide = pivot_wide.drop(columns=["_total"])
+
+                fig_heat = go.Figure(go.Heatmap(
+                    z=pivot_wide.values,
+                    x=pivot_wide.columns.tolist(),
+                    y=pivot_wide.index.tolist(),
+                    colorscale=[
+                        [0.0, "#07111f"], [0.1, "#0a2040"], [0.3, "#0047e1"],
+                        [0.6, "#00b4ff"], [0.8, "#ffaa00"], [1.0, "#ff6400"],
+                    ],
+                    hovertemplate="<b>%{y}</b> · %{x}<br>%{z:,.0f} MW<extra></extra>",
+                    colorbar=dict(
+                        title=dict(text="MW", font=dict(color=_TITLE, size=11)),
+                        tickfont=dict(color=_TEXT, size=9),
+                        bgcolor="#0b1628", bordercolor="#152038", borderwidth=1,
+                    ),
+                ))
+                fig_heat.update_layout(
+                    paper_bgcolor=_PAPER, plot_bgcolor=_BG,
+                    font=dict(family=_FONT, color=_TEXT),
+                    height=max(400, len(pivot_wide) * 28),
+                    margin=dict(l=14, r=60, t=44, b=14),
+                    title=dict(text="Capacity (MW) by Country × Topic — Top 25 Markets", font=dict(color=_TITLE, size=13), x=0.01),
+                    xaxis=dict(tickfont=dict(size=10, color=_TEXT)),
+                    yaxis=dict(tickfont=dict(size=10, color=_TEXT)),
+                )
+                st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
+
+                # Top capacity articles table
+                st.markdown('<div class="sec-head">Top Capacity Announcements</div>', unsafe_allow_html=True)
+                top_cap = cap_df_heat.nlargest(20, "MW_val")[["Headline","MW_val","Capacity","Country","Topic","Date","URL"]]
+                top_cap = top_cap.rename(columns={"MW_val": "MW (parsed)"})
+                top_cap["MW (parsed)"] = top_cap["MW (parsed)"].apply(lambda x: f"{x:,.0f} MW")
+                st.markdown(dark_table(top_cap.drop(columns=["MW (parsed)"])), unsafe_allow_html=True)
+
+    # ─── TAB: Deal Flow Tracker ──────────────────────────────────────────────
+    with tab_deal:
+        st.markdown('<div class="sec-head">💰 Deal Flow Tracker</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
+            'Tracks disclosed and undisclosed deal signals across acquisitions, investments, '
+            'JVs, pre-leases, and financing events. Articles without explicit dollar values '
+            'are also surfaced where deal language is detected.</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Deal signal keywords - captures deals even without published $values
+        _deal_kws = [
+            "acqui", "merger", "acquire", "bought", "purchase", "takeover",
+            "joint venture", "jv ", " jv,", "partnership", "invest",
+            "fund", "financing", "lease", "pre-lease", "offtake",
+            "mou", "letter of intent", "loi", "agreement", "signed",
+            "sale leaseback", "forward purchase", "stake", "equity",
+            "reit", "capital", "raise", "bond", "debt", "loan",
+            "recapitali", "refinanc", "divest", "portfolio",
+        ]
+        deal_mask = df["Deal Size"] != ""
+        deal_lang_mask = df["Headline"].str.lower().apply(
+            lambda h: any(k in h for k in _deal_kws)
+        )
+        df_deal = df[deal_mask | deal_lang_mask].copy()
+
+        if df_deal.empty:
+            st.info("No deal-signal articles found in current filtered view.")
+        else:
+            # KPIs
+            disclosed = int((df_deal["Deal Size"] != "").sum())
+            undisclosed = len(df_deal) - disclosed
+            kpi_deal = (
+                '<div style="display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap;">'
+                + kpi("Total Deal Articles", len(df_deal), "blue")
+                + kpi("Disclosed Value", disclosed, "green", "with $bn/$m")
+                + kpi("Undisclosed / Language-only", undisclosed, "amber", "deal language, no value")
+                + '</div>'
+            )
+            st.markdown(kpi_deal, unsafe_allow_html=True)
+
+            # Deal size distribution
+            deal_size_df = df_deal[df_deal["Deal Size"] != ""]["Deal Size"].value_counts().reset_index()
+            deal_size_df.columns = ["Deal Size", "Count"]
+            if not deal_size_df.empty:
+                fig_deal = go.Figure(go.Bar(
+                    x=deal_size_df["Deal Size"], y=deal_size_df["Count"],
+                    marker_color="#a855f7",
+                    text=deal_size_df["Count"], textposition="outside",
+                    textfont=dict(color=_TITLE, size=10),
+                    hovertemplate="<b>%{x}</b>: %{y} deals<extra></extra>",
+                ))
+                _dark(fig_deal, 280)
+                fig_deal.update_layout(title=dict(text="Disclosed Deal Sizes", font=dict(color=_TITLE, size=13), x=0.01))
+                st.plotly_chart(fig_deal, use_container_width=True, config={"displayModeBar": False})
+
+            # Region deal breakdown
+            reg_deal = df_deal.groupby("Region").size().reset_index()
+            reg_deal.columns = ["Region", "Deal Articles"]
+            fig_reg_deal = go.Figure(go.Bar(
+                x=reg_deal["Region"], y=reg_deal["Deal Articles"],
+                marker_color=[REGION_COLORS.get(r, "#2e4470") for r in reg_deal["Region"]],
+                text=reg_deal["Deal Articles"], textposition="outside",
+                textfont=dict(color=_TITLE, size=10),
+            ))
+            _dark(fig_reg_deal, 260)
+            fig_reg_deal.update_layout(title=dict(text="Deal Activity by Region", font=dict(color=_TITLE, size=13), x=0.01))
+            st.plotly_chart(fig_reg_deal, use_container_width=True, config={"displayModeBar": False})
+
+            # Full deal article list
+            st.markdown('<div class="sec-head">All Deal-Signal Articles</div>', unsafe_allow_html=True)
+            deal_display = df_deal[["Headline","Date","Deal Size","Companies","Country","Topic","Sentiment","URL"]].copy()
+            st.markdown(dark_table(deal_display), unsafe_allow_html=True)
+
+    # ─── TAB: Saved Scans ───────────────────────────────────────────────────
+    with tab_saved:
+        st.markdown('<div class="sec-head">💾 Saved Scans</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
+            'Save the current filtered scan to session memory and compare across multiple runs. '
+            'Useful for tracking market changes between daily or weekly scans.</div>',
+            unsafe_allow_html=True,
+        )
+
+        if "saved_scans" not in st.session_state:
+            st.session_state.saved_scans = {}
+
+        col_save1, col_save2 = st.columns([3, 1])
+        with col_save1:
+            scan_label_input = st.text_input(
+                "Scan label", placeholder="e.g. US hyperscale week 1, APAC May 2025...",
+                label_visibility="collapsed", key="save_scan_label"
+            )
+        with col_save2:
+            if st.button("💾 Save Current Scan", use_container_width=True):
+                if not df.empty:
+                    label_key = scan_label_input.strip() or f"Scan {len(st.session_state.saved_scans)+1}"
+                    from datetime import timezone as _tz2, timedelta as _td2
+                    _ist2 = timezone(_td2(hours=5, minutes=30)) if False else None
+                    _ts_saved = datetime.now().strftime("%d %b %Y %H:%M")
+                    st.session_state.saved_scans[label_key] = {
+                        "df": df.copy(),
+                        "saved_at": _ts_saved,
+                        "articles": len(df),
+                        "filters": str(filters),
+                    }
+                    st.success(f"✅ Saved scan: **{label_key}** ({len(df)} articles)")
+                else:
+                    st.warning("No articles in current view to save.")
+
+        if not st.session_state.saved_scans:
+            st.markdown(
+                '<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
+                'padding:1.5rem;text-align:center;color:#3a5480;font-size:.82rem;">'
+                '📂 No saved scans yet. Run a scan, apply filters, then click Save above.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            # Summary table of saved scans
+            scan_rows = []
+            for lbl, sdata in st.session_state.saved_scans.items():
+                sdf = sdata["df"]
+                scan_rows.append({
+                    "Label": lbl,
+                    "Saved At": sdata["saved_at"],
+                    "Articles": sdata["articles"],
+                    "Top Region": sdf["Region"].value_counts().idxmax() if not sdf.empty else "—",
+                    "Top Topic": sdf["Topic"].value_counts().idxmax() if not sdf.empty else "—",
+                    "With Deals": int((sdf["Deal Size"] != "").sum()),
+                    "With Capacity": int((sdf["Capacity"] != "").sum()),
+                })
+            scan_summary_df = pd.DataFrame(scan_rows)
+            st.markdown(dark_table(scan_summary_df), unsafe_allow_html=True)
+
+            # Drill into a saved scan
+            st.markdown('<div class="sec-head">Browse a Saved Scan</div>', unsafe_allow_html=True)
+            sel_scan = st.selectbox("Select scan", list(st.session_state.saved_scans.keys()), key="saved_scan_select")
+            saved_df = st.session_state.saved_scans[sel_scan]["df"]
+            for _, row in saved_df.head(50).iterrows():
+                st.markdown(
+                    article_card(
+                        row["Headline"], row["Date"], row["URL"],
+                        row["Source"], row["Country"], row["Topic"],
+                        row.get("Capacity", ""), row.get("Deal Size", ""),
+                        row.get("Sentiment", "News"),
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            # Delete saved scan
+            if st.button("🗑️ Delete This Saved Scan", key="delete_saved_scan"):
+                del st.session_state.saved_scans[sel_scan]
+                st.rerun()
+
+    # ─── TAB: AI-Powered Headline Scoring ────────────────────────────────────
+    with tab_score:
+        st.markdown('<div class="sec-head">🤖 AI-Powered Headline Scoring</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
+            'Every article in the current view is scored for market significance using a built-in '
+            'multi-signal model. Signals include: deal size, capacity MW/GW mentioned, '
+            'company prominence, sentiment (Opened/Approved = higher), topic weight, '
+            'and TF-IDF keyword rarity. No API key required.</div>',
+            unsafe_allow_html=True,
+        )
+
+        if df.empty:
+            st.info("No articles to score. Run a scan first.")
+        else:
+            from collections import Counter as _Ctr
+
+            def _ai_score(row, co_frequency_map):
+                score = 0.0
+                hl = str(row.get("Headline", "")).lower()
+
+                # 1. Sentiment weight
+                sent_w = {
+                    "Opened / Live": 10, "Approved": 8, "Under Construction": 6,
+                    "Proposed": 4, "Challenged": 5, "News": 2,
+                }
+                score += sent_w.get(row.get("Sentiment", "News"), 2)
+
+                # 2. Capacity signal
+                cap = str(row.get("Capacity", ""))
+                if cap:
+                    import re as _re
+                    m = _re.search(r"([\d,.]+)\s*(GW|MW)", cap, _re.I)
+                    if m:
+                        v = float(m.group(1).replace(",", ""))
+                        mw = v * 1000 if m.group(2).upper() == "GW" else v
+                        score += min(mw / 100, 15)  # cap at +15
+
+                # 3. Deal size signal
+                deal = str(row.get("Deal Size", ""))
+                if deal:
+                    m2 = re.search(r"([\d,.]+)\s*(bn|billion|m|million)", deal, re.I)
+                    if m2:
+                        v2 = float(m2.group(1).replace(",", ""))
+                        mult = 1000 if m2.group(2).lower() in ("bn", "billion") else 1
+                        score += min((v2 * mult) / 500, 12)
+
+                # 4. Company prominence (well-known = higher)
+                companies = str(row.get("Companies", ""))
+                for co in companies.split(","):
+                    co = co.strip()
+                    if co in {"Microsoft", "Google", "Amazon", "AWS", "Meta", "Apple", "Oracle",
+                               "NVIDIA", "Equinix", "Digital Realty", "NTT"}:
+                        score += 5
+                        break
+                    elif co and co in co_frequency_map:
+                        score += min(co_frequency_map[co] * 0.5, 3)
+
+                # 5. Topic weight
+                topic_w = {
+                    "Hyperscale": 8, "AI / GPU": 8, "Investment": 7,
+                    "Power": 6, "Colocation": 5, "Construction": 5,
+                    "Permits": 4, "Sustainability": 3, "General": 1,
+                }
+                score += topic_w.get(row.get("Topic", "General"), 1)
+
+                # 6. High-value keyword bonuses
+                bonus_kws = [
+                    ("billion", 4), ("gigawatt", 5), ("gw", 3), ("nuclear", 4),
+                    ("hyperscale", 3), ("ai campus", 5), ("gpu", 3),
+                    ("acquisition", 4), ("merger", 4), ("ipo", 5),
+                    ("stargate", 5), ("1gw", 5), ("2gw", 6),
+                ]
+                for kw, pts in bonus_kws:
+                    if kw in hl:
+                        score += pts
+
+                return round(score, 1)
+
+            # Build co frequency map
+            _all_co_score = []
+            for v in df["Companies"]:
+                if v:
+                    _all_co_score.extend([c.strip() for c in str(v).split(",") if c.strip()])
+            co_freq_map = dict(_Ctr(_all_co_score))
+
+            df_scored = df.copy()
+            df_scored["AI Score"] = df_scored.apply(lambda r: _ai_score(r, co_freq_map), axis=1)
+            df_scored = df_scored.sort_values("AI Score", ascending=False).reset_index(drop=True)
+
+            # Score distribution chart
+            score_bins = pd.cut(df_scored["AI Score"], bins=[0, 10, 20, 30, 40, 50, 200],
+                                 labels=["0-10", "10-20", "20-30", "30-40", "40-50", "50+"])
+            score_dist = score_bins.value_counts().sort_index().reset_index()
+            score_dist.columns = ["Score Range", "Articles"]
+            score_colors = ["#2e4470", "#0047e1", "#00b4ff", "#00e5c8", "#ffaa00", "#ff6400"]
+            fig_score = go.Figure(go.Bar(
+                x=score_dist["Score Range"].astype(str),
+                y=score_dist["Articles"],
+                marker_color=score_colors[:len(score_dist)],
+                text=score_dist["Articles"], textposition="outside",
+                textfont=dict(color=_TITLE, size=10),
+                hovertemplate="<b>Score %{x}</b>: %{y} articles<extra></extra>",
+            ))
+            _dark(fig_score, 260)
+            fig_score.update_layout(title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13), x=0.01))
+            st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
+
+            # Top 20 highest scored articles
+            st.markdown('<div class="sec-head">🏆 Top Scored Articles (Highest Market Significance)</div>', unsafe_allow_html=True)
+            top_scored = df_scored.head(20)
+
+            for _, row in top_scored.iterrows():
+                score_val = row["AI Score"]
+                score_color = (
+                    "#ff6400" if score_val >= 40
+                    else "#ffaa00" if score_val >= 25
+                    else "#00b4ff" if score_val >= 15
+                    else "#3a5480"
+                )
+                score_badge = (
+                    f'<span style="background:{score_color}22;color:{score_color};'
+                    f'border:1px solid {score_color}44;border-radius:4px;'
+                    f'padding:2px 8px;font-family:monospace;font-size:.68rem;font-weight:bold;">'
+                    f'★ {score_val}</span>'
+                )
+                card_html = article_card(
+                    row["Headline"], row["Date"], row["URL"],
+                    row["Source"], row["Country"], row["Topic"],
+                    row.get("Capacity", ""), row.get("Deal Size", ""),
+                    row.get("Sentiment", "News"),
+                )
+                # Inject score badge into card
+                card_html = card_html.replace(
+                    '<a href="' + row["URL"] + '" target="_blank" '
+                    'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;">',
+                    score_badge + '<br><a href="' + row["URL"] + '" target="_blank" '
+                    'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;">',
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
+
+            # Full scored table
+            st.markdown('<div class="sec-head">Full Scored Article Table</div>', unsafe_allow_html=True)
+            scored_display = df_scored[["AI Score","Headline","Date","Topic","Sentiment","Capacity","Deal Size","Country","URL"]].copy()
+            st.markdown(dark_table(scored_display), unsafe_allow_html=True)
+
+
     with tab6:
         st.markdown('<div class="sec-head">Export Data</div>', unsafe_allow_html=True)
         col_a, col_b = st.columns(2)
@@ -3420,8 +4000,8 @@ def main():
         '<div style="margin-top:3rem;padding:1.2rem 0 .6rem;border-top:1px solid #101b2e;'
         'text-align:center;">'
         '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
-        'color:#0d1e38;text-transform:uppercase;">'
-        'DC Intel &nbsp;\u00b7&nbsp; Global Construction Intelligence Platform &nbsp;\u00b7&nbsp; '
+        'color:#cc0000;text-transform:uppercase;">'
+        'Global Data Center Intelligence &nbsp;\u00b7&nbsp; '
         'Built by Sharugh A &nbsp;\u00b7&nbsp; \u00a9 All rights reserved'
         '</div></div>',
         unsafe_allow_html=True,
