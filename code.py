@@ -2091,32 +2091,35 @@ def chart_world_map(df):
 
     z_max = max(int(cc["Count"].max()), 1)
 
+    _MAP_BG    = "#f0f4fa"   # bright page background for map only
+    _MAP_OCEAN = "#c8d8ee"   # light steel-blue ocean
+    _MAP_LAND  = "#e8ede0"   # soft sage for countries with no data
+    _MAP_FRAME = "#aabbd0"
+
     fig = go.Figure(go.Choropleth(
         locations=cc["ISO"],
         z=cc["Count"],
         text=cc["Country"],
-        # Red heat scale — dark background → deep red → bright red → orange-white
+        # Bright heat scale: white → yellow → orange → red → deep crimson
         colorscale=[
-            [0.000, "#090f1c"],   # darkest — zero / background
-            [0.001, "#1a0505"],   # near-zero
-            [0.10,  "#3d0a0a"],   # very low
-            [0.25,  "#6b0f0f"],   # low
-            [0.45,  "#a01515"],   # low-medium
-            [0.65,  "#cc2020"],   # medium
-            [0.82,  "#e84040"],   # high
-            [0.93,  "#ff6a2a"],   # very high — orange
-            [1.000, "#ffcc00"],   # maximum — amber/gold peak
+            [0.000, "#f7f7f7"],   # zero / very low — near white
+            [0.10,  "#fff176"],   # low — light yellow
+            [0.30,  "#ffca28"],   # low-medium — amber
+            [0.50,  "#ff8f00"],   # medium — deep orange
+            [0.70,  "#e53935"],   # high — red
+            [0.87,  "#b71c1c"],   # very high — dark red
+            [1.000, "#4a0000"],   # maximum — deep crimson
         ],
         autocolorscale=False,
         reversescale=False,
         zauto=False,
         zmin=0,
         zmax=z_max,
-        marker=dict(line=dict(color="#151f35", width=0.5)),
+        marker=dict(line=dict(color="#9eb5cc", width=0.6)),
         colorbar=dict(
-            bgcolor=_PAPER, bordercolor=_GRID, borderwidth=1,
-            tickfont=dict(color=_TITLE, size=10),
-            title=dict(text="Articles", font=dict(color=_TITLE, size=11)),
+            bgcolor="#ffffff", bordercolor=_MAP_FRAME, borderwidth=1,
+            tickfont=dict(color="#334466", size=10),
+            title=dict(text="Articles", font=dict(color="#334466", size=11)),
             len=0.65, thickness=12,
             tickformat="d",
         ),
@@ -2124,26 +2127,26 @@ def chart_world_map(df):
         showscale=True,
     ))
     fig.update_geos(
-        bgcolor=_BG,
-        landcolor="#1a0e0e",      # unmatched-country land = dark maroon (no-data countries)
-        oceancolor="#060a10",
-        lakecolor="#060a10",
-        rivercolor="#060a10",
-        framecolor=_GRID,
-        showland=True, showocean=True, showlakes=True,
-        showcountries=True, countrycolor="#2e1010",
+        bgcolor=_MAP_BG,
+        landcolor=_MAP_LAND,
+        oceancolor=_MAP_OCEAN,
+        lakecolor=_MAP_OCEAN,
+        rivercolor=_MAP_OCEAN,
+        framecolor=_MAP_FRAME,
+        showland=True, showocean=True, showlakes=True, showrivers=True,
+        showcountries=True, countrycolor="#9eb5cc",
         showframe=True,
         projection_type="natural earth",
     )
     fig.update_layout(
-        paper_bgcolor=_BG, plot_bgcolor=_BG,
+        paper_bgcolor=_MAP_BG, plot_bgcolor=_MAP_BG,
         height=480,
-        margin=dict(l=0, r=0, t=32, b=0),
+        margin=dict(l=0, r=0, t=36, b=0),
         title=dict(
             text="Global Data Center Activity",
-            font=dict(color=_TITLE, size=14, family=_FONT), x=0.01,
+            font=dict(color="#1a2a44", size=14, family=_FONT), x=0.01,
         ),
-        geo=dict(bgcolor=_BG),
+        geo=dict(bgcolor=_MAP_BG),
     )
     return fig
 
@@ -2415,8 +2418,23 @@ def main():
                 unsafe_allow_html=True,
             )
 
-        # Scrape depth always maxed out; sources always all active
-        max_pages = 10
+        # ── Scrape Depth ──────────────────────────────────────────────────────
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+            'text-transform:uppercase;margin:.9rem 0 .2rem;">🔎 Scrape Depth (pages per DCD term)</div>',
+            unsafe_allow_html=True,
+        )
+        max_pages = st.slider(
+            "Scrape depth", min_value=1, max_value=100, value=10, step=1,
+            label_visibility="collapsed",
+            help="Higher = more articles but slower scan. 10 is fast, 50+ is thorough, 100 is maximum.",
+        )
+        st.markdown(
+            f'<div style="font-size:.68rem;color:#1a2e50;margin-top:-.3rem;margin-bottom:.4rem;">'
+            f'Up to {max_pages} page{"s" if max_pages != 1 else ""} per DCD term scraped</div>',
+            unsafe_allow_html=True,
+        )
+
         use_html  = True
         use_rss   = True
         use_gn    = True
@@ -3098,6 +3116,8 @@ def main():
                             ),
                             unsafe_allow_html=True,
                         )
+
+    with tab5:
         st.markdown('<div class="sec-head">\U0001f9e0 Market Intelligence Summary</div>', unsafe_allow_html=True)
 
         filter_summary_parts = []
