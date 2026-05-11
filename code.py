@@ -632,52 +632,45 @@ GNEWS_QUERIES = [
     ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
 ]
 
-RSS_SOURCES = [
-    {"name": "DataCenter Knowledge", "url": "https://www.datacenterknowledge.com/rss.xml",      "type": "rss"},
-    {"name": "DataCenterFrontier",   "url": "https://datacenterfrontier.com/feed/",             "type": "rss"},
-    {"name": "PR Newswire",          "url": "https://www.prnewswire.com/rss/news-releases-list.rss", "type": "rss"},
-    {"name": "BusinessWire",         "url": "https://feed.businesswire.com/rss/home/?rss=G22",  "type": "rss"},
-    {"name": "Reuters",              "url": "https://feeds.reuters.com/reuters/technologyNews",  "type": "rss"},
-    # Additional feeds
-    {"name": "Data Economy",         "url": "https://data-economy.com/feed/",                   "type": "rss"},
-    {"name": "Capacity Media",       "url": "https://www.capacitymedia.com/rss",                 "type": "rss"},
-    {"name": "The Register DC",      "url": "https://www.theregister.com/data_centre/headlines.atom", "type": "rss"},
-    {"name": "ZDNet",                "url": "https://www.zdnet.com/topic/data-centers/rss.xml", "type": "rss"},
-    {"name": "Bisnow",               "url": "https://www.bisnow.com/rss",                        "type": "rss"},
-    {"name": "DCD Asia Pacific",     "url": "https://www.datacenterdynamics.com/en/rss/?region=asia-pacific", "type": "rss"},
-    {"name": "DCD EMEA",             "url": "https://www.datacenterdynamics.com/en/rss/?region=emea", "type": "rss"},
-]
+RSS_SOURCES = []   # All sources are HTML-scraped directly; no RSS feeds used
 
 SCRAPE_SOURCES = [
-    # DataCenterDynamics — all topic channels
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=north-america",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=europe",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=asia-pacific",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=middle-east",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=africa",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=latin-america",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=hyperscale",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=colocation",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=power",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=investment",
-     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
-    # DataCenter Frontier
-    {"name": "DataCenterFrontier",  "url": "https://datacenterfrontier.com/news/",
-     "base": "https://datacenterfrontier.com", "link_pattern": r"^/[a-z0-9\-]+/$", "type": "html"},
-    # DataCenter Knowledge
-    {"name": "DataCenter Knowledge", "url": "https://www.datacenterknowledge.com/data-centers",
-     "base": "https://www.datacenterknowledge.com", "link_pattern": r"^/data-centers/[^?#]+$", "type": "html"},
+    # ── PRIMARY: DataCenterDynamics — full news listing, paginated ────────────
+    {
+        "name":         "DataCenterDynamics",
+        "url":          "https://www.datacenterdynamics.com/en/news/",
+        "base":         "https://www.datacenterdynamics.com",
+        "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$",
+        "type":         "html",
+        "priority":     1,          # used for dedup: keep DCD version over others
+    },
+    # ── DataCenter Knowledge — build-design section ───────────────────────────
+    {
+        "name":         "DataCenter Knowledge",
+        "url":          "https://www.datacenterknowledge.com/build-design",
+        "base":         "https://www.datacenterknowledge.com",
+        "link_pattern": r"^/(build-design|data-centers|cloud)/[^?#]+$",
+        "type":         "html",
+        "priority":     2,
+    },
+    # ── Data Center World — news & insights ──────────────────────────────────
+    {
+        "name":         "Data Center World",
+        "url":          "https://datacenterworld.com/news-insights/",
+        "base":         "https://datacenterworld.com",
+        "link_pattern": r"^/(news-insights|news)/[^?#]+$",
+        "type":         "html",
+        "priority":     3,
+    },
+    # ── Data Centre Magazine — news ───────────────────────────────────────────
+    {
+        "name":         "Data Centre Magazine",
+        "url":          "https://datacentremagazine.com/news",
+        "base":         "https://datacentremagazine.com",
+        "link_pattern": r"^/(news|articles|data-centres)/[^?#]+$",
+        "type":         "html",
+        "priority":     4,
+    },
 ]
 
 
@@ -725,51 +718,167 @@ def fetch_html(url, retries=2):
     return None
 
 
-def scrape_html_source(source, max_pages=3):
+def _extract_articles_from_soup(soup, source, base, pattern):
+    """
+    Generic article extractor: walks all <a> tags matching pattern,
+    finds the best headline text, and climbs the DOM for a date.
+    Returns list of {headline, url, date_obj} dicts.
+    """
     results = []
     seen = set()
-    base = source["base"]
-    pattern = re.compile(source["link_pattern"])
+    compiled = re.compile(pattern)
 
+    for a in soup.find_all("a", href=True):
+        href = a["href"].split("?")[0].rstrip("/")
+        if not compiled.search(href + "/") and not compiled.search(href):
+            continue
+        # Normalise href to include trailing slash for DCD
+        if "datacenterdynamics" in base and not href.endswith("/"):
+            href += "/"
+        if href in seen or len(href) < 10:
+            continue
+        seen.add(href)
+
+        # Best headline: look for heading tag inside <a>, fall back to link text
+        h_tag = a.find(["h1","h2","h3","h4","h5"])
+        headline = h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)
+        headline = re.sub(r"\s+", " ", headline).strip()
+        if not headline or len(headline) < 15:
+            continue
+
+        # Date: climb DOM up to 12 levels looking for a recognisable date string
+        date_obj = None
+        node = a.parent
+        for _ in range(12):
+            if node is None:
+                break
+            # Try <time datetime="..."> first
+            time_tag = node.find("time")
+            if time_tag:
+                dt_attr = time_tag.get("datetime", "")
+                if dt_attr:
+                    date_obj = parse_date_str(dt_attr)
+                if not date_obj:
+                    date_obj = parse_date_str(time_tag.get_text(strip=True))
+                if date_obj:
+                    break
+            txt = node.get_text(" ", strip=True)
+            # dd Mon YYYY
+            m = re.search(
+                r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
+                txt, re.I,
+            )
+            if m:
+                date_obj = parse_date_str(m.group(0))
+                break
+            # Mon dd, YYYY
+            m2 = re.search(
+                r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})\b",
+                txt, re.I,
+            )
+            if m2:
+                date_obj = parse_date_str(m2.group(0))
+                break
+            # ISO yyyy-mm-dd
+            m3 = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", txt)
+            if m3:
+                date_obj = parse_date_str(m3.group(1))
+                break
+            node = node.parent
+
+        full_url = (base + href) if href.startswith("/") else href
+        results.append({
+            "headline": headline,
+            "url":      full_url,
+            "date_obj": date_obj,
+            "source":   source,
+        })
+    return results
+
+
+def _get_next_page_url(soup, current_url, page_num, source_name):
+    """
+    Detect next-page URL using site-specific logic.
+    Returns None if no next page found.
+    """
+    sn = source_name.lower()
+
+    # DataCenterDynamics: ?page=N appended
+    if "datacenterdynamics" in sn or "datacenterdynamics" in current_url:
+        base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
+        sep = "&" if "?" in base_url else "?"
+        return f"{base_url}{sep}page={page_num}"
+
+    # DataCenter Knowledge: ?page=N
+    if "datacenterknowledge" in sn or "datacenterknowledge" in current_url:
+        base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
+        sep = "&" if "?" in base_url else "?"
+        return f"{base_url}{sep}page={page_num}"
+
+    # Data Center World: /page/N/
+    if "datacenterworld" in sn or "datacenterworld" in current_url:
+        base_url = re.sub(r"/page/\d+/?$", "", current_url).rstrip("/")
+        return f"{base_url}/page/{page_num}/"
+
+    # Data Centre Magazine: ?page=N
+    if "datacentremagazine" in sn or "datacentremagazine" in current_url:
+        base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
+        sep = "&" if "?" in base_url else "?"
+        return f"{base_url}{sep}page={page_num}"
+
+    # Generic fallback: look for a "Next" link in the HTML
+    next_link = soup.find("a", string=re.compile(r"next|›|»", re.I))
+    if next_link and next_link.get("href"):
+        href = next_link["href"]
+        if href.startswith("http"):
+            return href
+        # relative
+        from urllib.parse import urljoin
+        return urljoin(current_url, href)
+
+    return None
+
+
+def scrape_html_source(source, max_pages=10):
+    """
+    Scrape a single source up to max_pages pages.
+    Uses per-site pagination logic and the generic article extractor.
+    """
+    results  = []
+    seen_urls = set()
+    base     = source["base"]
+    pattern  = source["link_pattern"]
+    name     = source["name"]
+    start_url = source["url"]
+    priority  = source.get("priority", 99)
+
+    current_url = start_url
     for page in range(1, max_pages + 1):
-        url = source["url"] if page == 1 else source["url"] + f"&page={page}"
-        soup = fetch_html(url)
+        if page > 1:
+            current_url = _get_next_page_url(None, start_url, page, name)
+            if not current_url:
+                break
+
+        soup = fetch_html(current_url)
         if not soup:
             break
-        found_any = False
-        for a in soup.find_all("a", href=pattern):
-            href = a["href"]
-            if href in seen:
+
+        page_articles = _extract_articles_from_soup(soup, name, base, pattern)
+        new_on_page   = 0
+        for art in page_articles:
+            norm_url = art["url"].rstrip("/")
+            if norm_url in seen_urls:
                 continue
-            seen.add(href)
-            h = a.find(["h1", "h2", "h3", "h4"])
-            headline = h.get_text(strip=True) if h else a.get_text(strip=True)
-            if not headline or len(headline) < 12:
-                continue
-            date_obj = None
-            node = a.parent
-            for _ in range(9):
-                if node is None:
-                    break
-                txt = node.get_text(" ", strip=True)
-                m = re.search(
-                    r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
-                    txt, re.I
-                )
-                if m:
-                    date_obj = parse_date_str(m.group(0))
-                    break
-                node = node.parent
-            results.append({
-                "headline": headline,
-                "url": base + href,
-                "date_obj": date_obj,
-                "source": source["name"],
-            })
-            found_any = True
-        if not found_any:
-            break
-        time.sleep(0.4)
+            seen_urls.add(norm_url)
+            art["_priority"] = priority
+            results.append(art)
+            new_on_page += 1
+
+        if new_on_page == 0:
+            break   # no new articles on this page — stop paginating
+
+        time.sleep(0.35)
+
     return results
 
 
@@ -952,19 +1061,21 @@ def fuzzy_similar(a, b, threshold=0.88):
 
 
 def deduplicate(articles):
-    """Deduplicate by URL first, then fuzzy headline matching."""
-    # Step 1: URL-based dedup
-    seen_urls = set()
-    url_deduped = []
-    for art in articles:
-        url = art.get("URL", "").strip().rstrip("/")
-        if url and url in seen_urls:
-            continue
-        if url:
-            seen_urls.add(url)
-        url_deduped.append(art)
+    """
+    1. URL-based exact dedup (same URL = same article).
+    2. Fuzzy headline dedup — when two articles match, keep the one from
+       the source with the lowest _priority number (DCD = 1 wins).
+    """
+    # Step 1: URL dedup — sort by priority so DCD URLs win ties
+    seen_urls = {}
+    for art in sorted(articles, key=lambda x: x.get("_priority", 99)):
+        url = str(art.get("URL", art.get("url", ""))).strip().rstrip("/")
+        if url and url not in seen_urls:
+            seen_urls[url] = art
+    url_deduped = list(seen_urls.values())
 
-    # Step 2: Fuzzy headline dedup — keep highest-scored version
+    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
+    url_deduped.sort(key=lambda x: x.get("_priority", 99))
     keep = []
     seen_headlines = []
     for art in url_deduped:
@@ -1973,40 +2084,50 @@ def chart_world_map(df):
     cc.columns = ["Country", "Count"]
     cc["ISO"] = cc["Country"].map(COUNTRY_ISO)
     cc = cc.dropna(subset=["ISO"])
+    if cc.empty:
+        return go.Figure()
+
+    z_max = max(int(cc["Count"].max()), 1)
+
     fig = go.Figure(go.Choropleth(
         locations=cc["ISO"],
         z=cc["Count"],
         text=cc["Country"],
+        # Explicit navy → blue → teal scale — no red anywhere
         colorscale=[
-            [0.00, "#0b1628"],   # no data — darkest navy (matches sidebar bg)
-            [0.10, "#0e2245"],   # very low
-            [0.30, "#0f3580"],   # low
-            [0.55, "#0047e1"],   # medium — UI primary blue
-            [0.78, "#0099d4"],   # high — UI cyan
-            [1.00, "#00e5c8"],   # max — UI teal accent
+            [0.000, "#090f1c"],   # darkest — zero / background
+            [0.001, "#0b1628"],   # near-zero — matches card bg
+            [0.12,  "#0d2050"],   # very low
+            [0.30,  "#0f3580"],   # low-medium
+            [0.55,  "#0047e1"],   # medium — UI primary blue
+            [0.78,  "#0099d4"],   # high — UI cyan
+            [1.000, "#00e5c8"],   # maximum — UI teal
         ],
         autocolorscale=False,
         reversescale=False,
+        zauto=False,
+        zmin=0,
+        zmax=z_max,
         marker=dict(line=dict(color="#151f35", width=0.5)),
         colorbar=dict(
             bgcolor=_PAPER, bordercolor=_GRID, borderwidth=1,
             tickfont=dict(color=_TITLE, size=10),
             title=dict(text="Articles", font=dict(color=_TITLE, size=11)),
-            len=0.7, thickness=14,
+            len=0.65, thickness=12,
+            tickformat="d",
         ),
         hovertemplate="<b>%{text}</b><br>Articles: %{z}<extra></extra>",
         showscale=True,
-        zmin=0,
     ))
     fig.update_geos(
         bgcolor=_BG,
-        landcolor="#0d1a2e",
+        landcolor="#0d1a2e",      # unmatched-country land = dark navy
         oceancolor="#060a10",
         lakecolor="#060a10",
         rivercolor="#060a10",
         framecolor=_GRID,
         showland=True, showocean=True, showlakes=True,
-        showcountries=True, countrycolor="#152038",
+        showcountries=True, countrycolor="#1a2e4a",
         showframe=True,
         projection_type="natural earth",
     )
@@ -2301,7 +2422,13 @@ def main():
         if "df_full" in st.session_state and st.session_state.df_full is not None:
             df_full = st.session_state.df_full
 
-            # ── Clear All Filters button ──────────────────────────────────────
+            # ── Filter version counter (incremented on clear to force new widget keys) ──
+            if "_filter_ver" not in st.session_state:
+                st.session_state["_filter_ver"] = 0
+            _fv = st.session_state["_filter_ver"]
+            def _fk(name): return f"{name}_v{_fv}"   # versioned key
+
+            # ── REFINE RESULTS heading + Clear All ──────────────────────────────
             st.markdown(
                 '<div style="display:flex;justify-content:space-between;align-items:center;'
                 'margin-bottom:.4rem;">'
@@ -2310,32 +2437,23 @@ def main():
                 '</div>',
                 unsafe_allow_html=True,
             )
-
-            # Handle clear — set a flag, then rerun so widget defaults are clean
             if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters_btn"):
-                st.session_state["_filters_cleared"] = True
-                for k in ["f_regions","f_countries","f_states","f_companies",
-                          "f_topics","f_sents","f_keyword","f_min_mw",
-                          "filters"]:
-                    st.session_state.pop(k, None)
+                # Bump version → all widget keys change → Streamlit treats them as new → default=[] takes effect
+                st.session_state["_filter_ver"] = _fv + 1
+                st.session_state.pop("filters", None)
                 st.rerun()
-
-            # Detect post-clear state and suppress stale defaults
-            _cleared = st.session_state.pop("_filters_cleared", False)
 
             # ── Helper: map typed-but-unlisted value to closest match ─────────
             def _fuzzy_resolve(typed, candidates):
-                """Return candidates that contain the typed string (case-insensitive),
-                or fall back to headline-level matching done at filter-apply time."""
                 if not typed:
                     return []
                 t = typed.strip().lower()
                 return [c for c in candidates if t in c.lower()]
 
-            all_regions_av  = sorted(df_full["Region"].unique().tolist())
+            all_regions_av   = sorted(df_full["Region"].unique().tolist())
             all_countries_av = sorted(df_full["Country"].unique().tolist())
-            all_topics_av   = sorted(df_full["Topic"].unique().tolist())
-            all_sents_av    = sorted(df_full["Sentiment"].unique().tolist())
+            all_topics_av    = sorted(df_full["Topic"].unique().tolist())
+            all_sents_av     = sorted(df_full["Sentiment"].unique().tolist())
 
             # Build company list from data
             _all_co_raw = []
@@ -2344,25 +2462,19 @@ def main():
                     _all_co_raw.extend([c.strip() for c in str(v).split(",")])
             all_companies_av = sorted(set(c for c in _all_co_raw if c))
 
-            # ── 1. Region (multi-select, searchable) ──────────────────────────
+            # ── 1. Region ─────────────────────────────────────────────────────
             st.markdown(
                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🌐 Region</div>',
                 unsafe_allow_html=True,
             )
             sel_regions = st.multiselect(
-                "Region", all_regions_av,
-                default=[] if _cleared else st.session_state.get("f_regions", []),
-                placeholder="All regions", label_visibility="collapsed", key="f_regions",
+                "Region", all_regions_av, default=[],
+                placeholder="All regions", label_visibility="collapsed",
+                key=_fk("f_regions"),
             )
 
-            # ── 2. Country (multi-select, searchable, filtered by region) ─────
-            if sel_regions:
-                country_pool = sorted([c for c in all_countries_av
-                                       if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
-            else:
-                country_pool = all_countries_av
-            # Also include all world countries not yet in data (user may type one)
+            # ── 2. Country (filtered by region) ───────────────────────────────
             all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
             if sel_regions:
                 world_pool = sorted([c for c in all_world_countries
@@ -2375,78 +2487,69 @@ def main():
                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🌍 Country</div>',
                 unsafe_allow_html=True,
             )
-            sel_countries_raw = st.multiselect(
-                "Country", world_pool,
-                default=[] if _cleared else [c for c in st.session_state.get("f_countries", []) if c in world_pool],
-                placeholder="All countries", label_visibility="collapsed", key="f_countries",
+            sel_countries = st.multiselect(
+                "Country", world_pool, default=[],
+                placeholder="All countries", label_visibility="collapsed",
+                key=_fk("f_countries"),
             )
-            # Accept typed values not in list too
-            sel_countries = sel_countries_raw if sel_countries_raw else []
 
-            # ── 3. State (multi-select, filtered by selected countries) ───────
+            # ── 3. State (filtered by country) ────────────────────────────────
             state_pool = []
-            countries_for_states = sel_countries if sel_countries else world_pool
-            for c in countries_for_states:
+            for c in (sel_countries if sel_countries else world_pool):
                 state_pool.extend(COUNTRY_STATES.get(c, []))
             state_pool = sorted(set(state_pool))
 
+            sel_states = []
             if state_pool:
                 st.markdown(
                     '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
                     'text-transform:uppercase;margin:.9rem 0 .2rem;">📍 State / Province</div>',
                     unsafe_allow_html=True,
                 )
-                valid_defaults_state = [] if _cleared else [s for s in st.session_state.get("f_states", []) if s in state_pool]
                 sel_states = st.multiselect(
-                    "State", state_pool, default=valid_defaults_state,
+                    "State", state_pool, default=[],
                     placeholder="All states/provinces", label_visibility="collapsed",
-                    key="f_states",
+                    key=_fk("f_states"),
                 )
-            else:
-                sel_states = []
-                # clear stale state selection
-                st.session_state.pop("f_states", None)
 
-            # ── 4. Company (multi-select + free-type searchable) ──────────────
+            # ── 4. Company ────────────────────────────────────────────────────
             st.markdown(
                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🏢 Company</div>',
                 unsafe_allow_html=True,
             )
-            # Merge known companies list with those in data
             full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
-            valid_defaults_co = [] if _cleared else [c for c in st.session_state.get("f_companies", []) if c in full_co_pool]
             sel_companies = st.multiselect(
-                "Company", full_co_pool, default=valid_defaults_co,
+                "Company", full_co_pool, default=[],
                 placeholder="All companies — type to search", label_visibility="collapsed",
-                key="f_companies",
+                key=_fk("f_companies"),
             )
 
-            # ── 5. Topic (multi-select) ───────────────────────────────────────
+            # ── 5. Topic ──────────────────────────────────────────────────────
             st.markdown(
                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🏷️ Topic</div>',
                 unsafe_allow_html=True,
             )
             sel_topics = st.multiselect(
-                "Topic", all_topics_av,
-                default=[] if _cleared else st.session_state.get("f_topics", []),
-                placeholder="All topics", label_visibility="collapsed", key="f_topics",
+                "Topic", all_topics_av, default=[],
+                placeholder="All topics", label_visibility="collapsed",
+                key=_fk("f_topics"),
             )
 
-            # ── 6. Sentiment / Project Status (multi-select) ──────────────────
+            # ── 6. Project Status ─────────────────────────────────────────────
             st.markdown(
                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
                 'text-transform:uppercase;margin:.9rem 0 .2rem;">📊 Project Status</div>',
                 unsafe_allow_html=True,
             )
             sel_sents = st.multiselect(
-                "Status", all_sents_av,
-                default=[] if _cleared else st.session_state.get("f_sents", []),
-                placeholder="All statuses", label_visibility="collapsed", key="f_sents",
+                "Status", all_sents_av, default=[],
+                placeholder="All statuses", label_visibility="collapsed",
+                key=_fk("f_sents"),
             )
 
-            # ── 7. Keyword (free text) ────────────────────────────────────────
+            # ── 7. Keyword ────────────────────────────────────────────────────
             st.markdown(
                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🔤 Keyword</div>',
@@ -2454,7 +2557,7 @@ def main():
             )
             keyword = st.text_input(
                 "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
-                label_visibility="collapsed", key="f_keyword",
+                label_visibility="collapsed", key=_fk("f_keyword"),
             )
 
             # ── 8. Min Capacity (MW) ──────────────────────────────────────────
@@ -2464,8 +2567,8 @@ def main():
                 unsafe_allow_html=True,
             )
             min_mw = st.number_input(
-                "Min MW", min_value=0, value=st.session_state.get("f_min_mw", 0),
-                step=10, label_visibility="collapsed", key="f_min_mw",
+                "Min MW", min_value=0, value=0,
+                step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
             )
 
             # Collect into session_state filters
@@ -2490,7 +2593,7 @@ def main():
     now_str = fmt_local()
     st.markdown(
         f'<div class="gl-banner">'
-        f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES)} Sources Active</div>'
+        f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} Sources Active</div>'
         f'<div class="banner-title">Global Data Center <span>Construction</span> Intelligence</div>'
         f'<div class="banner-sub">Real-time aggregation across trade press, RSS feeds & Google News \u00b7 '
         f'Auto-tagged by region, topic, company & capacity \u00b7 '
@@ -2510,8 +2613,9 @@ def main():
         )
         features = [
             ("\U0001f578\ufe0f", "Multi-Source Scraping",
-             "Hits DCD (5 regions), DataCenter Knowledge, DataCenterFrontier, "
-             "PR Newswire, BusinessWire, Reuters & 5 Google News queries simultaneously."),
+             "Full-depth scraping of DataCenterDynamics, DataCenter Knowledge, "
+             "Data Center World and Data Centre Magazine — all pages, maximum depth, "
+             "DCD prioritised as primary source for deduplication."),
             ("\U0001f30d", "Global Coverage",
              "Covers 45+ countries across all continents with country/region auto-detection "
              "using 500+ geographic keywords and city names."),
@@ -2560,24 +2664,18 @@ def main():
 
         pbar = st.progress(0.0, text="Initialising global scan...")
 
-        active_html  = SCRAPE_SOURCES if use_html else []
-        active_rss   = RSS_SOURCES    if use_rss  else []
-        active_gn    = GNEWS_QUERIES  if use_gn   else []
-        total_tasks  = len(active_html) + len(active_rss) + len(active_gn)
+        active_html  = SCRAPE_SOURCES
+        total_tasks  = len(active_html)
         done_count   = [0]
 
         def progress_cb(frac, label=""):
             pbar.progress(min(frac, 1.0), text=f"Scanning sources... {label}")
 
         raw = []
-        with ThreadPoolExecutor(max_workers=10) as pool:
+        with ThreadPoolExecutor(max_workers=6) as pool:
             futures = {}
             for src in active_html:
                 futures[pool.submit(scrape_html_source, src, max_pages)] = src["name"]
-            for src in active_rss:
-                futures[pool.submit(fetch_rss, src)] = src["name"]
-            for q, lbl in active_gn:
-                futures[pool.submit(fetch_google_news, q, lbl)] = lbl
 
             for f in as_completed(futures):
                 try:
@@ -2703,7 +2801,7 @@ def main():
 
     kpi_html = (
         '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
-        + kpi("Sources Polled", len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES), "blue", "HTML + RSS + Google News")
+        + kpi("Sources Polled", len(SCRAPE_SOURCES), "blue", "DCD · DCK · DCW · DCM")
         + kpi("Raw Articles", st.session_state.raw_count, "cyan", "before dedup & filter")
         + kpi("Unique Articles", len(df_full), "green", "after deduplication")
         + kpi("Filtered View", len(df), "amber", "current filters applied")
@@ -2915,16 +3013,68 @@ def main():
                     _sum_df    = st.session_state.get("intel_df", df)
                     _sum_range = st.session_state.get("intel_range", scan_date_range)
 
-                    brief_hdr = (
-                        f'<div style="background:#0b1628;border:1px solid #0047e1;border-radius:10px;'
-                        f'padding:1.2rem 1.5rem;margin-top:.8rem;">'
-                        f'<div style="font-family:monospace;font-size:.65rem;letter-spacing:.12em;'
-                        f'color:#0047e1;text-transform:uppercase;margin-bottom:.7rem;">'
-                        f'🧠 Market Intelligence Briefing  ·  {context_label}</div>'
+                    # ── Render briefing as styled HTML so **bold** works ───────
+                    def _render_intel_html(md_text, ctx_label):
+                        def _md_inline(t):
+                            """Convert inline **bold** and `code` to HTML."""
+                            t = re.sub(r"\*\*(.+?)\*\*", r'<strong style="color:#ccdaf5;">\1</strong>', t)
+                            t = re.sub(r"`(.+?)`",         r'<code style="color:#00b4ff;background:rgba(0,71,225,0.12);padding:1px 4px;border-radius:3px;">\1</code>', t)
+                            return t
+
+                        html = (
+                            '<div style="background:#0b1628;border:1px solid #0047e1;'
+                            'border-radius:12px;padding:1.6rem 2rem;margin-top:.8rem;">'
+                            f'<div style="font-family:\'DM Mono\',monospace;font-size:.64rem;'
+                            f'letter-spacing:.14em;color:#0047e1;text-transform:uppercase;'
+                            f'margin-bottom:1.2rem;">🧠 Market Intelligence Briefing'
+                            + (f'  ·  {ctx_label}' if ctx_label else '') +
+                            '</div>'
+                        )
+
+                        for raw_line in md_text.splitlines():
+                            line = raw_line.rstrip()
+
+                            # Section heading  ## 1. Title
+                            if line.startswith("## "):
+                                title = _md_inline(line[3:])
+                                html += (
+                                    f'<div style="font-family:\'Syne\',sans-serif;font-size:.82rem;'
+                                    f'font-weight:700;color:#b8c8e0;letter-spacing:.07em;'
+                                    f'text-transform:uppercase;border-left:3px solid #0047e1;'
+                                    f'padding-left:.7rem;margin:1.8rem 0 .8rem;">{title}</div>'
+                                    f'<div style="height:1px;background:linear-gradient(90deg,#0047e1,transparent);'
+                                    f'margin-bottom:.9rem;"></div>'
+                                )
+
+                            # Bullet line  • **Topic** — text
+                            elif line.startswith("• "):
+                                content = _md_inline(line[2:])
+                                html += (
+                                    f'<div style="display:flex;gap:.6rem;margin-bottom:.55rem;'
+                                    f'line-height:1.6;font-size:.84rem;color:#8aa0c8;">'
+                                    f'<span style="color:#0047e1;flex-shrink:0;margin-top:.05rem;">◆</span>'
+                                    f'<span>{content}</span></div>'
+                                )
+
+                            # Blank line
+                            elif not line.strip():
+                                html += '<div style="height:.4rem;"></div>'
+
+                            # Normal paragraph text
+                            else:
+                                content = _md_inline(line)
+                                html += (
+                                    f'<p style="color:#8aa0c8;font-size:.84rem;line-height:1.7;'
+                                    f'margin:.0 0 .6rem;">{content}</p>'
+                                )
+
+                        html += '</div>'
+                        return html
+
+                    st.markdown(
+                        _render_intel_html(st.session_state.intel_summary, context_label),
+                        unsafe_allow_html=True,
                     )
-                    st.markdown(brief_hdr, unsafe_allow_html=True)
-                    st.markdown(st.session_state.intel_summary)
-                    st.markdown('</div>', unsafe_allow_html=True)
 
                     # ── Download buttons ──────────────────────────────────────
                     ts_intel = datetime.now().strftime("%Y%m%d_%H%M")
