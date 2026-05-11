@@ -632,6 +632,26 @@ GNEWS_QUERIES = [
     ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
 ]
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  UPGRADED SCRAPER SECTION — drop-in replacement for code__2__.py
+#  Replaces everything from RSS_SOURCES / SCRAPE_SOURCES / scraper functions
+#  down to (but NOT including) the enrichment helpers and run_all_scrapers.
+#
+#  KEY IMPROVEMENTS vs original code__2__:
+#  1.  DCD now scraped via its Construction Channel URL
+#      (?term=the-data-center-construction-channel) — same trick that makes
+#      app__15__.py fetch more articles — PLUS additional DCD term URLs that
+#      cover approved / site-selection / extension / disclosed-projects / etc.
+#  2.  Minimum headline length lowered from 15 → 10 chars (matches app15)
+#      so short but valid headlines are no longer silently dropped.
+#  3.  <time datetime="..."> parsing added (already in code__2__ but now
+#      also used for DCD's own <time> tags, which carry ISO timestamps).
+#  4.  GNEWS_QUERIES expanded with project-lifecycle terms:
+#      site selection, extension, disclosed, approved, announced, permit, etc.
+#  5.  DataCenter Frontier added as a 5th HTML source (high quality, free).
+#  6.  Data Centre Magazine URL corrected to a more reliable section.
+# ═══════════════════════════════════════════════════════════════════════════════
+
 RSS_SOURCES = []   # All sources are HTML-scraped directly; no RSS feeds used
 
 # ── DCD Construction-Channel term IDs ────────────────────────────────────────
@@ -1105,8 +1125,6 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb):
         filtered.append(item)
 
     return filtered
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  FREE / BUILT-IN INTELLIGENCE SUMMARISER  (no API key, no external ML libs)
 # ═══════════════════════════════════════════════════════════════════════════════
