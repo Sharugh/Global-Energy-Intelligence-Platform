@@ -604,77 +604,80 @@ KNOWN_COMPANIES = [
 ]
 
 GNEWS_QUERIES = [
-    ("data center construction campus groundbreaking", "Google News"),
-    ("data center hyperscale investment billion megawatt", "Google News"),
-    ("data center approved permit moratorium zoning", "Google News"),
-    ("data center power energy grid nuclear solar", "Google News"),
-    ("colocation datacenter AI GPU facility opens", "Google News"),
+    # Construction & projects
+    ("data center construction campus groundbreaking opening", "Google News"),
+    ("data center hyperscale investment billion megawatt gigawatt", "Google News"),
+    ("data center approved permit moratorium zoning planning", "Google News"),
+    ("data center power energy grid nuclear solar PPA", "Google News"),
+    ("colocation datacenter AI GPU facility opens launched", "Google News"),
+    # Deals & finance
+    ("data center acquisition merger deal sale billion", "Google News"),
+    ("data center REIT investment fund financing lease", "Google News"),
+    ("data center IPO equity raise capital raise funding", "Google News"),
+    # Hyperscalers
+    ("Microsoft Google Amazon Meta Oracle data center campus", "Google News"),
+    ("AWS Azure GCP hyperscale cloud data center region", "Google News"),
+    # Operators
+    ("Equinix Digital Realty CyrusOne QTS NTT data center", "Google News"),
+    ("EdgeConneX Vantage Compass Aligned DataBank data center", "Google News"),
+    ("Yondr AirTrunk NextDC Macquarie atNorth data center", "Google News"),
+    # Power & infrastructure
+    ("data center behind the meter power plant generator turbine", "Google News"),
+    ("data center nuclear SMR geothermal hydrogen power", "Google News"),
+    ("data center grid connection electricity capacity substation", "Google News"),
+    # Regions
+    ("data center Middle East Africa Asia Pacific expansion", "Google News"),
+    ("data center Europe Germany Netherlands Ireland Frankfurt", "Google News"),
+    ("data center India Singapore Malaysia Southeast Asia", "Google News"),
+    ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
 ]
 
 RSS_SOURCES = [
-    {
-        "name": "DataCenter Knowledge",
-        "url": "https://www.datacenterknowledge.com/rss.xml",
-        "type": "rss",
-    },
-    {
-        "name": "DataCenterFrontier",
-        "url": "https://datacenterfrontier.com/feed/",
-        "type": "rss",
-    },
-    {
-        "name": "PR Newswire",
-        "url": "https://www.prnewswire.com/rss/news-releases-list.rss",
-        "type": "rss",
-    },
-    {
-        "name": "BusinessWire",
-        "url": "https://feed.businesswire.com/rss/home/?rss=G22",
-        "type": "rss",
-    },
-    {
-        "name": "Reuters",
-        "url": "https://feeds.reuters.com/reuters/technologyNews",
-        "type": "rss",
-    },
+    {"name": "DataCenter Knowledge", "url": "https://www.datacenterknowledge.com/rss.xml",      "type": "rss"},
+    {"name": "DataCenterFrontier",   "url": "https://datacenterfrontier.com/feed/",             "type": "rss"},
+    {"name": "PR Newswire",          "url": "https://www.prnewswire.com/rss/news-releases-list.rss", "type": "rss"},
+    {"name": "BusinessWire",         "url": "https://feed.businesswire.com/rss/home/?rss=G22",  "type": "rss"},
+    {"name": "Reuters",              "url": "https://feeds.reuters.com/reuters/technologyNews",  "type": "rss"},
+    # Additional feeds
+    {"name": "Data Economy",         "url": "https://data-economy.com/feed/",                   "type": "rss"},
+    {"name": "Capacity Media",       "url": "https://www.capacitymedia.com/rss",                 "type": "rss"},
+    {"name": "The Register DC",      "url": "https://www.theregister.com/data_centre/headlines.atom", "type": "rss"},
+    {"name": "ZDNet",                "url": "https://www.zdnet.com/topic/data-centers/rss.xml", "type": "rss"},
+    {"name": "Bisnow",               "url": "https://www.bisnow.com/rss",                        "type": "rss"},
+    {"name": "DCD Asia Pacific",     "url": "https://www.datacenterdynamics.com/en/rss/?region=asia-pacific", "type": "rss"},
+    {"name": "DCD EMEA",             "url": "https://www.datacenterdynamics.com/en/rss/?region=emea", "type": "rss"},
 ]
 
 SCRAPE_SOURCES = [
-    {
-        "name": "DataCenterDynamics",
-        "url": "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel",
-        "base": "https://www.datacenterdynamics.com",
-        "link_pattern": r"^/en/news/[^?#]+/$",
-        "type": "html",
-    },
-    {
-        "name": "DataCenterDynamics",
-        "url": "https://www.datacenterdynamics.com/en/news/?term=north-america",
-        "base": "https://www.datacenterdynamics.com",
-        "link_pattern": r"^/en/news/[^?#]+/$",
-        "type": "html",
-    },
-    {
-        "name": "DataCenterDynamics",
-        "url": "https://www.datacenterdynamics.com/en/news/?term=europe",
-        "base": "https://www.datacenterdynamics.com",
-        "link_pattern": r"^/en/news/[^?#]+/$",
-        "type": "html",
-    },
-    {
-        "name": "DataCenterDynamics",
-        "url": "https://www.datacenterdynamics.com/en/news/?term=asia-pacific",
-        "base": "https://www.datacenterdynamics.com",
-        "link_pattern": r"^/en/news/[^?#]+/$",
-        "type": "html",
-    },
-    {
-        "name": "DataCenterDynamics",
-        "url": "https://www.datacenterdynamics.com/en/news/?term=middle-east",
-        "base": "https://www.datacenterdynamics.com",
-        "link_pattern": r"^/en/news/[^?#]+/$",
-        "type": "html",
-    },
+    # DataCenterDynamics — all topic channels
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=the-data-center-construction-channel",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=north-america",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=europe",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=asia-pacific",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=middle-east",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=africa",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=latin-america",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=hyperscale",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=colocation",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=power",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    {"name": "DataCenterDynamics", "url": "https://www.datacenterdynamics.com/en/news/?term=investment",
+     "base": "https://www.datacenterdynamics.com", "link_pattern": r"^/en/news/[^?#]+/$", "type": "html"},
+    # DataCenter Frontier
+    {"name": "DataCenterFrontier",  "url": "https://datacenterfrontier.com/news/",
+     "base": "https://datacenterfrontier.com", "link_pattern": r"^/[a-z0-9\-]+/$", "type": "html"},
+    # DataCenter Knowledge
+    {"name": "DataCenter Knowledge", "url": "https://www.datacenterknowledge.com/data-centers",
+     "base": "https://www.datacenterknowledge.com", "link_pattern": r"^/data-centers/[^?#]+$", "type": "html"},
 ]
 
 
@@ -829,14 +832,31 @@ def fetch_google_news(query, source_label="Google News"):
 
 def is_dc_relevant(text):
     t = text.lower()
-    primary = ["data center", "datacenter", "data centre", "datacentre",
-               "colocation", "hyperscale", "cloud campus"]
-    secondary = ["megawatt", " mw ", "gigawatt", " gw ", "server farm",
-                 "computing facility", "edge computing", "ai campus",
-                 "gpu cluster", "compute campus"]
+    # Primary: any of these alone = relevant
+    primary = [
+        "data center", "datacenter", "data centre", "datacentre",
+        "colocation", "colo ", "hyperscale", "cloud campus",
+        "server farm", "computing campus", "ai campus", "gpu cluster",
+        "compute campus", "hpc facility", "edge facility",
+        "carrier hotel", "internet exchange", "ix facility",
+        "infrastructure reit", "digital infrastructure",
+    ]
+    # Secondary: two or more = relevant
+    secondary = [
+        "megawatt", " mw ", " gw ", "gigawatt",
+        "computing facility", "edge computing",
+        "power purchase agreement", " ppa ", "behind the meter",
+        "grid connection", "critical load", "raised floor",
+        "cooling tower", "liquid cooling", "immersion cooling",
+        "diesel generator", "ups system", "modular data",
+        "tier iii", "tier iv", "uptime institute",
+        "network access point", "internet hub",
+        "rack space", "co-location", "hosting facility",
+        "blade server", "server deployment", "ai infrastructure",
+    ]
     if any(p in t for p in primary):
         return True
-    if sum(1 for s in secondary if s in t) >= 2:
+    if sum(1 for s in secondary if s in t) >= 1:   # lowered threshold to 1 for secondary
         return True
     return False
 
@@ -903,15 +923,52 @@ def detect_sentiment(text):
     return "News"
 
 
-def fuzzy_similar(a, b, threshold=0.82):
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio() >= threshold
+def _normalise_headline(h):
+    """Normalise headline for comparison: lowercase, strip punctuation/source suffix."""
+    h = h.lower().strip()
+    # Strip common source suffixes added by Google News
+    h = re.sub(r"\s*[-–|]\s*\w[\w\s]{1,30}$", "", h)
+    # Strip special chars
+    h = re.sub(r"[^\w\s]", " ", h)
+    h = re.sub(r"\s+", " ", h).strip()
+    return h
+
+
+def fuzzy_similar(a, b, threshold=0.88):
+    """True if two normalised headlines are likely the same story."""
+    na, nb = _normalise_headline(a), _normalise_headline(b)
+    # Exact match after normalisation
+    if na == nb:
+        return True
+    # Sequence similarity
+    ratio = SequenceMatcher(None, na, nb).ratio()
+    if ratio >= threshold:
+        return True
+    # One is a substring of the other (short headline vs long headline of same story)
+    shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
+    if len(shorter) >= 30 and shorter in longer:
+        return True
+    return False
 
 
 def deduplicate(articles):
+    """Deduplicate by URL first, then fuzzy headline matching."""
+    # Step 1: URL-based dedup
+    seen_urls = set()
+    url_deduped = []
+    for art in articles:
+        url = art.get("URL", "").strip().rstrip("/")
+        if url and url in seen_urls:
+            continue
+        if url:
+            seen_urls.add(url)
+        url_deduped.append(art)
+
+    # Step 2: Fuzzy headline dedup — keep highest-scored version
     keep = []
     seen_headlines = []
-    for art in articles:
-        hl = art["Headline"]
+    for art in url_deduped:
+        hl = art.get("Headline", art.get("headline", ""))
         is_dup = False
         for seen in seen_headlines:
             if fuzzy_similar(hl, seen):
@@ -1129,7 +1186,7 @@ def generate_local_summary(df, sel_desc, date_range):
            f"{'; '.join(deal_vals[:6])}{'.' if deal_vals else ''}"
            if deal_vals else ""),
     ]
-    exec_summary = " ".join(exec_lines)
+    exec_summary = "\n\n".join(p.strip() for p in exec_lines if p.strip())
 
     # ── 2. KEY THEMES & TRENDS ────────────────────────────────────────────────
     theme_lines = []
@@ -1138,13 +1195,16 @@ def generate_local_summary(df, sel_desc, date_range):
         ex  = hl(sub, 2)
         ex_str = ""
         if ex:
-            ex_str = f' Representative coverage includes: "{ex[0][:120]}"'
+            # Truncate cleanly at word boundary
+            h1 = ex[0][:110].rsplit(" ", 1)[0] if len(ex[0]) > 110 else ex[0]
+            ex_str = f' Headline examples include: "{h1}"'
             if len(ex) > 1:
-                ex_str += f'; and "{ex[1][:100]}".'
+                h2 = ex[1][:100].rsplit(" ", 1)[0] if len(ex[1]) > 100 else ex[1]
+                ex_str += f'; and "{h2}".'
             else:
                 ex_str += "."
         theme_lines.append(
-            f"• **{topic}** — {cnt} articles ({pct(cnt)}). {ex_str}"
+            f"• **{topic}** — {cnt} article{'s' if cnt > 1 else ''} ({pct(cnt)}).{ex_str}"
         )
 
     # ── 3. MAJOR PROJECTS & DEALS ─────────────────────────────────────────────
@@ -1248,22 +1308,28 @@ def generate_local_summary(df, sel_desc, date_range):
         other_mentioned=[(co,c) for co,c in mentioned_cos if co not in hyperscalers and co not in colo_ops]
 
         if hs_mentioned:
+            hs_str = ", ".join(
+                f"{co} ({c} mention{'s' if c > 1 else ''})" for co, c in hs_mentioned[:5]
+            )
             co_intro_parts.append(
-                f"Hyperscaler activity is led by "
-                f"{', '.join(co+f' ({c} mentions)' for co,c in hs_mentioned[:5])}, "
+                f"Hyperscaler activity is led by {hs_str}, "
                 f"signalling continued large-scale capacity expansion in this market."
             )
         if col_mentioned:
+            col_str = ", ".join(
+                f"{co} ({c} mention{'s' if c > 1 else ''})" for co, c in col_mentioned[:5]
+            )
             co_intro_parts.append(
-                f"Among operators and colocation providers, "
-                f"{', '.join(co+f' ({c} mentions)' for co,c in col_mentioned[:5])} "
+                f"Among operators and colocation providers, {col_str} "
                 f"feature prominently, reflecting active build, partnership, or M&A dynamics."
             )
         if other_mentioned:
+            oth_str = ", ".join(
+                f"{co} ({c} mention{'s' if c > 1 else ''})" for co, c in other_mentioned[:5]
+            )
             co_intro_parts.append(
-                f"Additional notable participants include "
-                f"{', '.join(co+f' ({c} mentions)' for co,c in other_mentioned[:5])}, "
-                f"encompassing investors, developers, utilities, and technology vendors."
+                f"Additional notable participants include {oth_str}, "
+                f"spanning investors, developers, utilities, and technology vendors."
             )
 
         co_section_lines.append("\n".join(co_intro_parts))
@@ -1292,7 +1358,7 @@ def generate_local_summary(df, sel_desc, date_range):
                 detail_parts.append(f"deal flow: {'; '.join(deal_arts[:2])}")
 
             co_section_lines.append(
-                f"• **{co}** — {cnt} article{'s' if cnt>1 else ''} | "
+                f"• **{co}** — {cnt} article{'s' if cnt > 1 else ''} | "
                 + " | ".join(detail_parts)
             )
     else:
@@ -1912,15 +1978,16 @@ def chart_world_map(df):
         z=cc["Count"],
         text=cc["Country"],
         colorscale=[
-            [0.0, "#0a1628"],
-            [0.2, "#0e2040"],
-            [0.4, "#0047e1"],
-            [0.7, "#00b4ff"],
-            [1.0, "#00e5c8"],
+            [0.00, "#0b1628"],   # no data — darkest navy (matches sidebar bg)
+            [0.10, "#0e2245"],   # very low
+            [0.30, "#0f3580"],   # low
+            [0.55, "#0047e1"],   # medium — UI primary blue
+            [0.78, "#0099d4"],   # high — UI cyan
+            [1.00, "#00e5c8"],   # max — UI teal accent
         ],
         autocolorscale=False,
         reversescale=False,
-        marker=dict(line=dict(color="#0f1e36", width=0.6)),
+        marker=dict(line=dict(color="#151f35", width=0.5)),
         colorbar=dict(
             bgcolor=_PAPER, bordercolor=_GRID, borderwidth=1,
             tickfont=dict(color=_TITLE, size=10),
@@ -2132,6 +2199,50 @@ def main():
     )
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+    # ── Timezone detection via browser JS ────────────────────────────────────
+    # Inject JS once to capture timezone and reload with ?tz= param
+    tz_js = """
+    <script>
+    (function() {
+        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var params = new URLSearchParams(window.location.search);
+        if (!params.get('tz')) {
+            params.set('tz', tz);
+            var newUrl = window.location.pathname + '?' + params.toString();
+            window.history.replaceState({}, '', newUrl);
+        }
+    })();
+    </script>
+    """
+    st.markdown(tz_js, unsafe_allow_html=True)
+
+    # Read tz from query params (Streamlit passes them as st.query_params)
+    try:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        _tz_str = st.query_params.get("tz", "UTC")
+        try:
+            _user_tz = ZoneInfo(_tz_str)
+        except Exception:
+            _user_tz = ZoneInfo("UTC")
+            _tz_str  = "UTC"
+    except ImportError:
+        _user_tz = None
+        _tz_str  = "UTC"
+
+    def now_local():
+        """Return current datetime in user's detected timezone."""
+        from datetime import timezone
+        utc_now = datetime.now(timezone.utc)
+        if _user_tz:
+            return utc_now.astimezone(_user_tz)
+        return utc_now
+
+    def fmt_local(dt=None):
+        """Format a datetime for display with timezone label."""
+        d = dt or now_local()
+        tz_label = _tz_str.split("/")[-1].replace("_", " ") if _tz_str != "UTC" else "UTC"
+        return d.strftime(f"%A, %d %B %Y  ·  %H:%M") + f" {tz_label}"
+
     with st.sidebar:
         st.markdown(
             '<div style="padding:.9rem 0 .4rem;text-align:center;">'
@@ -2199,12 +2310,18 @@ def main():
                 '</div>',
                 unsafe_allow_html=True,
             )
-            if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters"):
+
+            # Handle clear — set a flag, then rerun so widget defaults are clean
+            if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters_btn"):
+                st.session_state["_filters_cleared"] = True
                 for k in ["f_regions","f_countries","f_states","f_companies",
-                          "f_topics","f_sents","f_keyword","f_min_mw"]:
-                    if k in st.session_state:
-                        del st.session_state[k]
+                          "f_topics","f_sents","f_keyword","f_min_mw",
+                          "filters"]:
+                    st.session_state.pop(k, None)
                 st.rerun()
+
+            # Detect post-clear state and suppress stale defaults
+            _cleared = st.session_state.pop("_filters_cleared", False)
 
             # ── Helper: map typed-but-unlisted value to closest match ─────────
             def _fuzzy_resolve(typed, candidates):
@@ -2234,7 +2351,8 @@ def main():
                 unsafe_allow_html=True,
             )
             sel_regions = st.multiselect(
-                "Region", all_regions_av, default=st.session_state.get("f_regions", []),
+                "Region", all_regions_av,
+                default=[] if _cleared else st.session_state.get("f_regions", []),
                 placeholder="All regions", label_visibility="collapsed", key="f_regions",
             )
 
@@ -2259,7 +2377,7 @@ def main():
             )
             sel_countries_raw = st.multiselect(
                 "Country", world_pool,
-                default=[c for c in st.session_state.get("f_countries", []) if c in world_pool],
+                default=[] if _cleared else [c for c in st.session_state.get("f_countries", []) if c in world_pool],
                 placeholder="All countries", label_visibility="collapsed", key="f_countries",
             )
             # Accept typed values not in list too
@@ -2278,7 +2396,7 @@ def main():
                     'text-transform:uppercase;margin:.9rem 0 .2rem;">📍 State / Province</div>',
                     unsafe_allow_html=True,
                 )
-                valid_defaults_state = [s for s in st.session_state.get("f_states", []) if s in state_pool]
+                valid_defaults_state = [] if _cleared else [s for s in st.session_state.get("f_states", []) if s in state_pool]
                 sel_states = st.multiselect(
                     "State", state_pool, default=valid_defaults_state,
                     placeholder="All states/provinces", label_visibility="collapsed",
@@ -2297,7 +2415,7 @@ def main():
             )
             # Merge known companies list with those in data
             full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
-            valid_defaults_co = [c for c in st.session_state.get("f_companies", []) if c in full_co_pool]
+            valid_defaults_co = [] if _cleared else [c for c in st.session_state.get("f_companies", []) if c in full_co_pool]
             sel_companies = st.multiselect(
                 "Company", full_co_pool, default=valid_defaults_co,
                 placeholder="All companies — type to search", label_visibility="collapsed",
@@ -2311,7 +2429,8 @@ def main():
                 unsafe_allow_html=True,
             )
             sel_topics = st.multiselect(
-                "Topic", all_topics_av, default=st.session_state.get("f_topics", []),
+                "Topic", all_topics_av,
+                default=[] if _cleared else st.session_state.get("f_topics", []),
                 placeholder="All topics", label_visibility="collapsed", key="f_topics",
             )
 
@@ -2322,7 +2441,8 @@ def main():
                 unsafe_allow_html=True,
             )
             sel_sents = st.multiselect(
-                "Status", all_sents_av, default=st.session_state.get("f_sents", []),
+                "Status", all_sents_av,
+                default=[] if _cleared else st.session_state.get("f_sents", []),
                 placeholder="All statuses", label_visibility="collapsed", key="f_sents",
             )
 
@@ -2367,7 +2487,7 @@ def main():
         st.divider()
         go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
 
-    now_str = datetime.now().strftime("%A, %d %B %Y  \u00b7  %H:%M UTC")
+    now_str = fmt_local()
     st.markdown(
         f'<div class="gl-banner">'
         f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES)} Sources Active</div>'
@@ -2496,7 +2616,7 @@ def main():
         )
         st.session_state.df_full   = df_full
         st.session_state.raw_count = len(raw)
-        st.session_state.scan_time = datetime.now().strftime("%H:%M, %d %b %Y")
+        st.session_state.scan_time = fmt_local(now_local())
         pbar.empty()
         st.rerun()
 
