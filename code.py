@@ -86,6 +86,61 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 [data-testid="stSidebar"] * { color: #b8c8e0 !important; }
 [data-testid="stSidebar"] hr { border-color: #151f35 !important; }
 
+/* ── Sidebar collapse/expand toggle arrow — make it always visible ─────────── */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Style the collapsed-state sidebar tab (the strip shown when sidebar is closed) */
+[data-testid="stSidebarCollapsedControl"] {
+    background: #0047e1 !important;
+    border-radius: 0 10px 10px 0 !important;
+    border: 1px solid #0060ff !important;
+    border-left: none !important;
+    width: 2rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+}
+[data-testid="stSidebarCollapsedControl"] button {
+    color: #fff !important;
+    background: transparent !important;
+}
+[data-testid="stSidebarCollapsedControl"] svg {
+    fill: #fff !important;
+    stroke: #fff !important;
+}
+
+/* ── Sidebar expand button visible on hover area ────────────────────────────── */
+[data-testid="stSidebarCollapseButton"] button {
+    background: rgba(0,71,225,0.15) !important;
+    border-radius: 6px !important;
+    color: #7eb8ff !important;
+    border: 1px solid rgba(0,71,225,0.25) !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background: rgba(0,71,225,0.35) !important;
+    border-color: #0047e1 !important;
+}
+
+/* ── Floating sidebar reopen hint (shown via CSS when sidebar is collapsed) ─── */
+section[data-testid="stSidebarCollapsedControl"] ~ * .sidebar-hint { display: flex; }
+
+/* Always show the collapsed sidebar tab even if Streamlit tries to hide it */
+div[data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: #0047e1 !important;
+    border-radius: 0 8px 8px 0 !important;
+}
+div[data-testid="collapsedControl"] svg {
+    fill: #fff !important;
+}
+
 /* Sidebar Run button */
 [data-testid="stSidebar"] .stButton button {
     background: linear-gradient(135deg, #0047e1, #00b4ff) !important;
@@ -2627,6 +2682,89 @@ def main():
     </script>
     """
     st.markdown(tz_js, unsafe_allow_html=True)
+
+    # ── Floating "☰ Filters" button — reappears when sidebar is collapsed ────
+    sidebar_btn_js = """
+    <script>
+    (function() {
+        function injectSidebarBtn() {
+            // Remove any existing button we injected
+            var old = document.getElementById('_gdci_sidebar_btn');
+            if (old) old.remove();
+
+            var btn = document.createElement('button');
+            btn.id = '_gdci_sidebar_btn';
+            btn.innerHTML = '&#9776; Filters';
+            btn.title = 'Open filter sidebar';
+            btn.style.cssText = [
+                'position:fixed',
+                'top:14px',
+                'left:14px',
+                'z-index:99999',
+                'background:linear-gradient(135deg,#0047e1,#00b4ff)',
+                'color:#fff',
+                'border:none',
+                'border-radius:8px',
+                'padding:7px 14px',
+                'font-family:Syne,sans-serif',
+                'font-weight:700',
+                'font-size:0.82rem',
+                'letter-spacing:0.04em',
+                'cursor:pointer',
+                'box-shadow:0 4px 16px rgba(0,71,225,0.45)',
+                'display:none',
+                'align-items:center',
+                'gap:6px',
+                'transition:opacity 0.2s ease,transform 0.2s ease',
+            ].join(';');
+
+            btn.onmouseenter = function() {
+                btn.style.opacity = '0.85';
+                btn.style.transform = 'translateY(-1px)';
+            };
+            btn.onmouseleave = function() {
+                btn.style.opacity = '1';
+                btn.style.transform = 'translateY(0)';
+            };
+            btn.onclick = function() {
+                // Click the native Streamlit sidebar toggle
+                var toggles = document.querySelectorAll(
+                    '[data-testid="stSidebarCollapsedControl"] button, ' +
+                    '[data-testid="collapsedControl"] button, ' +
+                    'button[kind="header"][aria-label*="sidebar"], ' +
+                    'button[aria-label*="Open sidebar"], ' +
+                    'button[aria-label*="sidebar"]'
+                );
+                if (toggles.length > 0) {
+                    toggles[0].click();
+                }
+            };
+            document.body.appendChild(btn);
+
+            // Watch sidebar state and show/hide our button accordingly
+            function checkSidebar() {
+                var sidebar = document.querySelector('[data-testid="stSidebar"]');
+                if (!sidebar) return;
+                var rect = sidebar.getBoundingClientRect();
+                var isCollapsed = rect.width < 50;
+                btn.style.display = isCollapsed ? 'flex' : 'none';
+            }
+
+            // Poll every 400ms (lightweight)
+            setInterval(checkSidebar, 400);
+            checkSidebar();
+        }
+
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', injectSidebarBtn);
+        } else {
+            setTimeout(injectSidebarBtn, 800);
+        }
+    })();
+    </script>
+    """
+    st.markdown(sidebar_btn_js, unsafe_allow_html=True)
 
     _DEFAULT_TZ = "Asia/Kolkata"
     try:
