@@ -603,35 +603,6 @@ KNOWN_COMPANIES = [
     "DE-CIX","Interxion","euNetworks","Telehouse","Iomart","Pulsant",
 ]
 
-GNEWS_QUERIES = [
-    # Construction & projects
-    ("data center construction campus groundbreaking opening", "Google News"),
-    ("data center hyperscale investment billion megawatt gigawatt", "Google News"),
-    ("data center approved permit moratorium zoning planning", "Google News"),
-    ("data center power energy grid nuclear solar PPA", "Google News"),
-    ("colocation datacenter AI GPU facility opens launched", "Google News"),
-    # Deals & finance
-    ("data center acquisition merger deal sale billion", "Google News"),
-    ("data center REIT investment fund financing lease", "Google News"),
-    ("data center IPO equity raise capital raise funding", "Google News"),
-    # Hyperscalers
-    ("Microsoft Google Amazon Meta Oracle data center campus", "Google News"),
-    ("AWS Azure GCP hyperscale cloud data center region", "Google News"),
-    # Operators
-    ("Equinix Digital Realty CyrusOne QTS NTT data center", "Google News"),
-    ("EdgeConneX Vantage Compass Aligned DataBank data center", "Google News"),
-    ("Yondr AirTrunk NextDC Macquarie atNorth data center", "Google News"),
-    # Power & infrastructure
-    ("data center behind the meter power plant generator turbine", "Google News"),
-    ("data center nuclear SMR geothermal hydrogen power", "Google News"),
-    ("data center grid connection electricity capacity substation", "Google News"),
-    # Regions
-    ("data center Middle East Africa Asia Pacific expansion", "Google News"),
-    ("data center Europe Germany Netherlands Ireland Frankfurt", "Google News"),
-    ("data center India Singapore Malaysia Southeast Asia", "Google News"),
-    ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
-]
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  UPGRADED SCRAPER SECTION — drop-in replacement for code__2__.py
 #  Replaces everything from RSS_SOURCES / SCRAPE_SOURCES / scraper functions
@@ -1084,6 +1055,179 @@ def fetch_google_news(query, source_label="Google News"):
     return results
 
 
+def is_dc_relevant(text):
+    t = text.lower()
+    # Primary: any of these alone = relevant
+    primary = [
+        "data center", "datacenter", "data centre", "datacentre",
+        "colocation", "colo ", "hyperscale", "cloud campus",
+        "server farm", "computing campus", "ai campus", "gpu cluster",
+        "compute campus", "hpc facility", "edge facility",
+        "carrier hotel", "internet exchange", "ix facility",
+        "infrastructure reit", "digital infrastructure",
+    ]
+    # Secondary: two or more = relevant
+    secondary = [
+        "megawatt", " mw ", " gw ", "gigawatt",
+        "computing facility", "edge computing",
+        "power purchase agreement", " ppa ", "behind the meter",
+        "grid connection", "critical load", "raised floor",
+        "cooling tower", "liquid cooling", "immersion cooling",
+        "diesel generator", "ups system", "modular data",
+        "tier iii", "tier iv", "uptime institute",
+        "network access point", "internet hub",
+        "rack space", "co-location", "hosting facility",
+        "blade server", "server deployment", "ai infrastructure",
+    ]
+    if any(p in t for p in primary):
+        return True
+    if sum(1 for s in secondary if s in t) >= 1:   # lowered threshold to 1 for secondary
+        return True
+    return False
+
+
+def detect_country(text):
+    for country, patterns in COUNTRY_KEYWORDS.items():
+        for pat in patterns:
+            if re.search(pat if pat.startswith(r"\b") else r"\b" + re.escape(pat) + r"\b", text, re.I):
+                return country
+    return "Global"
+
+
+def detect_topic(text):
+    t = text.lower()
+    for topic, kws in TOPIC_KEYWORDS.items():
+        if any(k.lower() in t for k in kws):
+            return topic
+    return "General"
+
+
+def detect_mw(text):
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt)", text, re.I)
+    if m:
+        return m.group(1).replace(",", "") + " " + m.group(2).upper()
+    return ""
+
+
+def detect_deal_size(text):
+    m = re.search(r"\$([\d,.]+)\s*(billion|bn|million|mn|m\b)", text, re.I)
+    if m:
+        val = m.group(1).replace(",", "")
+        unit = m.group(2).lower()
+        if unit in ("billion", "bn"):
+            return f"${val}bn"
+        return f"${val}m"
+    return ""
+
+
+def detect_companies(text):
+    found = []
+    for co in KNOWN_COMPANIES:
+        if re.search(r"\b" + re.escape(co) + r"\b", text, re.I):
+            found.append(co)
+    return ", ".join(found[:4]) if found else ""
+
+
+def detect_sentiment(text):
+    t = text.lower()
+    if any(w in t for w in ["broke ground", "groundbreaking", "opens", "opened",
+                             "inaugurated", "energizes", "goes live", "launches"]):
+        return "Opened / Live"
+    if any(w in t for w in ["approved", "approval", "go-ahead", "green light",
+                             "permits", "zoning approved", "rezoning"]):
+        return "Approved"
+    if any(w in t for w in ["proposed", "plans", "eyes", "looks to", "could build",
+                             "may build", "files for", "announces plans"]):
+        return "Proposed"
+    if any(w in t for w in ["rejected", "denied", "moratorium", "blocked",
+                             "lawsuit", "sues", "opposition", "withdrawn"]):
+        return "Challenged"
+    if any(w in t for w in ["under construction", "construction begins",
+                             "construction started", "building"]):
+        return "Under Construction"
+    return "News"
+
+
+def _normalise_headline(h):
+    """Normalise headline for comparison: lowercase, strip punctuation/source suffix."""
+    h = h.lower().strip()
+    # Strip common source suffixes added by Google News
+    h = re.sub(r"\s*[-–|]\s*\w[\w\s]{1,30}$", "", h)
+    # Strip special chars
+    h = re.sub(r"[^\w\s]", " ", h)
+    h = re.sub(r"\s+", " ", h).strip()
+    return h
+
+
+def fuzzy_similar(a, b, threshold=0.88):
+    """True if two normalised headlines are likely the same story."""
+    na, nb = _normalise_headline(a), _normalise_headline(b)
+    # Exact match after normalisation
+    if na == nb:
+        return True
+    # Sequence similarity
+    ratio = SequenceMatcher(None, na, nb).ratio()
+    if ratio >= threshold:
+        return True
+    # One is a substring of the other (short headline vs long headline of same story)
+    shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
+    if len(shorter) >= 30 and shorter in longer:
+        return True
+    return False
+
+
+def deduplicate(articles):
+    """
+    1. URL-based exact dedup (same URL = same article).
+    2. Fuzzy headline dedup — when two articles match, keep the one from
+       the source with the lowest _priority number (DCD = 1 wins).
+    """
+    # Step 1: URL dedup — sort by priority so DCD URLs win ties
+    seen_urls = {}
+    for art in sorted(articles, key=lambda x: x.get("_priority", 99)):
+        url = str(art.get("URL", art.get("url", ""))).strip().rstrip("/")
+        if url and url not in seen_urls:
+            seen_urls[url] = art
+    url_deduped = list(seen_urls.values())
+
+    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
+    url_deduped.sort(key=lambda x: x.get("_priority", 99))
+    keep = []
+    seen_headlines = []
+    for art in url_deduped:
+        hl = art.get("Headline", art.get("headline", ""))
+        is_dup = False
+        for seen in seen_headlines:
+            if fuzzy_similar(hl, seen):
+                is_dup = True
+                break
+        if not is_dup:
+            keep.append(art)
+            seen_headlines.append(hl)
+    return keep
+
+
+def enrich(raw_item):
+    hl = raw_item["headline"]
+    d = raw_item.get("date_obj")
+    country = detect_country(hl)
+    region = COUNTRY_TO_REGION.get(country, "Global")
+    return {
+        "Headline":  hl,
+        "Date":      d.strftime("%Y-%m-%d") if d else "Unknown",
+        "Source":    raw_item.get("source", "Unknown"),
+        "URL":       raw_item.get("url", ""),
+        "Country":   country,
+        "Region":    region,
+        "Topic":     detect_topic(hl),
+        "Sentiment": detect_sentiment(hl),
+        "Capacity":  detect_mw(hl),
+        "Deal Size": detect_deal_size(hl),
+        "Companies": detect_companies(hl),
+        "_date_obj": d,
+    }
+
+
 def run_all_scrapers(max_html_pages, cutoff, progress_cb):
     raw = []
     total_tasks = len(SCRAPE_SOURCES) + len(RSS_SOURCES) + len(GNEWS_QUERIES)
@@ -1125,6 +1269,8 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb):
         filtered.append(item)
 
     return filtered
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  FREE / BUILT-IN INTELLIGENCE SUMMARISER  (no API key, no external ML libs)
 # ═══════════════════════════════════════════════════════════════════════════════
