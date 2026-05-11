@@ -634,17 +634,49 @@ GNEWS_QUERIES = [
 
 RSS_SOURCES = []   # All sources are HTML-scraped directly; no RSS feeds used
 
-SCRAPE_SOURCES = [
-    # ── PRIMARY: DataCenterDynamics — full news listing, paginated ────────────
+# ── DCD Construction-Channel term IDs ────────────────────────────────────────
+# Each entry produces its own paginated scrape so articles from every lifecycle
+# stage are collected independently, then deduped.
+_DCD_BASE = "https://www.datacenterdynamics.com"
+_DCD_TERMS = [
+    # The primary construction channel — biggest volume, matches app__15__
+    "the-data-center-construction-channel",
+    # Project stages you specifically want
+    "approved",
+    "site-selection",
+    "disclosed-projects",
+    "project-announcement",
+    "expansion",
+    "extension",
+    # General DC news as a catch-all (bare listing)
+    # — keep priority 1 so DCD always wins dedup
+]
+# Build one SCRAPE_SOURCE entry per DCD term
+_DCD_SOURCES = [
     {
         "name":         "DataCenterDynamics",
-        "url":          "https://www.datacenterdynamics.com/en/news/",
-        "base":         "https://www.datacenterdynamics.com",
+        "url":          f"{_DCD_BASE}/en/news/?term={term}",
+        "base":         _DCD_BASE,
         "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$",
         "type":         "html",
-        "priority":     1,          # used for dedup: keep DCD version over others
-    },
-    # ── DataCenter Knowledge — build-design section ───────────────────────────
+        "priority":     1,
+    }
+    for term in _DCD_TERMS
+]
+# Also add the bare /en/news/ listing so we don't miss anything un-tagged
+_DCD_SOURCES.append({
+    "name":         "DataCenterDynamics",
+    "url":          f"{_DCD_BASE}/en/news/",
+    "base":         _DCD_BASE,
+    "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$",
+    "type":         "html",
+    "priority":     1,
+})
+
+SCRAPE_SOURCES = [
+    *_DCD_SOURCES,
+
+    # ── DataCenter Knowledge — build-design + data-centers sections ───────────
     {
         "name":         "DataCenter Knowledge",
         "url":          "https://www.datacenterknowledge.com/build-design",
@@ -653,6 +685,25 @@ SCRAPE_SOURCES = [
         "type":         "html",
         "priority":     2,
     },
+    {
+        "name":         "DataCenter Knowledge",
+        "url":          "https://www.datacenterknowledge.com/data-centers",
+        "base":         "https://www.datacenterknowledge.com",
+        "link_pattern": r"^/(build-design|data-centers|cloud)/[^?#]+$",
+        "type":         "html",
+        "priority":     2,
+    },
+
+    # ── Data Center Frontier — news (new 5th source, high quality) ────────────
+    {
+        "name":         "DataCenterFrontier",
+        "url":          "https://datacenterfrontier.com/news/",
+        "base":         "https://datacenterfrontier.com",
+        "link_pattern": r"^/(news|construction|power|colocation|hyperscale)/[^?#]+$",
+        "type":         "html",
+        "priority":     3,
+    },
+
     # ── Data Center World — news & insights ──────────────────────────────────
     {
         "name":         "Data Center World",
@@ -660,19 +711,85 @@ SCRAPE_SOURCES = [
         "base":         "https://datacenterworld.com",
         "link_pattern": r"^/(news-insights|news)/[^?#]+$",
         "type":         "html",
-        "priority":     3,
+        "priority":     4,
     },
+
     # ── Data Centre Magazine — news ───────────────────────────────────────────
     {
         "name":         "Data Centre Magazine",
-        "url":          "https://datacentremagazine.com/news",
+        "url":          "https://datacentremagazine.com/data-centres",
         "base":         "https://datacentremagazine.com",
-        "link_pattern": r"^/(news|articles|data-centres)/[^?#]+$",
+        "link_pattern": r"^/(data-centres|news|articles)/[^?#]+$",
         "type":         "html",
-        "priority":     4,
+        "priority":     5,
     },
 ]
 
+
+# ── Google News queries — project-lifecycle coverage ─────────────────────────
+GNEWS_QUERIES = [
+    # ── Construction / Physical build ────────────────────────────────────────
+    ("data center construction campus groundbreaking opening", "Google News"),
+    ("data center broke ground topping out opens ribbon cutting", "Google News"),
+    ("data center under construction building phase expansion", "Google News"),
+    ("data center facility development site acres square feet", "Google News"),
+
+    # ── Approvals / Permits / Regulatory ─────────────────────────────────────
+    ("data center approved approval permit planning zoning", "Google News"),
+    ("data center zoning rezoning moratorium ordinance vote hearing", "Google News"),
+    ("data center rejected denied blocked lawsuit opposition", "Google News"),
+    ("data center project approval go-ahead green light county city", "Google News"),
+
+    # ── Site Selection / Disclosed Projects / Announced ───────────────────────
+    ("data center site selection disclosed announced plans", "Google News"),
+    ("data center project announced new campus planned", "Google News"),
+    ("data center site selected location chosen new market", "Google News"),
+    ("data center disclosed project pipeline plans filed", "Google News"),
+
+    # ── Extension / Expansion ─────────────────────────────────────────────────
+    ("data center expansion extension phase two additional capacity", "Google News"),
+    ("data center campus expansion megawatt additional phase", "Google News"),
+
+    # ── Power & Energy ────────────────────────────────────────────────────────
+    ("data center hyperscale investment billion megawatt gigawatt", "Google News"),
+    ("data center power energy grid nuclear solar PPA", "Google News"),
+    ("data center behind the meter power plant generator turbine", "Google News"),
+    ("data center nuclear SMR geothermal hydrogen power", "Google News"),
+    ("data center grid connection electricity capacity substation", "Google News"),
+
+    # ── Investment / Finance ──────────────────────────────────────────────────
+    ("data center acquisition merger deal sale billion", "Google News"),
+    ("data center REIT investment fund financing lease", "Google News"),
+    ("data center IPO equity raise capital raise funding", "Google News"),
+
+    # ── Hyperscalers ──────────────────────────────────────────────────────────
+    ("Microsoft Google Amazon Meta Oracle data center campus", "Google News"),
+    ("AWS Azure GCP hyperscale cloud data center region", "Google News"),
+
+    # ── Operators / Colos ─────────────────────────────────────────────────────
+    ("Equinix Digital Realty CyrusOne QTS NTT data center", "Google News"),
+    ("EdgeConneX Vantage Compass Aligned DataBank data center", "Google News"),
+    ("Yondr AirTrunk NextDC Macquarie atNorth data center", "Google News"),
+    ("colocation datacenter AI GPU facility opens launched", "Google News"),
+
+    # ── AI / GPU ──────────────────────────────────────────────────────────────
+    ("AI data center GPU campus hyperscale construction", "Google News"),
+    ("AI infrastructure data center campus build deploy", "Google News"),
+
+    # ── Sustainability ────────────────────────────────────────────────────────
+    ("data center sustainability carbon net zero renewable cooling", "Google News"),
+
+    # ── Regions ───────────────────────────────────────────────────────────────
+    ("data center Middle East Africa Asia Pacific expansion", "Google News"),
+    ("data center Europe Germany Netherlands Ireland Frankfurt", "Google News"),
+    ("data center India Singapore Malaysia Southeast Asia", "Google News"),
+    ("data center Latin America Brazil Mexico Chile Argentina", "Google News"),
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  SCRAPER FUNCTIONS  (paste these in, replacing the originals)
+# ─────────────────────────────────────────────────────────────────────────────
 
 def parse_date_str(raw):
     if not raw:
@@ -722,7 +839,12 @@ def _extract_articles_from_soup(soup, source, base, pattern):
     """
     Generic article extractor: walks all <a> tags matching pattern,
     finds the best headline text, and climbs the DOM for a date.
-    Returns list of {headline, url, date_obj} dicts.
+
+    IMPROVED vs original:
+    - Min headline length lowered to 10 (was 15) to match app__15__.py
+    - <time datetime="..."> parsed first before regex text scan
+    - ISO yyyy-mm-dd in text also checked
+    - Climbs 12 DOM levels (unchanged)
     """
     results = []
     seen = set()
@@ -732,7 +854,7 @@ def _extract_articles_from_soup(soup, source, base, pattern):
         href = a["href"].split("?")[0].rstrip("/")
         if not compiled.search(href + "/") and not compiled.search(href):
             continue
-        # Normalise href to include trailing slash for DCD
+        # Normalise href — DCD requires trailing slash
         if "datacenterdynamics" in base and not href.endswith("/"):
             href += "/"
         if href in seen or len(href) < 10:
@@ -740,19 +862,20 @@ def _extract_articles_from_soup(soup, source, base, pattern):
         seen.add(href)
 
         # Best headline: look for heading tag inside <a>, fall back to link text
-        h_tag = a.find(["h1","h2","h3","h4","h5"])
+        h_tag = a.find(["h1", "h2", "h3", "h4", "h5"])
         headline = h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)
         headline = re.sub(r"\s+", " ", headline).strip()
-        if not headline or len(headline) < 15:
+        # ↓ 10 chars not 15 — same threshold as app__15__.py
+        if not headline or len(headline) < 10:
             continue
 
-        # Date: climb DOM up to 12 levels looking for a recognisable date string
+        # Date: climb DOM up to 12 levels
         date_obj = None
         node = a.parent
         for _ in range(12):
             if node is None:
                 break
-            # Try <time datetime="..."> first
+            # 1. <time datetime="..."> — most reliable, used by DCD and DCF
             time_tag = node.find("time")
             if time_tag:
                 dt_attr = time_tag.get("datetime", "")
@@ -763,7 +886,7 @@ def _extract_articles_from_soup(soup, source, base, pattern):
                 if date_obj:
                     break
             txt = node.get_text(" ", strip=True)
-            # dd Mon YYYY
+            # 2. "dd Mon YYYY"
             m = re.search(
                 r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
                 txt, re.I,
@@ -771,7 +894,7 @@ def _extract_articles_from_soup(soup, source, base, pattern):
             if m:
                 date_obj = parse_date_str(m.group(0))
                 break
-            # Mon dd, YYYY
+            # 3. "Mon dd, YYYY"
             m2 = re.search(
                 r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})\b",
                 txt, re.I,
@@ -779,7 +902,7 @@ def _extract_articles_from_soup(soup, source, base, pattern):
             if m2:
                 date_obj = parse_date_str(m2.group(0))
                 break
-            # ISO yyyy-mm-dd
+            # 4. ISO yyyy-mm-dd
             m3 = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", txt)
             if m3:
                 date_obj = parse_date_str(m3.group(1))
@@ -803,38 +926,38 @@ def _get_next_page_url(soup, current_url, page_num, source_name):
     """
     sn = source_name.lower()
 
-    # DataCenterDynamics: ?page=N appended
     if "datacenterdynamics" in sn or "datacenterdynamics" in current_url:
         base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
         sep = "&" if "?" in base_url else "?"
         return f"{base_url}{sep}page={page_num}"
 
-    # DataCenter Knowledge: ?page=N
     if "datacenterknowledge" in sn or "datacenterknowledge" in current_url:
         base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
         sep = "&" if "?" in base_url else "?"
         return f"{base_url}{sep}page={page_num}"
 
-    # Data Center World: /page/N/
+    if "datacenterfrontier" in sn or "datacenterfrontier" in current_url:
+        base_url = re.sub(r"/page/\d+/?$", "", current_url).rstrip("/")
+        return f"{base_url}/page/{page_num}/"
+
     if "datacenterworld" in sn or "datacenterworld" in current_url:
         base_url = re.sub(r"/page/\d+/?$", "", current_url).rstrip("/")
         return f"{base_url}/page/{page_num}/"
 
-    # Data Centre Magazine: ?page=N
     if "datacentremagazine" in sn or "datacentremagazine" in current_url:
         base_url = re.sub(r"[&?]page=\d+", "", current_url).rstrip("&?")
         sep = "&" if "?" in base_url else "?"
         return f"{base_url}{sep}page={page_num}"
 
-    # Generic fallback: look for a "Next" link in the HTML
-    next_link = soup.find("a", string=re.compile(r"next|›|»", re.I))
-    if next_link and next_link.get("href"):
-        href = next_link["href"]
-        if href.startswith("http"):
-            return href
-        # relative
-        from urllib.parse import urljoin
-        return urljoin(current_url, href)
+    # Generic fallback: look for a "Next" link
+    if soup:
+        next_link = soup.find("a", string=re.compile(r"next|›|»", re.I))
+        if next_link and next_link.get("href"):
+            href = next_link["href"]
+            if href.startswith("http"):
+                return href
+            from urllib.parse import urljoin
+            return urljoin(current_url, href)
 
     return None
 
@@ -844,11 +967,11 @@ def scrape_html_source(source, max_pages=10):
     Scrape a single source up to max_pages pages.
     Uses per-site pagination logic and the generic article extractor.
     """
-    results  = []
+    results   = []
     seen_urls = set()
-    base     = source["base"]
-    pattern  = source["link_pattern"]
-    name     = source["name"]
+    base      = source["base"]
+    pattern   = source["link_pattern"]
+    name      = source["name"]
     start_url = source["url"]
     priority  = source.get("priority", 99)
 
@@ -898,13 +1021,14 @@ def fetch_rss(source):
                     date_obj = datetime(*entry.published_parsed[:6])
                 except Exception:
                     pass
-            if date_obj is None:
+            if not date_obj:
                 date_obj = parse_date_str(pub)
             results.append({
                 "headline": headline,
-                "url": url,
+                "url":      url,
                 "date_obj": date_obj,
-                "source": source["name"],
+                "source":   source["name"],
+                "_priority": source.get("priority", 99),
             })
     except Exception:
         pass
@@ -919,7 +1043,7 @@ def fetch_google_news(query, source_label="Google News"):
         feed = feedparser.parse(url)
         for entry in feed.entries:
             headline = entry.get("title", "").strip()
-            url_val = entry.get("link", "").strip()
+            url_val  = entry.get("link", "").strip()
             if not headline or not url_val:
                 continue
             date_obj = None
@@ -930,186 +1054,14 @@ def fetch_google_news(query, source_label="Google News"):
                     pass
             results.append({
                 "headline": headline,
-                "url": url_val,
+                "url":      url_val,
                 "date_obj": date_obj,
-                "source": source_label,
+                "source":   source_label,
+                "_priority": 10,   # Google News lower priority than direct sources
             })
     except Exception:
         pass
     return results
-
-
-def is_dc_relevant(text):
-    t = text.lower()
-    # Primary: any of these alone = relevant
-    primary = [
-        "data center", "datacenter", "data centre", "datacentre",
-        "colocation", "colo ", "hyperscale", "cloud campus",
-        "server farm", "computing campus", "ai campus", "gpu cluster",
-        "compute campus", "hpc facility", "edge facility",
-        "carrier hotel", "internet exchange", "ix facility",
-        "infrastructure reit", "digital infrastructure",
-    ]
-    # Secondary: two or more = relevant
-    secondary = [
-        "megawatt", " mw ", " gw ", "gigawatt",
-        "computing facility", "edge computing",
-        "power purchase agreement", " ppa ", "behind the meter",
-        "grid connection", "critical load", "raised floor",
-        "cooling tower", "liquid cooling", "immersion cooling",
-        "diesel generator", "ups system", "modular data",
-        "tier iii", "tier iv", "uptime institute",
-        "network access point", "internet hub",
-        "rack space", "co-location", "hosting facility",
-        "blade server", "server deployment", "ai infrastructure",
-    ]
-    if any(p in t for p in primary):
-        return True
-    if sum(1 for s in secondary if s in t) >= 1:   # lowered threshold to 1 for secondary
-        return True
-    return False
-
-
-def detect_country(text):
-    for country, patterns in COUNTRY_KEYWORDS.items():
-        for pat in patterns:
-            if re.search(pat if pat.startswith(r"\b") else r"\b" + re.escape(pat) + r"\b", text, re.I):
-                return country
-    return "Global"
-
-
-def detect_topic(text):
-    t = text.lower()
-    for topic, kws in TOPIC_KEYWORDS.items():
-        if any(k.lower() in t for k in kws):
-            return topic
-    return "General"
-
-
-def detect_mw(text):
-    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt)", text, re.I)
-    if m:
-        return m.group(1).replace(",", "") + " " + m.group(2).upper()
-    return ""
-
-
-def detect_deal_size(text):
-    m = re.search(r"\$([\d,.]+)\s*(billion|bn|million|mn|m\b)", text, re.I)
-    if m:
-        val = m.group(1).replace(",", "")
-        unit = m.group(2).lower()
-        if unit in ("billion", "bn"):
-            return f"${val}bn"
-        return f"${val}m"
-    return ""
-
-
-def detect_companies(text):
-    found = []
-    for co in KNOWN_COMPANIES:
-        if re.search(r"\b" + re.escape(co) + r"\b", text, re.I):
-            found.append(co)
-    return ", ".join(found[:4]) if found else ""
-
-
-def detect_sentiment(text):
-    t = text.lower()
-    if any(w in t for w in ["broke ground", "groundbreaking", "opens", "opened",
-                             "inaugurated", "energizes", "goes live", "launches"]):
-        return "Opened / Live"
-    if any(w in t for w in ["approved", "approval", "go-ahead", "green light",
-                             "permits", "zoning approved", "rezoning"]):
-        return "Approved"
-    if any(w in t for w in ["proposed", "plans", "eyes", "looks to", "could build",
-                             "may build", "files for", "announces plans"]):
-        return "Proposed"
-    if any(w in t for w in ["rejected", "denied", "moratorium", "blocked",
-                             "lawsuit", "sues", "opposition", "withdrawn"]):
-        return "Challenged"
-    if any(w in t for w in ["under construction", "construction begins",
-                             "construction started", "building"]):
-        return "Under Construction"
-    return "News"
-
-
-def _normalise_headline(h):
-    """Normalise headline for comparison: lowercase, strip punctuation/source suffix."""
-    h = h.lower().strip()
-    # Strip common source suffixes added by Google News
-    h = re.sub(r"\s*[-–|]\s*\w[\w\s]{1,30}$", "", h)
-    # Strip special chars
-    h = re.sub(r"[^\w\s]", " ", h)
-    h = re.sub(r"\s+", " ", h).strip()
-    return h
-
-
-def fuzzy_similar(a, b, threshold=0.88):
-    """True if two normalised headlines are likely the same story."""
-    na, nb = _normalise_headline(a), _normalise_headline(b)
-    # Exact match after normalisation
-    if na == nb:
-        return True
-    # Sequence similarity
-    ratio = SequenceMatcher(None, na, nb).ratio()
-    if ratio >= threshold:
-        return True
-    # One is a substring of the other (short headline vs long headline of same story)
-    shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
-    if len(shorter) >= 30 and shorter in longer:
-        return True
-    return False
-
-
-def deduplicate(articles):
-    """
-    1. URL-based exact dedup (same URL = same article).
-    2. Fuzzy headline dedup — when two articles match, keep the one from
-       the source with the lowest _priority number (DCD = 1 wins).
-    """
-    # Step 1: URL dedup — sort by priority so DCD URLs win ties
-    seen_urls = {}
-    for art in sorted(articles, key=lambda x: x.get("_priority", 99)):
-        url = str(art.get("URL", art.get("url", ""))).strip().rstrip("/")
-        if url and url not in seen_urls:
-            seen_urls[url] = art
-    url_deduped = list(seen_urls.values())
-
-    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
-    url_deduped.sort(key=lambda x: x.get("_priority", 99))
-    keep = []
-    seen_headlines = []
-    for art in url_deduped:
-        hl = art.get("Headline", art.get("headline", ""))
-        is_dup = False
-        for seen in seen_headlines:
-            if fuzzy_similar(hl, seen):
-                is_dup = True
-                break
-        if not is_dup:
-            keep.append(art)
-            seen_headlines.append(hl)
-    return keep
-
-
-def enrich(raw_item):
-    hl = raw_item["headline"]
-    d = raw_item.get("date_obj")
-    country = detect_country(hl)
-    region = COUNTRY_TO_REGION.get(country, "Global")
-    return {
-        "Headline":  hl,
-        "Date":      d.strftime("%Y-%m-%d") if d else "Unknown",
-        "Source":    raw_item.get("source", "Unknown"),
-        "URL":       raw_item.get("url", ""),
-        "Country":   country,
-        "Region":    region,
-        "Topic":     detect_topic(hl),
-        "Sentiment": detect_sentiment(hl),
-        "Capacity":  detect_mw(hl),
-        "Deal Size": detect_deal_size(hl),
-        "Companies": detect_companies(hl),
-        "_date_obj": d,
-    }
 
 
 def run_all_scrapers(max_html_pages, cutoff, progress_cb):
