@@ -2095,15 +2095,17 @@ def chart_world_map(df):
         locations=cc["ISO"],
         z=cc["Count"],
         text=cc["Country"],
-        # Explicit navy → blue → teal scale — no red anywhere
+        # Red heat scale — dark background → deep red → bright red → orange-white
         colorscale=[
             [0.000, "#090f1c"],   # darkest — zero / background
-            [0.001, "#0b1628"],   # near-zero — matches card bg
-            [0.12,  "#0d2050"],   # very low
-            [0.30,  "#0f3580"],   # low-medium
-            [0.55,  "#0047e1"],   # medium — UI primary blue
-            [0.78,  "#0099d4"],   # high — UI cyan
-            [1.000, "#00e5c8"],   # maximum — UI teal
+            [0.001, "#1a0505"],   # near-zero
+            [0.10,  "#3d0a0a"],   # very low
+            [0.25,  "#6b0f0f"],   # low
+            [0.45,  "#a01515"],   # low-medium
+            [0.65,  "#cc2020"],   # medium
+            [0.82,  "#e84040"],   # high
+            [0.93,  "#ff6a2a"],   # very high — orange
+            [1.000, "#ffcc00"],   # maximum — amber/gold peak
         ],
         autocolorscale=False,
         reversescale=False,
@@ -2123,13 +2125,13 @@ def chart_world_map(df):
     ))
     fig.update_geos(
         bgcolor=_BG,
-        landcolor="#0d1a2e",      # unmatched-country land = dark navy
+        landcolor="#1a0e0e",      # unmatched-country land = dark maroon (no-data countries)
         oceancolor="#060a10",
         lakecolor="#060a10",
         rivercolor="#060a10",
         framecolor=_GRID,
         showland=True, showocean=True, showlakes=True,
-        showcountries=True, countrycolor="#1a2e4a",
+        showcountries=True, countrycolor="#2e1010",
         showframe=True,
         projection_type="natural earth",
     )
@@ -2814,11 +2816,12 @@ def main():
     )
     st.markdown(pills_html, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab4b, tab5, tab6 = st.tabs([
         "\U0001f4f0 Feed",
         "\U0001f5fa\ufe0f World Map",
         "\U0001f4ca Analytics",
         "\U0001f3e2 By Company",
+        "\U0001f4cd By State",
         "\U0001f9e0 Market Intel",
         "\u2b07\ufe0f Export",
     ])
@@ -2934,7 +2937,167 @@ def main():
         else:
             st.info("No company mentions detected in the current filtered view.")
 
-    with tab5:
+    with tab4b:
+        st.markdown('<div class="sec-head">📍 State / Province Drill-Down</div>', unsafe_allow_html=True)
+
+        # Build a state column by scanning headlines for state/province keywords
+        # Uses the COUNTRY_STATES lookup so it respects whatever region/country filter is active
+        def _detect_states_in_headline(headline):
+            """Return list of all state/province names found in the headline."""
+            found = []
+            hl = str(headline).lower()
+            for country, states in COUNTRY_STATES.items():
+                for state in states:
+                    if re.search(r"\b" + re.escape(state.lower()) + r"\b", hl):
+                        found.append(state)
+            return found if found else ["Unspecified"]
+
+        # Explode: one row per state mention so we can count + filter
+        state_rows = []
+        for _, row in df.iterrows():
+            states_found = _detect_states_in_headline(row["Headline"])
+            for st_name in states_found:
+                state_rows.append({
+                    "State":     st_name,
+                    "Headline":  row["Headline"],
+                    "Date":      row["Date"],
+                    "URL":       row["URL"],
+                    "Source":    row["Source"],
+                    "Country":   row["Country"],
+                    "Region":    row["Region"],
+                    "Topic":     row["Topic"],
+                    "Capacity":  row.get("Capacity", ""),
+                    "Deal Size": row.get("Deal Size", ""),
+                    "Sentiment": row.get("Sentiment", "News"),
+                })
+
+        if not state_rows:
+            st.info("No state/province mentions detected in the current filtered view. Try broadening your filters.")
+        else:
+            state_df_all = pd.DataFrame(state_rows)
+            state_counts = (
+                state_df_all[state_df_all["State"] != "Unspecified"]["State"]
+                .value_counts()
+                .reset_index()
+            )
+            state_counts.columns = ["State", "Articles"]
+
+            # ── Top states bar chart ──────────────────────────────────────────
+            if not state_counts.empty:
+                sc_sorted = state_counts.head(30).sort_values("Articles")
+                n_sc = len(sc_sorted)
+                sc_colors = [
+                    f"rgba({int(180 + 75 * i / max(n_sc-1,1))},{int(20 - 10 * i / max(n_sc-1,1))},{int(20 - 10 * i / max(n_sc-1,1))},0.85)"
+                    for i in range(n_sc)
+                ]
+                fig_st = go.Figure(go.Bar(
+                    x=sc_sorted["Articles"],
+                    y=sc_sorted["State"],
+                    orientation="h",
+                    marker=dict(color=sc_colors, line=dict(width=0)),
+                    text=sc_sorted["Articles"],
+                    textposition="outside",
+                    textfont=dict(color=_TITLE, size=10),
+                    hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+                ))
+                _dark(fig_st, max(320, n_sc * 22))
+                fig_st.update_layout(
+                    title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13), x=0.01)
+                )
+                st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False})
+
+            # ── Summary table ─────────────────────────────────────────────────
+            col_tbl, col_drill = st.columns([1, 2])
+
+            with col_tbl:
+                st.markdown('<div class="sec-head">All States</div>', unsafe_allow_html=True)
+                # Include unspecified count separately
+                unspec_count = len(state_df_all[state_df_all["State"] == "Unspecified"])
+                display_sc = state_counts.copy()
+                if unspec_count:
+                    display_sc = pd.concat([
+                        display_sc,
+                        pd.DataFrame([{"State": "Unspecified", "Articles": unspec_count}])
+                    ], ignore_index=True)
+                st.markdown(dark_table(display_sc), unsafe_allow_html=True)
+
+            with col_drill:
+                st.markdown('<div class="sec-head">Drill Into a State</div>', unsafe_allow_html=True)
+
+                all_states_list = state_counts["State"].tolist() if not state_counts.empty else []
+
+                if not all_states_list:
+                    st.info("No named states found.")
+                else:
+                    sel_state = st.selectbox(
+                        "Select state / province",
+                        all_states_list,
+                        key="state_drill_select",
+                    )
+
+                    state_articles = state_df_all[state_df_all["State"] == sel_state]
+
+                    # ── Mini metrics for selected state ───────────────────────
+                    s_topics   = state_articles["Topic"].value_counts()
+                    s_top_topic = s_topics.idxmax() if not s_topics.empty else "—"
+                    s_countries = state_articles["Country"].value_counts()
+                    s_country   = s_countries.idxmax() if not s_countries.empty else "—"
+                    s_latest    = state_articles["Date"].max() if not state_articles.empty else "—"
+                    s_cap       = state_articles[state_articles["Capacity"] != ""]["Capacity"].count()
+
+                    mini_pills = (
+                        f'<div class="pill-row">'
+                        f'<div class="pill"><span class="pill-dot"></span>'
+                        f'<b>{len(state_articles)}</b>&nbsp;articles</div>'
+                        f'<div class="pill"><span class="pill-dot"></span>'
+                        f'Top topic: <b>{s_top_topic}</b></div>'
+                        f'<div class="pill"><span class="pill-dot"></span>'
+                        f'Country: <b>{s_country}</b></div>'
+                        f'<div class="pill"><span class="pill-dot"></span>'
+                        f'Latest: <b>{s_latest}</b></div>'
+                        f'<div class="pill"><span class="pill-dot"></span>'
+                        f'Capacity mentions: <b>{s_cap}</b></div>'
+                        f'</div>'
+                    )
+                    st.markdown(mini_pills, unsafe_allow_html=True)
+
+                    # ── Topic breakdown mini bar for selected state ────────────
+                    if not s_topics.empty and len(s_topics) > 1:
+                        tp_df = s_topics.reset_index()
+                        tp_df.columns = ["Topic", "Count"]
+                        tp_colors = [TOPIC_COLORS.get(t, "#2e4470") for t in tp_df["Topic"]]
+                        fig_tp = go.Figure(go.Bar(
+                            x=tp_df["Topic"], y=tp_df["Count"],
+                            marker=dict(color=tp_colors, line=dict(width=0)),
+                            text=tp_df["Count"], textposition="outside",
+                            textfont=dict(color=_TITLE, size=10),
+                            hovertemplate="<b>%{x}</b>: %{y}<extra></extra>",
+                        ))
+                        _dark(fig_tp, 220)
+                        fig_tp.update_layout(
+                            title=dict(text=f"Topics — {sel_state}", font=dict(color=_TITLE, size=11), x=0.01),
+                            xaxis=dict(tickfont=dict(size=9)),
+                        )
+                        st.plotly_chart(fig_tp, use_container_width=True, config={"displayModeBar": False})
+
+                    # ── Article cards for selected state ──────────────────────
+                    st.markdown(
+                        f'<div style="font-family:Inter,sans-serif;font-size:.82rem;color:#3a5480;'
+                        f'margin-bottom:.7rem;">'
+                        f'<b style="color:#fff">{len(state_articles)}</b> articles mentioning '
+                        f'<b style="color:#e84040">{sel_state}</b></div>',
+                        unsafe_allow_html=True,
+                    )
+                    for _, row in state_articles.iterrows():
+                        st.markdown(
+                            article_card(
+                                row["Headline"], row["Date"], row["URL"],
+                                row["Source"], row["Country"], row["Topic"],
+                                row.get("Capacity", ""), row.get("Deal Size", ""),
+                                row.get("Sentiment", "News"),
+                            ),
+                            unsafe_allow_html=True,
+                        )
         st.markdown('<div class="sec-head">\U0001f9e0 Market Intelligence Summary</div>', unsafe_allow_html=True)
 
         filter_summary_parts = []
