@@ -86,59 +86,54 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 [data-testid="stSidebar"] * { color: #b8c8e0 !important; }
 [data-testid="stSidebar"] hr { border-color: #151f35 !important; }
 
-/* ── Sidebar collapse/expand toggle arrow — make it always visible ─────────── */
-[data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebarCollapsedControl"] {
+/* ── Sidebar: ALWAYS VISIBLE — prevent collapse entirely ───────────────────── */
+
+/* Hide the collapse-arrow button so users cannot close the sidebar */
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
+
+/* Force the sidebar to always stay expanded (overrides Streamlit's
+   data-collapsed attribute and any transform/translate it applies) */
+[data-testid="stSidebar"][aria-expanded="false"],
+[data-testid="stSidebar"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    min-width: 244px !important;
+    max-width: 244px !important;
+    width: 244px !important;
+    transform: none !important;
+    margin-left: 0 !important;
+    left: 0 !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* Show the reopen tab/button at all times (belt-and-suspenders) */
+[data-testid="stSidebarCollapsedControl"],
+div[data-testid="collapsedControl"] {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
-}
-
-/* Style the collapsed-state sidebar tab (the strip shown when sidebar is closed) */
-[data-testid="stSidebarCollapsedControl"] {
     background: #0047e1 !important;
     border-radius: 0 10px 10px 0 !important;
     border: 1px solid #0060ff !important;
     border-left: none !important;
     width: 2rem !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
+    z-index: 99999 !important;
 }
-[data-testid="stSidebarCollapsedControl"] button {
+[data-testid="stSidebarCollapsedControl"] button,
+div[data-testid="collapsedControl"] button {
     color: #fff !important;
     background: transparent !important;
 }
-[data-testid="stSidebarCollapsedControl"] svg {
-    fill: #fff !important;
-    stroke: #fff !important;
-}
-
-/* ── Sidebar expand button visible on hover area ────────────────────────────── */
-[data-testid="stSidebarCollapseButton"] button {
-    background: rgba(0,71,225,0.15) !important;
-    border-radius: 6px !important;
-    color: #7eb8ff !important;
-    border: 1px solid rgba(0,71,225,0.25) !important;
-}
-[data-testid="stSidebarCollapseButton"] button:hover {
-    background: rgba(0,71,225,0.35) !important;
-    border-color: #0047e1 !important;
-}
-
-/* ── Floating sidebar reopen hint (shown via CSS when sidebar is collapsed) ─── */
-section[data-testid="stSidebarCollapsedControl"] ~ * .sidebar-hint { display: flex; }
-
-/* Always show the collapsed sidebar tab even if Streamlit tries to hide it */
-div[data-testid="collapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    background: #0047e1 !important;
-    border-radius: 0 8px 8px 0 !important;
-}
+[data-testid="stSidebarCollapsedControl"] svg,
 div[data-testid="collapsedControl"] svg {
     fill: #fff !important;
+    stroke: #fff !important;
 }
 
 /* Sidebar Run button */
@@ -2683,12 +2678,88 @@ def main():
     """
     st.markdown(tz_js, unsafe_allow_html=True)
 
-    # ── Floating "☰ Filters" button — reappears when sidebar is collapsed ────
+    # ── Sidebar: aggressive force-open on every load ─────────────────────────
+    # Strategy: three-layer approach
+    #  1. Nuke ALL localStorage keys that relate to sidebar/collapsed state
+    #  2. Force-click the sidebar open button if sidebar is found collapsed
+    #  3. Inject a visible "☰ Filters" floating button as a permanent fallback
     sidebar_btn_js = """
     <script>
     (function() {
-        function injectSidebarBtn() {
-            // Remove any existing button we injected
+
+        // ── LAYER 1: Wipe every localStorage key that could keep sidebar closed ──
+        function nukeLocalStorage() {
+            try {
+                var toDelete = [];
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (!k) continue;
+                    var kl = k.toLowerCase();
+                    if (
+                        kl.includes('sidebar') ||
+                        kl.includes('collapsed') ||
+                        kl.includes('stSidebar') ||
+                        kl.includes('streamlit') ||
+                        kl.includes('layout') ||
+                        kl.includes('toggled')
+                    ) {
+                        toDelete.push(k);
+                    }
+                }
+                toDelete.forEach(function(k) { localStorage.removeItem(k); });
+            } catch(e) {}
+
+            // Also try sessionStorage
+            try {
+                var sToDelete = [];
+                for (var j = 0; j < sessionStorage.length; j++) {
+                    var sk = sessionStorage.key(j);
+                    if (!sk) continue;
+                    var skl = sk.toLowerCase();
+                    if (
+                        skl.includes('sidebar') ||
+                        skl.includes('collapsed') ||
+                        skl.includes('streamlit')
+                    ) {
+                        sToDelete.push(sk);
+                    }
+                }
+                sToDelete.forEach(function(sk) { sessionStorage.removeItem(sk); });
+            } catch(e) {}
+        }
+        nukeLocalStorage();
+
+        // ── LAYER 2: Force-click the sidebar open if it appears collapsed ────────
+        function forceSidebarOpen() {
+            var sidebar = document.querySelector('[data-testid="stSidebar"]');
+            if (!sidebar) return false;
+
+            // Check if sidebar is actually collapsed (very narrow or off-screen)
+            var rect = sidebar.getBoundingClientRect();
+            var isCollapsed = rect.width < 60 || rect.left < -100;
+
+            if (isCollapsed) {
+                // Try every selector Streamlit uses for the reopen button
+                var selectors = [
+                    '[data-testid="stSidebarCollapsedControl"] button',
+                    'div[data-testid="collapsedControl"] button',
+                    'button[aria-label="Open sidebar"]',
+                    'button[aria-label*="sidebar"]',
+                    '[data-testid="collapsedControl"] button',
+                ];
+                for (var i = 0; i < selectors.length; i++) {
+                    var btns = document.querySelectorAll(selectors[i]);
+                    if (btns.length > 0) {
+                        btns[0].click();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // ── LAYER 3: Floating "☰ Filters" emergency button ───────────────────────
+        function injectFiltersBtn() {
             var old = document.getElementById('_gdci_sidebar_btn');
             if (old) old.remove();
 
@@ -2698,9 +2769,9 @@ def main():
             btn.title = 'Open filter sidebar';
             btn.style.cssText = [
                 'position:fixed',
-                'top:14px',
-                'left:14px',
-                'z-index:99999',
+                'top:12px',
+                'left:12px',
+                'z-index:2147483647',
                 'background:linear-gradient(135deg,#0047e1,#00b4ff)',
                 'color:#fff',
                 'border:none',
@@ -2711,56 +2782,69 @@ def main():
                 'font-size:0.82rem',
                 'letter-spacing:0.04em',
                 'cursor:pointer',
-                'box-shadow:0 4px 16px rgba(0,71,225,0.45)',
+                'box-shadow:0 4px 16px rgba(0,71,225,0.55)',
                 'display:none',
                 'align-items:center',
                 'gap:6px',
-                'transition:opacity 0.2s ease,transform 0.2s ease',
+                'transition:opacity 0.2s,transform 0.2s',
             ].join(';');
 
-            btn.onmouseenter = function() {
-                btn.style.opacity = '0.85';
-                btn.style.transform = 'translateY(-1px)';
-            };
-            btn.onmouseleave = function() {
-                btn.style.opacity = '1';
-                btn.style.transform = 'translateY(0)';
-            };
+            btn.onmouseenter = function() { btn.style.opacity='0.85'; btn.style.transform='translateY(-1px)'; };
+            btn.onmouseleave = function() { btn.style.opacity='1';    btn.style.transform='translateY(0)';    };
+
             btn.onclick = function() {
-                // Click the native Streamlit sidebar toggle
-                var toggles = document.querySelectorAll(
-                    '[data-testid="stSidebarCollapsedControl"] button, ' +
-                    '[data-testid="collapsedControl"] button, ' +
-                    'button[kind="header"][aria-label*="sidebar"], ' +
-                    'button[aria-label*="Open sidebar"], ' +
-                    'button[aria-label*="sidebar"]'
-                );
-                if (toggles.length > 0) {
-                    toggles[0].click();
+                nukeLocalStorage();
+                var selectors = [
+                    '[data-testid="stSidebarCollapsedControl"] button',
+                    'div[data-testid="collapsedControl"] button',
+                    'button[aria-label="Open sidebar"]',
+                    'button[aria-label*="sidebar"]',
+                    '[data-testid="collapsedControl"] button',
+                ];
+                for (var i = 0; i < selectors.length; i++) {
+                    var btns = document.querySelectorAll(selectors[i]);
+                    if (btns.length > 0) { btns[0].click(); return; }
                 }
             };
+
             document.body.appendChild(btn);
 
-            // Watch sidebar state and show/hide our button accordingly
+            // Poll: show button only when sidebar is collapsed
             function checkSidebar() {
                 var sidebar = document.querySelector('[data-testid="stSidebar"]');
-                if (!sidebar) return;
+                if (!sidebar) { btn.style.display = 'flex'; return; }
                 var rect = sidebar.getBoundingClientRect();
-                var isCollapsed = rect.width < 50;
-                btn.style.display = isCollapsed ? 'flex' : 'none';
+                var collapsed = rect.width < 60 || rect.left < -100;
+                btn.style.display = collapsed ? 'flex' : 'none';
             }
 
-            // Poll every 400ms (lightweight)
-            setInterval(checkSidebar, 400);
+            setInterval(checkSidebar, 300);
             checkSidebar();
         }
 
-        // Wait for DOM to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', injectSidebarBtn);
-        } else {
-            setTimeout(injectSidebarBtn, 800);
+        // ── Boot sequence ────────────────────────────────────────────────────────
+        function boot() {
+            nukeLocalStorage();
+            injectFiltersBtn();
+
+            // Try to force open immediately, then retry a few times
+            // (Streamlit renders the DOM progressively so we need retries)
+            var attempts = 0;
+            var maxAttempts = 12;
+            var interval = setInterval(function() {
+                nukeLocalStorage();
+                var opened = forceSidebarOpen();
+                attempts++;
+                if (opened || attempts >= maxAttempts) clearInterval(interval);
+            }, 400);
         }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot);
+        } else {
+            setTimeout(boot, 300);
+        }
+
     })();
     </script>
     """
