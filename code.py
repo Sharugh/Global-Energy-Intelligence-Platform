@@ -2889,14 +2889,18 @@ def main():
 
     with st.sidebar:
         st.markdown(
-            '<div style="padding:.9rem 0 .4rem;text-align:center;">'
-            '<div style="font-family:monospace;font-size:.6rem;letter-spacing:.2em;'
-            'color:#1a2e50;text-transform:uppercase;margin-bottom:.25rem;">Intelligence Platform</div>'
-            '<div style="font-family:Syne,sans-serif;font-size:.9rem;font-weight:800;color:#fff;">Global Data Center Intelligence</div>'
-            '<div style="font-family:monospace;font-size:.6rem;color:#1a2e50;margin-top:.15rem;">'
-            'Global Intelligence Platform</div>'
-            '<div style="font-family:monospace;font-size:.55rem;color:#0f1e36;margin-top:.5rem;'
-            'letter-spacing:.06em;">&#169; Sharugh A &nbsp;&middot;&nbsp; All rights reserved</div>'
+            '<div style="padding:.9rem 0 .4rem;text-align:left;">'
+            '<div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.45rem;">'
+            '<svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">'
+            '<rect width="40" height="40" rx="7" fill="#0047e1"/>'
+            '<path d="M8 28 L14 12 L20 22 L26 12 L32 28" stroke="#fff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
+            '<circle cx="20" cy="22" r="2.5" fill="#00b4ff"/>'
+            '</svg>'
+            '<div>'
+            '<div style="font-family:Syne,sans-serif;font-size:.88rem;font-weight:800;color:#fff;line-height:1.1;">Wood Mac</div>'
+            '<div style="font-family:monospace;font-size:.55rem;letter-spacing:.14em;color:#1a2e50;text-transform:uppercase;">Intelligence Platform</div>'
+            '</div></div>'
+            '<div style="font-family:Syne,sans-serif;font-size:.78rem;font-weight:600;color:#3a5480;">Global Data Center Intelligence</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -3142,9 +3146,7 @@ def main():
         f'Auto-tagged by region, topic, company & capacity \u00b7 '
         f'Deduplicated across all sources</div>'
         f'<div class="banner-ts">\U0001f550 {now_str}'
-        f'<span style="margin-left:1.8rem;color:#0d1e38;font-size:.6rem;letter-spacing:.08em;">'
-        f'Built by Sharugh A &nbsp;\u00b7&nbsp; Licensed &nbsp;\u00b7&nbsp; All rights reserved'
-        f'</span></div>'
+        f'</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -3153,6 +3155,46 @@ def main():
         st.session_state.df_full = None
 
     if not go_btn and st.session_state.df_full is None:
+        # ── About / Info panel ────────────────────────────────────────────────
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#07111f 0%,#0b1d3a 60%,#07111f 100%);'
+            'border:1px solid #132040;border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1.4rem;">'
+            '<div style="font-family:\'DM Mono\',monospace;font-size:.62rem;letter-spacing:.18em;'
+            'color:#00b4ff;text-transform:uppercase;margin-bottom:.5rem;">About This Platform</div>'
+            '<div style="font-family:Syne,sans-serif;font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.6rem;">'
+            'What is Global Data Center Intelligence?</div>'
+            '<div style="font-size:.82rem;color:#6a80a8;line-height:1.7;margin-bottom:.9rem;">'
+            'This platform is a <b style="color:#b8c8e0">real-time intelligence tool</b> built for Wood Mac analysts, '
+            'strategists, and clients tracking the global data center market. It automatically scrapes, '
+            'enriches, and surfaces the most relevant news from specialist trade publications — saving hours '
+            'of manual research every day.'
+            '</div>'
+            '<div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.9rem;">'
+            '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
+            '<span style="font-size:.75rem;color:#00b4ff;font-family:Syne,sans-serif;font-weight:700;">Who is it for?</span>'
+            '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
+            'Wood Mac researchers, energy analysts, and market intelligence teams monitoring hyperscale, '
+            'AI infrastructure, power, and investment activity across 45+ countries.</div>'
+            '</div>'
+            '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
+            '<span style="font-size:.75rem;color:#00e5c8;font-family:Syne,sans-serif;font-weight:700;">What does it do?</span>'
+            '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
+            'Scrapes DataCenterDynamics, DataCenter Knowledge, DataCenter Frontier and more · '
+            'Auto-tags every article by region, topic, sentiment, company, capacity (MW/GW) and deal size · '
+            'Deduplicates across sources · Scores articles by market significance.</div>'
+            '</div>'
+            '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
+            '<span style="font-size:.75rem;color:#ffaa00;font-family:Syne,sans-serif;font-weight:700;">How to use it</span>'
+            '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
+            '1. Set your date range and scrape depth in the left panel.<br>'
+            '2. Click <b style="color:#b8c8e0">Run Global Scan</b> to pull live articles.<br>'
+            '3. Use filters to drill into regions, countries, topics, or companies.<br>'
+            '4. Explore tabs: Feed · Map · Analytics · Deal Flow · AI Scoring · Export.</div>'
+            '</div>'
+            '</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             '<div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-bottom:1.4rem;">',
             unsafe_allow_html=True,
@@ -3358,7 +3400,7 @@ def main():
     )
     st.markdown(pills_html, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab4b, tab5, tab_trend, tab_heatmap, tab_deal, tab_saved, tab_score, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab4b, tab5, tab_trend, tab_heatmap, tab_deal, tab_score, tab6 = st.tabs([
         "\U0001f4f0 Feed",
         "\U0001f5fa\ufe0f World Map",
         "\U0001f4ca Analytics",
@@ -3368,7 +3410,6 @@ def main():
         "\U0001f4c8 Trend Compare",
         "\U0001f525 Capacity Heatmap",
         "\U0001f4b0 Deal Flow",
-        "\U0001f4be Saved Scans",
         "\U0001f916 AI Scoring",
         "\u2b07\ufe0f Export",
     ])
@@ -4300,161 +4341,6 @@ def main():
             deal_display = deal_display.drop(columns=["_deal_usd_m"])
             st.markdown(dark_table(deal_display[["Headline","Date","Deal Size","Est. USD ($m)","Companies","Country","Topic","Sentiment","URL"]]), unsafe_allow_html=True)
 
-    # ─── TAB: Saved Scans ───────────────────────────────────────────────────
-    with tab_saved:
-        st.markdown('<div class="sec-head">💾 Saved Scans</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Name and save scan results to session memory. Compare two saved scans side-by-side '
-            'to track market changes between daily or weekly runs.</div>',
-            unsafe_allow_html=True,
-        )
-
-        if "saved_scans" not in st.session_state:
-            st.session_state.saved_scans = {}
-
-        col_save1, col_save2 = st.columns([3, 1])
-        with col_save1:
-            scan_label_input = st.text_input(
-                "Scan label", placeholder="e.g. US hyperscale week 1, APAC May 2025...",
-                label_visibility="collapsed", key="save_scan_label"
-            )
-        with col_save2:
-            if st.button("💾 Save Current Scan", use_container_width=True):
-                if not df.empty:
-                    label_key = scan_label_input.strip() or f"Scan {len(st.session_state.saved_scans)+1}"
-                    _ts_saved = datetime.now().strftime("%d %b %Y %H:%M")
-                    st.session_state.saved_scans[label_key] = {
-                        "df": df.copy(),
-                        "saved_at": _ts_saved,
-                        "articles": len(df),
-                        "filters": str(filters),
-                    }
-                    st.success(f"✅ Saved scan: **{label_key}** ({len(df)} articles)")
-                else:
-                    st.warning("No articles in current view to save.")
-
-        if not st.session_state.saved_scans:
-            st.markdown(
-                '<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
-                'padding:1.5rem;text-align:center;color:#3a5480;font-size:.82rem;">'
-                '📂 No saved scans yet. Run a scan, apply filters, then click Save above.</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            # Summary table of saved scans
-            scan_rows = []
-            for lbl, sdata in st.session_state.saved_scans.items():
-                sdf = sdata["df"]
-                scan_rows.append({
-                    "Label": lbl,
-                    "Saved At": sdata["saved_at"],
-                    "Articles": sdata["articles"],
-                    "Top Region": sdf["Region"].value_counts().idxmax() if not sdf.empty else "—",
-                    "Top Topic": sdf["Topic"].value_counts().idxmax() if not sdf.empty else "—",
-                    "With Deals": int((sdf["Deal Size"] != "").sum()),
-                    "With Capacity": int((sdf["Capacity"] != "").sum()),
-                })
-            scan_summary_df = pd.DataFrame(scan_rows)
-            st.markdown(dark_table(scan_summary_df), unsafe_allow_html=True)
-
-            scan_names = list(st.session_state.saved_scans.keys())
-
-            # ── Compare two saved scans ───────────────────────────────────────
-            if len(scan_names) >= 2:
-                st.markdown('<div class="sec-head">📊 Compare Two Saved Scans</div>', unsafe_allow_html=True)
-                cmp_c1, cmp_c2 = st.columns(2)
-                with cmp_c1:
-                    cmp_scan_a = st.selectbox("Scan A", scan_names, key="cmp_scan_a", index=0)
-                with cmp_c2:
-                    cmp_scan_b = st.selectbox("Scan B", scan_names, key="cmp_scan_b", index=min(1, len(scan_names)-1))
-
-                cmp_df_a = st.session_state.saved_scans[cmp_scan_a]["df"]
-                cmp_df_b = st.session_state.saved_scans[cmp_scan_b]["df"]
-
-                # KPI deltas
-                def _delta_kpi(label, val_a, val_b, fmt=str, accent="blue"):
-                    delta = val_b - val_a if isinstance(val_a, (int, float)) else 0
-                    delta_sign = "▲" if delta > 0 else ("▼" if delta < 0 else "–")
-                    delta_color = "#00e676" if delta > 0 else ("#ff2d6b" if delta < 0 else "#3a5480")
-                    return (
-                        f'<div class="kpi-card" style="flex:1;min-width:130px;background:#0b1628;'
-                        f'border:1px solid #152038;border-radius:12px;padding:1rem 1.2rem;position:relative;">'
-                        f'<div style="font-family:monospace;font-size:.6rem;letter-spacing:.12em;'
-                        f'text-transform:uppercase;color:#2a3e60;margin-bottom:.35rem;">{label}</div>'
-                        f'<div style="display:flex;gap:.6rem;align-items:baseline;">'
-                        f'<span style="font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#0047e1;">{fmt(val_a)}</span>'
-                        f'<span style="font-family:monospace;font-size:.7rem;color:#2a3e60;">→</span>'
-                        f'<span style="font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;color:#ffaa00;">{fmt(val_b)}</span>'
-                        f'</div>'
-                        f'<div style="font-size:.7rem;color:{delta_color};margin-top:.2rem;font-family:monospace;">'
-                        f'{delta_sign} {abs(delta)}</div>'
-                        f'</div>'
-                    )
-
-                cmp_kpi_row = (
-                    '<div style="display:flex;gap:.7rem;margin:1rem 0;flex-wrap:wrap;">'
-                    + _delta_kpi("Articles", len(cmp_df_a), len(cmp_df_b))
-                    + _delta_kpi("Deals", int((cmp_df_a["Deal Size"]!="").sum()), int((cmp_df_b["Deal Size"]!="").sum()))
-                    + _delta_kpi("Capacity", int((cmp_df_a["Capacity"]!="").sum()), int((cmp_df_b["Capacity"]!="").sum()))
-                    + _delta_kpi("Countries", int(cmp_df_a["Country"].nunique()), int(cmp_df_b["Country"].nunique()))
-                    + '</div>'
-                )
-                st.markdown(cmp_kpi_row, unsafe_allow_html=True)
-
-                # Topic comparison
-                topics_cmp = sorted(set(cmp_df_a["Topic"].unique()) | set(cmp_df_b["Topic"].unique()))
-                fig_cmp = go.Figure()
-                fig_cmp.add_trace(go.Bar(
-                    name=cmp_scan_a, x=topics_cmp,
-                    y=[int(cmp_df_a["Topic"].value_counts().get(t, 0)) for t in topics_cmp],
-                    marker_color="#0047e1",
-                ))
-                fig_cmp.add_trace(go.Bar(
-                    name=cmp_scan_b, x=topics_cmp,
-                    y=[int(cmp_df_b["Topic"].value_counts().get(t, 0)) for t in topics_cmp],
-                    marker_color="#ffaa00",
-                ))
-                _dark(fig_cmp, 300)
-                fig_cmp.update_layout(
-                    barmode="group", showlegend=True,
-                    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
-                    title=dict(text="Topic Comparison: Scan A vs Scan B", font=dict(color=_TITLE, size=13), x=0.01),
-                )
-                st.plotly_chart(fig_cmp, use_container_width=True, config={"displayModeBar": False})
-
-                # Side-by-side headlines
-                st.markdown('<div class="sec-head">Side-by-Side Headlines</div>', unsafe_allow_html=True)
-                col_cmp_a, col_cmp_b = st.columns(2)
-                with col_cmp_a:
-                    st.markdown(f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#0047e1;font-size:.85rem;margin-bottom:.5rem;">● {cmp_scan_a}</div>', unsafe_allow_html=True)
-                    for _, row in cmp_df_a.head(8).iterrows():
-                        st.markdown(article_card(row["Headline"],row["Date"],row["URL"],row["Source"],row["Country"],row["Topic"],row.get("Capacity",""),row.get("Deal Size",""),row.get("Sentiment","News")), unsafe_allow_html=True)
-                with col_cmp_b:
-                    st.markdown(f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#ffaa00;font-size:.85rem;margin-bottom:.5rem;">● {cmp_scan_b}</div>', unsafe_allow_html=True)
-                    for _, row in cmp_df_b.head(8).iterrows():
-                        st.markdown(article_card(row["Headline"],row["Date"],row["URL"],row["Source"],row["Country"],row["Topic"],row.get("Capacity",""),row.get("Deal Size",""),row.get("Sentiment","News")), unsafe_allow_html=True)
-
-            # Drill into a single saved scan
-            st.markdown('<div class="sec-head">Browse a Saved Scan</div>', unsafe_allow_html=True)
-            sel_scan = st.selectbox("Select scan", scan_names, key="saved_scan_select")
-            saved_df = st.session_state.saved_scans[sel_scan]["df"]
-            for _, row in saved_df.head(50).iterrows():
-                st.markdown(
-                    article_card(
-                        row["Headline"], row["Date"], row["URL"],
-                        row["Source"], row["Country"], row["Topic"],
-                        row.get("Capacity", ""), row.get("Deal Size", ""),
-                        row.get("Sentiment", "News"),
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-            # Delete saved scan
-            if st.button("🗑️ Delete This Saved Scan", key="delete_saved_scan"):
-                del st.session_state.saved_scans[sel_scan]
-                st.rerun()
-
     # ─── TAB: AI-Powered Headline Scoring ────────────────────────────────────
     with tab_score:
         st.markdown('<div class="sec-head">🤖 AI-Powered Headline Scoring</div>', unsafe_allow_html=True)
@@ -4668,9 +4554,8 @@ def main():
         '<div style="margin-top:3rem;padding:1.2rem 0 .6rem;border-top:1px solid #101b2e;'
         'text-align:center;">'
         '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
-        'color:#cc0000;text-transform:uppercase;">'
-        'Global Data Center Intelligence &nbsp;\u00b7&nbsp; '
-        'Built by Sharugh A &nbsp;\u00b7&nbsp; \u00a9 All rights reserved'
+        'color:#1a2e50;text-transform:uppercase;">'
+        'Global Data Center Intelligence &nbsp;\u00b7&nbsp; Wood Mac'
         '</div></div>',
         unsafe_allow_html=True,
     )
