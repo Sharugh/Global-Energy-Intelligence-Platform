@@ -2887,20 +2887,35 @@ def main():
             off_s = ""
         return d.strftime("%A, %d %B %Y  \u00b7  %H:%M") + f"  {tz_label} ({off_s})"
 
+    # ── Load Wood Mackenzie logo as base64 for GitHub deployment ─────────────
+    import base64, os as _os
+    _logo_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "wood_mac.png")
+    try:
+        with open(_logo_path, "rb") as _f:
+            _logo_b64 = base64.b64encode(_f.read()).decode()
+        _logo_src = f"data:image/png;base64,{_logo_b64}"
+    except Exception:
+        _logo_src = ""
+
     with st.sidebar:
         st.markdown(
-            '<div style="padding:.9rem 0 .4rem;text-align:left;">'
-            '<div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.45rem;">'
-            '<svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">'
-            '<rect width="40" height="40" rx="7" fill="#0047e1"/>'
-            '<path d="M8 28 L14 12 L20 22 L26 12 L32 28" stroke="#fff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
-            '<circle cx="20" cy="22" r="2.5" fill="#00b4ff"/>'
-            '</svg>'
-            '<div>'
-            '<div style="font-family:Syne,sans-serif;font-size:.88rem;font-weight:800;color:#fff;line-height:1.1;">Wood Mac</div>'
-            '<div style="font-family:monospace;font-size:.55rem;letter-spacing:.14em;color:#1a2e50;text-transform:uppercase;">Intelligence Platform</div>'
-            '</div></div>'
-            '<div style="font-family:Syne,sans-serif;font-size:.78rem;font-weight:600;color:#3a5480;">Global Data Center Intelligence</div>'
+            '<div style="padding:.9rem 0 .4rem;">'
+            # Logo flush to the right
+            '<div style="display:flex;justify-content:flex-end;margin-bottom:.55rem;">'
+            + (f'<img src="{_logo_src}" alt="Wood Mackenzie" '
+               'style="height:38px;width:auto;object-fit:contain;"/>'
+               if _logo_src else
+               '<div style="font-family:Syne,sans-serif;font-size:.88rem;font-weight:800;color:#0047e1;">Wood Mackenzie</div>')
+            + '</div>'
+            # Main label
+            '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
+            'letter-spacing:.02em;margin-bottom:.18rem;">Global Data Center Intelligence</div>'
+            # Sub-label
+            '<div style="font-family:monospace;font-size:.55rem;letter-spacing:.14em;color:#1a2e50;'
+            'text-transform:uppercase;margin-bottom:.22rem;">Intelligence Platform</div>'
+            # Built By
+            '<div style="font-family:monospace;font-size:.58rem;letter-spacing:.08em;color:#2a3e60;">'
+            'Built By <span style="color:#0047e1;font-weight:600;">Sharugh</span></div>'
             '</div>',
             unsafe_allow_html=True,
         )
