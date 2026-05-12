@@ -1,7 +1,6 @@
 import streamlit as st
 import re
 import io
-import json
 import time
 import math
 import textwrap
@@ -663,7 +662,25 @@ for _c, _r in _EXTRA_COUNTRY_MAP.items():
     COUNTRY_TO_REGION.setdefault(_c, _r)
 
 
-TOPIC_KEYWORDS = {
+
+# ─── Config: load TOPIC_KEYWORDS and KNOWN_COMPANIES from JSON ───────────────
+# These large lookup tables live in dc_config.json so they can be updated
+# without touching Python code.  Falls back to inline defaults on ImportError.
+import json as _json
+import os as _os
+
+_CONFIG_PATH = _os.path.join(_os.path.dirname(__file__), "dc_config.json")
+
+def _load_config():
+    try:
+        with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
+            return _json.load(_f)
+    except Exception:
+        return {}
+
+_cfg = _load_config()
+
+TOPIC_KEYWORDS = _cfg.get("topic_keywords", {
     "Hyperscale": ["hyperscale","microsoft","google","amazon","aws","meta",
                    "apple","oracle","alibaba","tencent","bytedance",
                    "alphabet","openai","stargate","coreweave"],
@@ -692,9 +709,9 @@ TOPIC_KEYWORDS = {
                       "green","esg","water","pue","cooling","waste heat",
                       "recycle","circular","biodiversity","solar panel",
                       "wind power","offset"],
-}
+})
 
-KNOWN_COMPANIES = [
+KNOWN_COMPANIES = _cfg.get("known_companies", [
     "Microsoft","Google","Amazon","AWS","Meta","Apple","Oracle","Alibaba",
     "Tencent","ByteDance","Baidu","Huawei","Samsung","IBM","Intel","NVIDIA",
     "Equinix","Digital Realty","Iron Mountain","CoreSite","CyrusOne","NTT",
@@ -713,7 +730,9 @@ KNOWN_COMPANIES = [
     "CtrlS","NxtGen","Yotta","STT GDC","Keppel","Singtel","Telstra",
     "NextDC","Macquarie","AirTrunk","MEVSPACE","Beyond.pl","Atman",
     "DE-CIX","Interxion","euNetworks","Telehouse","Iomart","Pulsant",
-]
+])
+
+
 
 
 # ─── DCD constants ─────────────────────────────────────────────────────────
@@ -859,39 +878,18 @@ _DCD_HEADERS = {
     "Referer": "https://www.datacenterdynamics.com/",
 }
 
-def fetch_html(url, retries=3):
-    """
-    Fetch a URL and return a BeautifulSoup object.
-    Retries up to `retries` times with exponential back-off.
-    Handles 429 / 503 rate-limit responses gracefully.
-    Returns None on total failure (never raises).
-    """
-    _RETRY_STATUSES = {429, 500, 502, 503, 504}
+def fetch_html(url, retries=2):
     for attempt in range(retries):
         try:
             if _USE_CS:
-                r = _CS.get(url, timeout=25)
+                r = _CS.get(url, timeout=20)
             else:
-                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25)
-
-            # Rate-limit / server-error → back off and retry
-            if r.status_code in _RETRY_STATUSES:
-                wait = 2 ** (attempt + 1)          # 2s, 4s, 8s
-                time.sleep(wait)
-                continue
-
+                r = _CS.get(url, headers=_DCD_HEADERS, timeout=20)
             r.raise_for_status()
-
-            # Guard against empty / non-HTML bodies
-            ct = r.headers.get("Content-Type", "")
-            if "html" not in ct and "xml" not in ct and len(r.text) < 200:
-                return None
-
             return BeautifulSoup(r.text, "html.parser")
-
         except Exception:
-            if attempt < retries - 1:
-                time.sleep(2 ** attempt)            # 1s, 2s before final attempt
+            if attempt == 0:
+                time.sleep(2)
     return None
 
 
@@ -967,198 +965,7 @@ def _parse_articles_from_soup(soup, source_name, base_url):
     return articles
 
 
-# ─── Global request rate limiter ────────────────────────────────────────────
-class _RateLimiter:
-    """
-    Token-bucket rate limiter for the HTML scrapers.
-    Ensures the total requests/second across all scrapers stays under a
-    configurable ceiling, preventing IP bans at high scrape depths (50+).
-
-    Usage:
-        _rate_limiter.wait()   # call before every fetch_html() at depth
-    """
-    def __init__(self, max_rps: float = 2.5):
-        self._min_gap = 1.0 / max_rps    # minimum seconds between requests
-        self._last    = 0.0
-
-    def wait(self):
-        now  = time.monotonic()
-        gap  = now - self._last
-        if gap < self._min_gap:
-            time.sleep(self._min_gap - gap)
-        self._last = time.monotonic()
-
-_rate_limiter = _RateLimiter(max_rps=2.5)   # ≤ 2.5 requests/s globally
-
-
-# ─── Structural change detector ──────────────────────────────────────────────
-def _check_scraper_structure(soup, source_name: str, expected_min_links: int = 3) -> bool:
-    """
-    Lightweight structural health check.
-    Returns True if the page looks like a valid article listing.
-    Logs a warning into scraper health if the site has likely been redesigned.
-    """
-    if soup is None:
-        return False
-
-    # Check for a plausible number of article-like <a> tags
-    a_tags = soup.find_all("a", href=True)
-    if len(a_tags) < expected_min_links:
-        _record_health(
-            source_name, 0, 1,
-            f"⚠️ Structural change detected — only {len(a_tags)} links found. "
-            "Site may have been redesigned.",
-        )
-        return False
-
-    # Check that the page isn't a CAPTCHA / bot-block page
-    page_text = soup.get_text(" ", strip=True).lower()
-    block_signals = ["captcha", "access denied", "403 forbidden",
-                     "bot detection", "enable javascript", "checking your browser"]
-    for sig in block_signals:
-        if sig in page_text[:2000]:
-            _record_health(
-                source_name, 0, 1,
-                f"🚫 Bot block / CAPTCHA detected on {source_name}. "
-                "Consider rotating User-Agent or adding delay.",
-            )
-            return False
-
-    return True
-
-
-# ─── Scraper versioning & fallback parser registry ───────────────────────────
-# Each entry is a (version_tag, parser_fn) pair.
-# _parse_articles_from_soup_v2 is the current primary; earlier versions are kept
-# as automatic fallbacks so a DCD redesign degrades gracefully instead of
-# returning zero articles.
-#
-# How it works:
-#   scrape_dcd() calls _parse_articles_versioned() which tries parsers in order.
-#   If the primary returns < MIN_ARTICLES, it tries the next version.
-#   Health is recorded with which version succeeded (or "all_failed").
-#
-# To add a new parser after a redesign:
-#   1. Define _parse_articles_from_soup_vN(soup, source, base_url)
-#   2. Prepend it to _DCD_PARSER_VERSIONS below.
-
-_MIN_PARSER_ARTICLES = 1   # minimum articles to consider a parse "successful"
-
-def _parse_articles_v1_fallback(soup, source_name: str, base_url: str) -> list:
-    """
-    Broad fallback: catches any <a> whose href contains '/news/' or '/analysis/'
-    and whose inner text is long enough to be a headline.
-    Intentionally permissive — used only when the primary parser yields nothing.
-    """
-    articles = []
-    seen = set()
-    for a in soup.find_all("a", href=re.compile(r"/(news|analysis|opinion)/", re.I)):
-        href = a.get("href", "")
-        if not href:
-            continue
-        if not href.startswith("http"):
-            href = base_url + href
-        norm = href.rstrip("/")
-        if norm in seen:
-            continue
-        seen.add(norm)
-        text = a.get_text(" ", strip=True)
-        text = re.sub(r"\s+", " ", text).strip()
-        if len(text) < 12:
-            continue
-        articles.append({
-            "headline":  text,
-            "url":       norm,
-            "date_obj":  None,
-            "source":    source_name,
-            "_priority": 5,          # lower priority than primary parser
-        })
-    return articles
-
-
-def _parse_articles_v2_generic(soup, source_name: str, base_url: str) -> list:
-    """
-    Generic article-card parser: looks for <article> / [class*=card] / [class*=item]
-    wrappers that contain both a link and a heading, regardless of URL structure.
-    Used as a mid-level fallback between primary and broad fallback.
-    """
-    articles = []
-    seen = set()
-    containers = soup.find_all(
-        lambda tag: tag.name in ("article", "div", "li", "section")
-        and any(c for c in (tag.get("class") or [])
-                if any(kw in c.lower() for kw in ("card", "item", "post", "story", "result")))
-    )
-    for container in containers:
-        a_tag = container.find("a", href=True)
-        h_tag = container.find(["h1", "h2", "h3", "h4", "h5"])
-        if not a_tag or not h_tag:
-            continue
-        href = a_tag["href"]
-        if not href.startswith("http"):
-            href = base_url + href
-        norm = href.rstrip("/")
-        if norm in seen:
-            continue
-        seen.add(norm)
-        headline = re.sub(r"\s+", " ", h_tag.get_text(" ", strip=True)).strip()
-        if len(headline) < 10:
-            continue
-        # Try to extract a date from the container
-        date_obj = None
-        tt = container.find("time")
-        if tt:
-            date_obj = parse_date_str(tt.get("datetime", "") or tt.get_text(strip=True))
-        articles.append({
-            "headline":  headline,
-            "url":       norm,
-            "date_obj":  date_obj,
-            "source":    source_name,
-            "_priority": 4,
-        })
-    return articles
-
-
-# Ordered list of (version_tag, parser_fn) — primary first, fallbacks after.
-_DCD_PARSER_VERSIONS: list[tuple[str, callable]] = [
-    ("v3-primary",  _parse_articles_from_soup),   # current production parser
-    ("v2-generic",  _parse_articles_v2_generic),   # mid-level fallback
-    ("v1-broad",    _parse_articles_v1_fallback),  # permissive last-resort
-]
-
-
-def _parse_articles_versioned(
-    soup,
-    source_name: str,
-    base_url: str,
-    health_key: str = "DataCenterDynamics",
-) -> tuple[list, str]:
-    """
-    Try each parser version in order.  Returns (articles, version_tag) for the
-    first version that yields at least _MIN_PARSER_ARTICLES results.
-    Records health entry with the active parser version for observability.
-    """
-    for version_tag, parser_fn in _DCD_PARSER_VERSIONS:
-        try:
-            articles = parser_fn(soup, source_name, base_url)
-            if len(articles) >= _MIN_PARSER_ARTICLES:
-                _record_health(
-                    health_key, len(articles), 0,
-                    f"OK (parser={version_tag})",
-                )
-                return articles, version_tag
-        except Exception as exc:
-            _record_health(
-                health_key, 0, 1,
-                f"Parser {version_tag} error: {exc}",
-            )
-
-    # All parsers failed — log and return empty
-    _record_health(
-        health_key, 0, 1,
-        "⚠️ All parser versions failed — DCD may have been redesigned.",
-    )
-    return [], "all_failed"
+# ─── DCD scraper: construction channel × region terms (app15 engine) ───────
 def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
     """
     Scrapes DCD using:
@@ -1217,72 +1024,45 @@ def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
                     text=f"⚡ Neural Scan: Probing {', '.join(terms).upper()} · Page {page}/{max_pages}",
                 )
 
-            try:
-                _rate_limiter.wait()          # global request budget
-                soup = fetch_html(url)
-                if not soup:
-                    break   # this term set seems unreachable; move on
-
-                # Structural health check on the first page of each term set
-                if page == 1 and not _check_scraper_structure(soup, "DataCenterDynamics"):
-                    break
-
-                page_arts, _active_ver = _parse_articles_versioned(
-                    soup, "DataCenterDynamics", DCD_BASE
-                )
-                new_on_page = 0
-                stop = False
-
-                for art in page_arts:
-                    norm_url = art["url"].rstrip("/")
-                    if norm_url in seen_urls:
-                        continue
-                    seen_urls.add(norm_url)
-                    d = art["date_obj"]
-                    if d and d < cutoff:
-                        stop = True
-                        break
-                    all_articles.append(art)
-                    new_on_page += 1
-
-                if stop or new_on_page == 0:
-                    break
-
-            except Exception:
-                # One page failed — skip it but continue with remaining pages/terms
+            soup = fetch_html(url)
+            if not soup:
                 break
+
+            page_arts = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
+            new_on_page = 0
+            stop = False
+
+            for art in page_arts:
+                norm_url = art["url"].rstrip("/")
+                if norm_url in seen_urls:
+                    continue
+                seen_urls.add(norm_url)
+                d = art["date_obj"]
+                if d and d < cutoff:
+                    stop = True
+                    break
+                all_articles.append(art)
+                new_on_page += 1
+
+            if stop or new_on_page == 0:
+                break
+
+            time.sleep(0.5)
 
     return all_articles
 
 
-# ─── Google News fetcher — versioned with fallback chain ─────────────────────
-#
-# Problem: if Google changes its RSS structure, the entire GNews pipeline
-# silently returns zero articles.  We now have three strategies tried in order:
-#
-#   v1-rss     Primary: RSS feed via requests + feedparser (fastest)
-#   v2-atom    Fallback: Atom/JSON feed variant Google sometimes serves instead
-#   v3-scrape  Last-resort: scrape the Google News HTML search results page
-#
-# Each strategy is a standalone function returning a list or raising on failure.
-# _fetch_google_news_versioned() iterates through them and returns the first
-# non-empty result, recording which version was used in _SCRAPER_HEALTH.
-
-_GN_MIN_ENTRIES = 1   # minimum entries to consider a strategy successful
-
-
-def _gn_parse_feed(feed, source_label: str) -> list:
-    """Convert a feedparser feed object into our standard article dicts."""
+# ─── Google News fetcher ───────────────────────────────────────────────────
+def fetch_google_news(query, source_label="Google News"):
     results = []
-    for entry in feed.entries:
-        try:
-            headline = (entry.get("title") or "").strip()
-            url_val  = (entry.get("link")  or "").strip()
-            if not headline or len(headline) < 10:
-                continue
-            if not url_val or not url_val.startswith("http"):
-                continue
-            if "news.google.com/rss/articles" in url_val and len(url_val) < 60:
+    try:
+        q   = query.replace(" ", "+")
+        url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+        feed = feedparser.parse(url)
+        for entry in feed.entries:
+            headline = entry.get("title", "").strip()
+            url_val  = entry.get("link",  "").strip()
+            if not headline or not url_val:
                 continue
             date_obj = None
             if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -1297,144 +1077,20 @@ def _gn_parse_feed(feed, source_label: str) -> list:
                 "source":    source_label,
                 "_priority": 10,
             })
-        except Exception:
-            continue
-    return results
-
-
-def _gn_strategy_rss(q_encoded: str, source_label: str) -> list:
-    """v1-rss: Standard Google News RSS endpoint."""
-    url = f"https://news.google.com/rss/search?q={q_encoded}&hl=en-US&gl=US&ceid=US:en"
-    try:
-        if _USE_CS:
-            r = _CS.get(url, timeout=15)
-        else:
-            r = _CS.get(url, headers=_HEADERS, timeout=15)
-        r.raise_for_status()
-        feed = feedparser.parse(r.text)
     except Exception:
-        feed = feedparser.parse(url)   # let feedparser try with its own socket
-    if getattr(feed, "bozo", False) and not feed.entries:
-        raise ValueError("RSS feed bozo / empty")
-    results = _gn_parse_feed(feed, source_label)
-    if not results:
-        raise ValueError("RSS returned 0 usable entries")
+        pass
     return results
-
-
-def _gn_strategy_atom(q_encoded: str, source_label: str) -> list:
-    """
-    v2-atom: Google News Atom / alternate endpoint.
-    Google occasionally switches between RSS and Atom; this catches that.
-    Also tries the /search?q= HTML endpoint with an Accept header that
-    asks for application/atom+xml.
-    """
-    atom_url = f"https://news.google.com/atom/search?q={q_encoded}&hl=en-US&gl=US&ceid=US:en"
-    try:
-        if _USE_CS:
-            r = _CS.get(atom_url, timeout=15)
-        else:
-            r = _CS.get(atom_url, headers={**_HEADERS, "Accept": "application/atom+xml,*/*"}, timeout=15)
-        r.raise_for_status()
-        feed = feedparser.parse(r.text)
-    except Exception:
-        feed = feedparser.parse(atom_url)
-    if getattr(feed, "bozo", False) and not feed.entries:
-        raise ValueError("Atom feed bozo / empty")
-    results = _gn_parse_feed(feed, source_label)
-    if not results:
-        raise ValueError("Atom returned 0 usable entries")
-    return results
-
-
-def _gn_strategy_scrape(q_encoded: str, source_label: str) -> list:
-    """
-    v3-scrape: Last-resort direct HTML scrape of Google News search results.
-    Extracts article links and headlines from the rendered search page.
-    Less reliable than feed-based strategies but works when both feeds fail.
-    """
-    search_url = f"https://news.google.com/search?q={q_encoded}&hl=en-US&gl=US&ceid=US:en"
-    soup = fetch_html(search_url)
-    if soup is None:
-        raise ValueError("Google News HTML fetch returned None")
-    results = []
-    seen = set()
-    # Google News renders articles as <article> tags with <a> links inside
-    for article_tag in soup.find_all("article"):
-        a = article_tag.find("a", href=True)
-        if not a:
-            continue
-        href = a.get("href", "")
-        # GNews uses relative /articles/... links
-        if href.startswith("./"):
-            href = "https://news.google.com/" + href[2:]
-        elif href.startswith("/"):
-            href = "https://news.google.com" + href
-        if not href.startswith("http"):
-            continue
-        if href in seen:
-            continue
-        seen.add(href)
-        # Headline: prefer h3/h4, fall back to all link text
-        h_tag = article_tag.find(["h3", "h4"])
-        headline = (h_tag.get_text(" ", strip=True) if h_tag
-                    else a.get_text(" ", strip=True)).strip()
-        headline = re.sub(r"\s+", " ", headline)
-        if len(headline) < 10:
-            continue
-        # Date from <time datetime="..."> if present
-        date_obj = None
-        tt = article_tag.find("time")
-        if tt:
-            date_obj = parse_date_str(tt.get("datetime", "") or tt.get_text(strip=True))
-        results.append({
-            "headline":  headline,
-            "url":       href,
-            "date_obj":  date_obj,
-            "source":    source_label,
-            "_priority": 11,   # slightly lower than feed-based
-        })
-    if not results:
-        raise ValueError("HTML scrape returned 0 usable articles")
-    return results
-
-
-# Ordered list of (version_tag, strategy_fn) — primary first
-_GN_STRATEGIES: list[tuple[str, callable]] = [
-    ("v1-rss",    _gn_strategy_rss),
-    ("v2-atom",   _gn_strategy_atom),
-    ("v3-scrape", _gn_strategy_scrape),
-]
-
-
-def fetch_google_news(query: str, source_label: str = "Google News") -> list:
-    """
-    Fetch Google News articles for `query` using a versioned fallback chain.
-    Returns a (possibly empty) list — never raises.
-    Tries v1-rss → v2-atom → v3-scrape in order, stopping at the first success.
-    """
-    q_encoded = query.replace(" ", "+")
-    for version_tag, strategy_fn in _GN_STRATEGIES:
-        try:
-            results = strategy_fn(q_encoded, source_label)
-            if len(results) >= _GN_MIN_ENTRIES:
-                # Tag each article with the strategy that produced it (for debugging)
-                for r in results:
-                    r["_gn_strategy"] = version_tag
-                return results
-        except Exception:
-            continue   # try next strategy
-
-    return []   # all strategies failed — caller tracks error count
 
 
 # ─── Scraper health tracking ────────────────────────────────────────────────
-# Each source is tracked: articles fetched, errors, last status
-_SCRAPER_HEALTH: dict = {}
+# Health is stored in a plain dict that gets written into st.session_state
+# after each scrape run, so concurrent users never clobber each other.
+# _scrape_health_buf is a local accumulator used only inside run_all_scrapers.
+_scrape_health_buf: dict = {}   # module-level buffer; only lives during a scrape call
 
 def _record_health(source: str, count: int, errors: int, status: str):
-    """Record per-source scrape health for the Source Health panel."""
-    _SCRAPER_HEALTH[source] = {
+    """Accumulate per-source scrape health into the local buffer."""
+    _scrape_health_buf[source] = {
         "articles": count,
         "errors":   errors,
         "status":   status,
@@ -1453,63 +1109,54 @@ def scrape_dck(cutoff, max_pages=5):
     try:
         for page in range(1, max_pages + 1):
             url = DCK_BASE + "/news" + (f"?page={page}" if page > 1 else "")
-            try:
-                _rate_limiter.wait()
-                soup = fetch_html(url)
-                if soup is None:
-                    errors += 1
-                    break
-                if page == 1 and not _check_scraper_structure(soup, "DataCenter Knowledge"):
-                    errors += 1
-                    break
-                for a in soup.find_all("a", href=re.compile(r"/(data-centers|cloud|edge)/[^?#]+$")):
-                    href = a.get("href", "")
-                    if not href.startswith("http"):
-                        href = DCK_BASE + href
-                    if href in seen:
-                        continue
-                    seen.add(href)
-                    h_tag = a.find(["h1","h2","h3","h4"])
-                    headline = (h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)).strip()
-                    if not headline or len(headline) < 12:
-                        continue
-                    # date: walk up DOM
-                    date_obj = None
-                    node = a.parent
-                    for _ in range(10):
-                        if node is None:
-                            break
-                        tt = node.find("time")
-                        if tt:
-                            date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
-                            if date_obj:
-                                break
-                        m = re.search(r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b", node.get_text(" ",strip=True), re.I)
-                        if m:
-                            date_obj = parse_date_str(m.group(0))
-                            break
-                        node = node.parent
-                    if date_obj and date_obj < cutoff:
-                        break
-                    if not is_dc_relevant(headline):
-                        continue
-                    articles.append({
-                        "headline":  headline,
-                        "url":       href,
-                        "date_obj":  date_obj,
-                        "source":    "DataCenter Knowledge",
-                        "_priority": 2,
-                    })
-                time.sleep(0.4)
-            except Exception as page_exc:
+            soup = fetch_html(url)
+            if soup is None:
                 errors += 1
-                break   # stop paging this source on page-level error
+                break
+            for a in soup.find_all("a", href=re.compile(r"/(data-centers|cloud|edge)/[^?#]+$")):
+                href = a.get("href", "")
+                if not href.startswith("http"):
+                    href = DCK_BASE + href
+                if href in seen:
+                    continue
+                seen.add(href)
+                h_tag = a.find(["h1","h2","h3","h4"])
+                headline = (h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)).strip()
+                if not headline or len(headline) < 12:
+                    continue
+                # date: walk up DOM
+                date_obj = None
+                node = a.parent
+                for _ in range(10):
+                    if node is None:
+                        break
+                    tt = node.find("time")
+                    if tt:
+                        date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
+                        if date_obj:
+                            break
+                    m = re.search(r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b", node.get_text(" ",strip=True), re.I)
+                    if m:
+                        date_obj = parse_date_str(m.group(0))
+                        break
+                    node = node.parent
+                if date_obj and date_obj < cutoff:
+                    break
+                if not is_dc_relevant(headline):
+                    continue
+                articles.append({
+                    "headline":  headline,
+                    "url":       href,
+                    "date_obj":  date_obj,
+                    "source":    "DataCenter Knowledge",
+                    "_priority": 2,
+                })
+            time.sleep(0.4)
     except Exception as exc:
         errors += 1
         _record_health("DataCenter Knowledge", len(articles), errors, f"Error: {exc}")
         return articles
-    _record_health("DataCenter Knowledge", len(articles), errors,
-                   "OK" if errors == 0 else f"Partial ({errors} page error(s))")
+    _record_health("DataCenter Knowledge", len(articles), errors, "OK" if errors == 0 else "Partial")
     return articles
 
 
@@ -1524,58 +1171,49 @@ def scrape_dcm(cutoff, max_pages=4):
     try:
         for page in range(1, max_pages + 1):
             url = DCM_BASE + "/latest" + (f"?page={page}" if page > 1 else "")
-            try:
-                _rate_limiter.wait()
-                soup = fetch_html(url)
-                if soup is None:
-                    errors += 1
-                    break
-                if page == 1 and not _check_scraper_structure(soup, "DataCentreMagazine"):
-                    errors += 1
-                    break
-                for a in soup.find_all("a", href=re.compile(r"/(data-centres|technology|sustainability)/[^?#]+")):
-                    href = a.get("href", "")
-                    if not href.startswith("http"):
-                        href = DCM_BASE + href
-                    if href in seen:
-                        continue
-                    seen.add(href)
-                    h_tag = a.find(["h1","h2","h3","h4"])
-                    headline = (h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)).strip()
-                    if not headline or len(headline) < 12:
-                        continue
-                    date_obj = None
-                    node = a.parent
-                    for _ in range(10):
-                        if node is None:
-                            break
-                        tt = node.find("time")
-                        if tt:
-                            date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
-                            if date_obj:
-                                break
-                        node = node.parent
-                    if date_obj and date_obj < cutoff:
-                        break
-                    if not is_dc_relevant(headline):
-                        continue
-                    articles.append({
-                        "headline":  headline,
-                        "url":       href,
-                        "date_obj":  date_obj,
-                        "source":    "DataCentreMagazine",
-                        "_priority": 3,
-                    })
-                time.sleep(0.4)
-            except Exception:
+            soup = fetch_html(url)
+            if soup is None:
                 errors += 1
-                break   # stop paging on page-level error
+                break
+            for a in soup.find_all("a", href=re.compile(r"/(data-centres|technology|sustainability)/[^?#]+")):
+                href = a.get("href", "")
+                if not href.startswith("http"):
+                    href = DCM_BASE + href
+                if href in seen:
+                    continue
+                seen.add(href)
+                h_tag = a.find(["h1","h2","h3","h4"])
+                headline = (h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)).strip()
+                if not headline or len(headline) < 12:
+                    continue
+                date_obj = None
+                node = a.parent
+                for _ in range(10):
+                    if node is None:
+                        break
+                    tt = node.find("time")
+                    if tt:
+                        date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
+                        if date_obj:
+                            break
+                    node = node.parent
+                if date_obj and date_obj < cutoff:
+                    break
+                if not is_dc_relevant(headline):
+                    continue
+                articles.append({
+                    "headline":  headline,
+                    "url":       href,
+                    "date_obj":  date_obj,
+                    "source":    "DataCentreMagazine",
+                    "_priority": 3,
+                })
+            time.sleep(0.4)
     except Exception as exc:
         errors += 1
         _record_health("DataCentreMagazine", len(articles), errors, f"Error: {exc}")
         return articles
-    _record_health("DataCentreMagazine", len(articles), errors,
-                   "OK" if errors == 0 else f"Partial ({errors} page error(s))")
+    _record_health("DataCentreMagazine", len(articles), errors, "OK" if errors == 0 else "Partial")
     return articles
 
 
@@ -1585,18 +1223,9 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
     region_terms: list of DCD region slug strings (e.g. ["north-america","europe"]).
                   Pass [] or None for global (no region filter on DCD).
     Returns (filtered_articles, health_dict).
-
-    Error-resilience improvements:
-    - Each HTML scraper runs inside its own try/except; failure of one never
-      blocks the others.
-    - DCD partial success (articles > 0 even if an exception was caught) is
-      recorded as "Partial" rather than "Error".
-    - Google News futures have a per-future timeout so one slow query doesn't
-      stall the whole pool.
-    - An empty raw list is handled gracefully instead of crashing the filter step.
     """
-    global _SCRAPER_HEALTH
-    _SCRAPER_HEALTH = {}   # reset on each scan
+    global _scrape_health_buf
+    _scrape_health_buf = {}   # reset on each scan
 
     if region_terms is None:
         region_terms = []
@@ -1608,7 +1237,6 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
     class _FakePbar:
         def progress(self, frac, text=""): progress_cb(frac * 0.55, text)
 
-    dcd_arts: list = []
     try:
         dcd_arts = scrape_dcd(cutoff, max_html_pages, region_terms, pbar=_FakePbar())
         raw.extend(dcd_arts)
@@ -1616,93 +1244,63 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
         progress_cb(0.55, f"DCD: {len(dcd_arts)} articles")
     except Exception as exc:
         failed_sources.append(f"DCD: {exc}")
-        # If we collected something before the exception, mark as Partial
-        status = f"Partial ({len(dcd_arts)} articles)" if dcd_arts else f"Error: {exc}"
-        _record_health("DataCenterDynamics", len(dcd_arts), 1, status)
-        if dcd_arts:
-            raw.extend(dcd_arts)
-        progress_cb(0.55, f"DCD: {'partial' if dcd_arts else 'failed'}")
+        _record_health("DataCenterDynamics", 0, 1, f"Error: {exc}")
+        progress_cb(0.55, "DCD: failed")
 
     # ── Step 2: DataCenter Knowledge ──────────────────────────────────────
     progress_cb(0.58, "Scraping DataCenter Knowledge…")
-    dck_arts: list = []
     try:
         dck_arts = scrape_dck(cutoff, max_pages=min(max_html_pages, 6))
         raw.extend(dck_arts)
         progress_cb(0.62, f"DCK: {len(dck_arts)} articles")
     except Exception as exc:
         failed_sources.append(f"DCK: {exc}")
-        status = f"Partial ({len(dck_arts)} articles)" if dck_arts else f"Error: {exc}"
-        _record_health("DataCenter Knowledge", len(dck_arts), 1, status)
-        if dck_arts:
-            raw.extend(dck_arts)
+        _record_health("DataCenter Knowledge", 0, 1, f"Error: {exc}")
 
     # ── Step 3: Data Centre Magazine ──────────────────────────────────────
     progress_cb(0.63, "Scraping Data Centre Magazine…")
-    dcm_arts: list = []
     try:
         dcm_arts = scrape_dcm(cutoff, max_pages=min(max_html_pages, 4))
         raw.extend(dcm_arts)
         progress_cb(0.66, f"DCM: {len(dcm_arts)} articles")
     except Exception as exc:
         failed_sources.append(f"DCM: {exc}")
-        status = f"Partial ({len(dcm_arts)} articles)" if dcm_arts else f"Error: {exc}"
-        _record_health("DataCentreMagazine", len(dcm_arts), 1, status)
-        if dcm_arts:
-            raw.extend(dcm_arts)
+        _record_health("DataCentreMagazine", 0, 1, f"Error: {exc}")
 
     # ── Step 4: Google News supplement (runs in parallel) ─────────────────
     progress_cb(0.68, "Fetching Google News supplement…")
-    gn_results: list = []
+    gn_results = []
     gn_errors  = 0
-    _GN_FUTURE_TIMEOUT = 20   # seconds per individual query future
-
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(fetch_google_news, q, lbl): lbl for q, lbl in GNEWS_QUERIES}
         done = [0]
-        for f in as_completed(futures, timeout=None):
+        for f in as_completed(futures):
             try:
-                batch = f.result(timeout=_GN_FUTURE_TIMEOUT)
-                if batch:
-                    gn_results.extend(batch)
+                gn_results.extend(f.result())
             except Exception:
                 gn_errors += 1
             done[0] += 1
             progress_cb(0.68 + 0.28 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
-
     raw.extend(gn_results)
-    _record_health(
-        "Google News", len(gn_results), gn_errors,
-        "OK" if gn_errors == 0 else f"{gn_errors} query error(s)",
-    )
-
+    _record_health("Google News", len(gn_results), gn_errors,
+                   "OK" if gn_errors == 0 else f"{gn_errors} query errors")
     if failed_sources:
-        _record_health(
-            "_failed_sources", 0, len(failed_sources),
-            " | ".join(failed_sources),
-        )
+        _record_health("_failed_sources", 0, len(failed_sources),
+                       " | ".join(failed_sources))
 
     progress_cb(0.97, "Filtering and deduplicating…")
-
-    # Guard: nothing scraped at all
-    if not raw:
-        return []
 
     # ── Step 5: date cutoff + DC relevance filter ─────────────────────────
     filtered = []
     for item in raw:
-        # Skip items with missing or invalid headline
-        headline = item.get("headline", "").strip()
-        if not headline:
-            continue
         d = item.get("date_obj")
         if d and d < cutoff:
             continue
-        if not is_dc_relevant(headline):
+        if not is_dc_relevant(item["headline"]):
             continue
         filtered.append(item)
 
-    return filtered
+    return filtered, dict(_scrape_health_buf)
 
 
 # ─── SCRAPE_SOURCES — all active sources ────────────────────────────────────
@@ -1717,18 +1315,8 @@ SCRAPE_SOURCES = [
     {"name": "Google News (Investment)",    "url": "", "type": "gnews", "priority": 10},
 ]
 def is_dc_relevant(text):
-    """
-    Three-tier relevance filter:
-      1. Primary keywords  → any single match = relevant
-      2. Strong secondary  → any single match = relevant (specific DC-tech terms)
-      3. Weak secondary    → requires 2+ matches (generic financial/size words)
-
-    This prevents "$1bn acquisition" or "100 acres" alone from passing
-    while still catching multi-signal headlines like "$2bn data park".
-    """
     t = text.lower()
-
-    # ── Tier 1: Primary — any single term is conclusive ──────────────────────
+    # Primary: any of these alone = relevant
     primary = [
         "data center", "datacenter", "data centre", "datacentre",
         "colocation", "colo ", "hyperscale", "cloud campus",
@@ -1736,106 +1324,61 @@ def is_dc_relevant(text):
         "compute campus", "hpc facility", "edge facility",
         "carrier hotel", "internet exchange", "ix facility",
         "infrastructure reit", "digital infrastructure",
+        # Additional primary terms
         "data hall", "data park", "digital campus",
         "compute facility", "cloud facility", "network facility",
         "ai factory", "inference facility", "training facility",
         "wholesale data", "retail colocation", "powered shell",
         "build-to-suit", "mission critical", "critical facility",
     ]
-    if any(p in t for p in primary):
-        return True
-
-    # ── Tier 2: Strong secondary — highly specific DC-tech terms ─────────────
-    # Any single one of these is a strong enough signal on its own.
-    strong_secondary = [
+    # Secondary: two or more = relevant
+    secondary = [
         "megawatt", " mw ", " gw ", "gigawatt",
+        "computing facility", "edge computing",
         "power purchase agreement", " ppa ", "behind the meter",
         "grid connection", "critical load", "raised floor",
         "cooling tower", "liquid cooling", "immersion cooling",
         "diesel generator", "ups system", "modular data",
         "tier iii", "tier iv", "uptime institute",
+        "network access point", "internet hub",
         "rack space", "co-location", "hosting facility",
-        "ai infrastructure", "edge computing",
-        "crac unit", "adiabatic cooling", "free cooling",
-        "power usage effectiveness", "water usage effectiveness",
-        "pue", "wue",
-        "sale leaseback", "forward purchase",
-        "offtake agreement", "capacity agreement", "pre-lease",
+        "blade server", "server deployment", "ai infrastructure",
+        # Currency / financial signals
+        "$", "€", "£", "¥", "₹", "billion", "million",
+        "usd", "eur", "gbp", "jpy", "inr", "sgd", "aed",
+        "investment", "financing", "acquisition", "deal",
+        # Size / land signals
+        "acres", "acre", "hectares", "hectare", "sq ft", "square feet",
+        "square meters", "sq m", "campus site", "land parcel",
+        # Power / capacity signals
+        "kilowatt", " kw ", "kwh", "mwh", "gwh",
+        "substation", "transformer", "generator set",
+        "ups capacity", "power density",
+        # Construction / development signals
         "breaking ground", "ground breaking", "ribbon cutting",
         "topping off", "commissioning", "fit-out", "fitout",
         "shell and core", "white space", "raised floor space",
-        "kilowatt", "kwh", "mwh", "gwh",
-        "substation", "transformer", "generator set",
-        "ups capacity", "power density",
-        "campus site", "land parcel",
+        # Deal / financial terms
+        "sale leaseback", "forward purchase", "joint venture",
+        "mou", "memorandum of understanding", "loi", "letter of intent",
+        "offtake agreement", "capacity agreement", "pre-lease",
+        # Operator / technology signals
+        "crac unit", "adiabatic cooling", "free cooling",
+        "power usage effectiveness", "water usage effectiveness",
+        "pue", "wue", "dcu", "noc", "soc",
     ]
-    if any(s in t for s in strong_secondary):
+    if any(p in t for p in primary):
         return True
-
-    # ── Tier 3: Weak secondary — generic financial/size words ─────────────────
-    # Require 2+ matches to avoid passing "$1bn pharma deal" or "100 acres farm".
-    weak_secondary = [
-        "$", "€", "£", "¥", "₹",
-        "billion", "million",
-        "usd", "eur", "gbp", "jpy", "inr", "sgd", "aed",
-        "investment", "financing", "acquisition", "deal",
-        "acres", "acre", "hectares", "hectare",
-        "sq ft", "square feet", "square meters", "sq m",
-        "joint venture", "mou", "memorandum of understanding",
-        "loi", "letter of intent",
-        "blade server", "server deployment",
-        "network access point", "internet hub",
-        " kw ",
-    ]
-    if sum(1 for w in weak_secondary if w in t) >= 2:
+    if sum(1 for s in secondary if s in t) >= 1:   # lowered threshold to 1 for secondary
         return True
-
     return False
 
 
-# ─── Country detection: O(1) compiled-regex index ────────────────────────────
-# Pre-compile one regex per country and build a list sorted by specificity
-# (longer keyword lists first so more-specific countries win on ties).
-# This replaces the O(countries × patterns × articles) linear scan with a
-# single compiled-regex pass per article — roughly 60× faster at 3 000+ articles.
-
-def _build_country_index(kw_map: dict) -> list[tuple[str, re.Pattern]]:
-    """
-    Returns a list of (country, compiled_pattern) sorted so that countries
-    with more keywords (more specific) are checked first.
-    """
-    index = []
-    for country, patterns in sorted(kw_map.items(), key=lambda x: -len(x[1])):
-        parts = []
+def detect_country(text):
+    for country, patterns in COUNTRY_KEYWORDS.items():
         for pat in patterns:
-            if pat.startswith(r"\b"):
-                parts.append(pat)
-            else:
-                parts.append(r"\b" + re.escape(pat) + r"\b")
-        combined = "|".join(f"(?:{p})" for p in parts)
-        try:
-            index.append((country, re.compile(combined, re.I)))
-        except re.error:
-            # Fallback: compile each sub-pattern individually
-            for p in parts:
-                try:
-                    index.append((country, re.compile(p, re.I)))
-                    break
-                except re.error:
-                    pass
-    return index
-
-_COUNTRY_INDEX: list[tuple[str, re.Pattern]] = _build_country_index(COUNTRY_KEYWORDS)
-
-
-def detect_country(text: str) -> str:
-    """
-    O(countries) country detection using pre-compiled combined regexes.
-    Falls back to 'Global' when no pattern matches.
-    """
-    for country, pattern in _COUNTRY_INDEX:
-        if pattern.search(text):
-            return country
+            if re.search(pat if pat.startswith(r"\b") else r"\b" + re.escape(pat) + r"\b", text, re.I):
+                return country
     return "Global"
 
 
@@ -1928,241 +1471,51 @@ def _normalise_headline(h):
     return h
 
 
-def _extract_headline_entities(headline: str) -> dict:
-    """
-    Extract concrete entities from a headline for direct comparison:
-      companies, country, mw_value, deal_value
-    Used by fuzzy_similar to avoid collapsing structurally similar but
-    factually distinct headlines (e.g. Google vs Amazon, 100MW vs 300MW).
-    """
-    # Companies present (sorted for determinism)
-    companies = sorted(
-        co for co in KNOWN_COMPANIES
-        if re.search(r"\b" + re.escape(co) + r"\b", headline, re.I)
-    )
-    # Country
-    country = detect_country(headline)
-    # Numeric capacity (extract raw number for comparison)
-    mw_raw = ""
-    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt|kilowatt|kw)\b", headline, re.I)
-    if m:
-        mw_raw = m.group(1).replace(",", "") + m.group(2).upper()
-    # Numeric deal value (raw number + unit)
-    deal_raw = ""
-    m2 = re.search(
-        r"(\$|€|£|US\$|USD|EUR|GBP|AED|SGD|INR)?\s*([\d,.]+)\s*(billion|bn|million|mn)",
-        headline, re.I
-    )
-    if m2:
-        deal_raw = m2.group(2).replace(",", "") + (m2.group(3) or "").lower()[:2]
-    return {
-        "companies": companies,
-        "country":   country,
-        "mw":        mw_raw,
-        "deal":      deal_raw,
-    }
-
-
-def _entities_conflict(a: str, b: str) -> bool:
-    """
-    Return True if two headlines have concrete entity values that differ,
-    meaning they are factually distinct stories despite structural similarity.
-    Conflicts:
-      - Different lead companies (both non-empty and not overlapping)
-      - Different specific country (both non-Global and different)
-      - Different MW value (both non-empty and different)
-      - Different deal value (both non-empty and different)
-    """
-    ea, eb = _extract_headline_entities(a), _extract_headline_entities(b)
-
-    # Company conflict: both have companies, no overlap
-    if ea["companies"] and eb["companies"]:
-        if not set(ea["companies"]) & set(eb["companies"]):
-            return True
-
-    # Country conflict
-    if (ea["country"] != "Global" and eb["country"] != "Global"
-            and ea["country"] != eb["country"]):
-        return True
-
-    # MW conflict: both have a capacity value and they differ
-    if ea["mw"] and eb["mw"] and ea["mw"] != eb["mw"]:
-        return True
-
-    # Deal value conflict
-    if ea["deal"] and eb["deal"] and ea["deal"] != eb["deal"]:
-        return True
-
-    return False
-
-
-def fuzzy_similar(a: str, b: str, threshold: float | None = None) -> bool:
-    """
-    Entity-aware duplicate detector.
-
-    Step 1 — Entity conflict check (fast): if the two headlines have concrete
-    entities that differ (different companies, locations, MW, or deal values),
-    they are NOT duplicates regardless of string similarity.  This prevents
-    "Google 100MW Iowa" and "Amazon 100MW Iowa" from collapsing.
-
-    Step 2 — String similarity: use a context-derived threshold based on
-    the entity density of each headline.  Entity-rich headlines use a lower
-    threshold (0.65) to catch paraphrased cross-source duplicates; generic
-    headlines use 0.88 to avoid collapsing temporally distinct stories.
-
-    Step 3 — Substring containment: only for entity-rich headlines where
-    one headline is a truncated version of the other.
-    """
+def fuzzy_similar(a, b, threshold=0.88):
+    """True if two normalised headlines are likely the same story."""
     na, nb = _normalise_headline(a), _normalise_headline(b)
+    # Exact match after normalisation
     if na == nb:
         return True
-
-    # Step 1: bail out immediately on entity conflict
-    if _entities_conflict(a, b):
-        return False
-
-    # Step 2: string similarity
-    if threshold is None:
-        density_a = _headline_entity_density(a)
-        density_b = _headline_entity_density(b)
-        # Use tighter threshold for entity-rich headlines (paraphrase detection)
-        max_density = max(density_a, density_b)
-        if max_density >= 3:
-            threshold = 0.65
-        elif max_density >= 1:
-            threshold = 0.82
-        else:
-            threshold = 0.88
-
+    # Sequence similarity
     ratio = SequenceMatcher(None, na, nb).ratio()
     if ratio >= threshold:
         return True
-
-    # Step 3: substring containment — only for entity-rich pairs
-    min_density = min(_headline_entity_density(a), _headline_entity_density(b))
+    # One is a substring of the other (short headline vs long headline of same story)
     shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
-    if min_density >= 2 and len(shorter) >= 30 and shorter in longer:
-        return True
-
-    return False
-    """
-    Count entity signals in a headline: each MW value, deal size, company name,
-    and country match adds 1.  Used to decide how tight the dedup threshold is.
-    A headline with 3+ signals is entity-rich and needs a tighter threshold
-    (0.72) so cross-source duplicates of the same specific story collapse.
-    A generic headline (0 signals) keeps the loose threshold (0.88) so
-    "Equinix expands in Europe" (Jan) ≠ "Equinix expands in Europe" (Mar).
-    """
-    score = 0
-    if detect_mw(headline):
-        score += 1
-    if detect_deal_size(headline):
-        score += 1
-    # Count company matches (capped at 2 to avoid over-weighting)
-    co_hits = sum(
-        1 for co in KNOWN_COMPANIES
-        if re.search(r"\b" + re.escape(co) + r"\b", headline, re.I)
-    )
-    score += min(co_hits, 2)
-    # Country / location match
-    if detect_country(headline) != "Global":
-        score += 1
-    return score
-
-
-def _dedup_threshold(headline: str) -> float:
-    """
-    Return the similarity threshold for this headline.
-    Entity-rich (≥3 signals) → 0.72  (tight: same story from different sources)
-    Moderate (1-2 signals)   → 0.82
-    Generic (0 signals)      → 0.88  (loose: avoid collapsing similar-sounding
-                                       but temporally distinct generic headlines)
-    """
-    density = _headline_entity_density(headline)
-    if density >= 3:
-        return 0.72
-    if density >= 1:
-        return 0.82
-    return 0.88
-
-
-def fuzzy_similar(a: str, b: str, threshold: float | None = None) -> bool:
-    """
-    True if two normalised headlines are likely the same story.
-    If threshold is None, it is derived from the entity density of the
-    more specific headline (lower of the two thresholds = safer).
-    """
-    na, nb = _normalise_headline(a), _normalise_headline(b)
-    if na == nb:
-        return True
-    # Use the tighter of the two context-derived thresholds
-    if threshold is None:
-        threshold = min(_dedup_threshold(a), _dedup_threshold(b))
-    ratio = SequenceMatcher(None, na, nb).ratio()
-    if ratio >= threshold:
-        return True
-    # Substring containment: only for entity-rich headlines (avoids generic false merges)
-    shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
-    min_density = min(_headline_entity_density(a), _headline_entity_density(b))
-    if min_density >= 2 and len(shorter) >= 30 and shorter in longer:
+    if len(shorter) >= 30 and shorter in longer:
         return True
     return False
-
-
-def _trigram_set(text: str) -> set:
-    """Return the set of character trigrams for a normalised headline."""
-    t = _normalise_headline(text)
-    return {t[i:i+3] for i in range(len(t) - 2)} if len(t) >= 3 else {t}
 
 
 def deduplicate(articles):
     """
     1. URL-based exact dedup (same URL = same article).
-    2. Fuzzy headline dedup — O(n log n) via trigram-bucket pre-filter.
-       Two headlines only reach SequenceMatcher if they share enough trigrams,
-       which eliminates ~95 % of comparisons at large article counts.
-       When duplicates are found, keep the article from the source with the
-       lowest _priority number (DCD = 1 wins).
+    2. Fuzzy headline dedup — when two articles match, keep the one from
+       the source with the lowest _priority number (DCD = 1 wins).
     """
-    # ── Step 1: URL dedup — sort by priority so DCD URLs win ties ────────────
-    seen_urls: dict = {}
+    # Step 1: URL dedup — sort by priority so DCD URLs win ties
+    seen_urls = {}
     for art in sorted(articles, key=lambda x: x.get("_priority", 99)):
         url = str(art.get("URL", art.get("url", ""))).strip().rstrip("/")
         if url and url not in seen_urls:
             seen_urls[url] = art
     url_deduped = list(seen_urls.values())
 
-    # ── Step 2: Fuzzy headline dedup — trigram-accelerated ───────────────────
+    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
     url_deduped.sort(key=lambda x: x.get("_priority", 99))
-
-    # Build an inverted index: trigram → list of keep-indices that contain it
-    keep: list = []
-    trigram_index: dict[str, list[int]] = {}   # trigram → indices in keep[]
-
+    keep = []
+    seen_headlines = []
     for art in url_deduped:
-        hl  = art.get("Headline", art.get("headline", ""))
-        tgs = _trigram_set(hl)
-
-        # Collect candidate indices that share at least 1 trigram
-        candidate_indices: set[int] = set()
-        for tg in tgs:
-            for idx in trigram_index.get(tg, []):
-                candidate_indices.add(idx)
-
+        hl = art.get("Headline", art.get("headline", ""))
         is_dup = False
-        for idx in candidate_indices:
-            kept_hl = keep[idx].get("Headline", keep[idx].get("headline", ""))
-            if fuzzy_similar(hl, kept_hl):
+        for seen in seen_headlines:
+            if fuzzy_similar(hl, seen):
                 is_dup = True
                 break
-
         if not is_dup:
-            new_idx = len(keep)
             keep.append(art)
-            # Index the new article's trigrams
-            for tg in tgs:
-                trigram_index.setdefault(tg, []).append(new_idx)
-
+            seen_headlines.append(hl)
     return keep
 
 
@@ -2201,82 +1554,27 @@ _STOPWORDS = {
 }
 
 def _tfidf_scores(headlines):
-    """
-    Significance-weighted headline scorer.
-
-    Pure TF-IDF rewards rare vocabulary, not importance — a niche headline
-    with unusual words outscores a major deal announcement with common terms.
-    This blends TF-IDF (60 %) with a DC-signal bonus (40 %) so headlines
-    that mention MW values, deal sizes, named companies, and specific locations
-    score higher than ones that just happen to use unusual words.
-
-    Signal bonus components (each normalised to [0, 1]):
-      • capacity_bonus : MW/GW value present (+0.4 max)
-      • deal_bonus     : deal size present (+0.3 max)
-      • company_bonus  : 1–3 known companies (+0.1 per company, max 0.3)
-      • location_bonus : non-Global country detected (+0.2)
-      • sentiment_bonus: Opened/Live or Approved (+0.15), Under Construction (+0.1)
-
-    The final score is: 0.6 × tfidf_norm + 0.4 × signal_norm
-    """
+    """Lightweight TF-IDF over headline tokens → sentence score dict."""
     tokenize = lambda h: [w.lower() for w in re.findall(r"[a-zA-Z]{3,}", h)
                           if w.lower() not in _STOPWORDS]
     tokenized = [tokenize(h) for h in headlines]
-
-    # ── TF-IDF component ──────────────────────────────────────────────────────
-    N = max(len(headlines), 1)
+    # IDF
+    N = len(headlines)
     df_counts = Counter()
     for toks in tokenized:
         for t in set(toks):
             df_counts[t] += 1
     idf = {t: math.log((N + 1) / (c + 1)) + 1 for t, c in df_counts.items()}
-    raw_tfidf = []
+    # TF-IDF score per sentence
+    scores = []
     for toks in tokenized:
         if not toks:
-            raw_tfidf.append(0.0)
+            scores.append(0.0)
             continue
         tf = Counter(toks)
-        raw_tfidf.append(sum(tf[t] * idf.get(t, 1) for t in toks) / len(toks))
-
-    # Normalise TF-IDF to [0, 1]
-    max_tfidf = max(raw_tfidf) if raw_tfidf else 1.0
-    if max_tfidf == 0:
-        max_tfidf = 1.0
-    tfidf_norm = [s / max_tfidf for s in raw_tfidf]
-
-    # ── DC-signal bonus component ─────────────────────────────────────────────
-    HIGH_SENT = {"Opened / Live", "Approved"}
-    MID_SENT  = {"Under Construction"}
-
-    signal_scores = []
-    for h in headlines:
-        bonus = 0.0
-        if detect_mw(h):
-            bonus += 0.4
-        if detect_deal_size(h):
-            bonus += 0.3
-        co_hits = sum(
-            1 for co in KNOWN_COMPANIES
-            if re.search(r"\b" + re.escape(co) + r"\b", h, re.I)
-        )
-        bonus += min(co_hits, 3) * 0.1
-        if detect_country(h) != "Global":
-            bonus += 0.2
-        sent = detect_sentiment(h)
-        if sent in HIGH_SENT:
-            bonus += 0.15
-        elif sent in MID_SENT:
-            bonus += 0.10
-        signal_scores.append(min(bonus, 1.0))   # cap at 1.0
-
-    # Normalise signal scores (already in [0, 1] range, but normalise for fairness)
-    max_sig = max(signal_scores) if signal_scores else 1.0
-    if max_sig == 0:
-        max_sig = 1.0
-    signal_norm = [s / max_sig for s in signal_scores]
-
-    # ── Blend: 60 % TF-IDF + 40 % signal ────────────────────────────────────
-    return [0.6 * t + 0.4 * s for t, s in zip(tfidf_norm, signal_norm)]
+        s = sum(tf[t] * idf.get(t, 1) for t in toks) / len(toks)
+        scores.append(s)
+    return scores
 
 
 def generate_local_summary(df, sel_desc, date_range):
@@ -3500,6 +2798,20 @@ def kpi(label, value, accent="blue", delta=""):
     )
 
 
+# ─── Cached scraper entry-point (module-level so @st.cache_data works) ───────
+# Defined here — outside main() — so Streamlit registers it once and the TTL
+# cache persists across button clicks and user sessions.
+# TTL = 2700 s (45 min).  Re-runs only when (max_pages, cutoff_ts, regions) change.
+@st.cache_data(ttl=2700, show_spinner=False)
+def _cached_scrape(max_p, cutoff_ts, regions_key):
+    """Cached wrapper around run_all_scrapers.  Returns (raw_articles, health_dict)."""
+    _cutoff  = datetime.fromtimestamp(cutoff_ts) if cutoff_ts != 0 else datetime.min
+    _regions = list(regions_key)
+    # progress_cb is not cacheable — pass a no-op inside the cache
+    articles, health = run_all_scrapers(max_p, _cutoff, lambda f, l="": None, region_terms=_regions)
+    return articles, health
+
+
 def main():
     st.set_page_config(
         page_title="Global Data Center Intelligence",
@@ -4074,38 +3386,10 @@ def main():
             if r in _region_map_reverse
         ]
 
-        # ── Cached scraper call (TTL = 45 min) ───────────────────────────
-        @st.cache_data(ttl=2700, show_spinner=False)
-        def _cached_scrape(max_p, cutoff_ts, regions_key):
-            """Cached wrapper — re-runs only when params change or TTL expires."""
-            _cutoff = datetime.fromtimestamp(cutoff_ts)
-            _regions = list(regions_key)
-            # progress_cb not cacheable; pass a no-op inside the cache
-            return run_all_scrapers(max_p, _cutoff, lambda f, l="": None, region_terms=_regions)
-
         cutoff_ts_key = int(cutoff.timestamp()) if cutoff != datetime.min else 0
-        try:
-            raw = _cached_scrape(max_pages, cutoff_ts_key, tuple(sorted(region_terms)))
-        except Exception as _cache_err:
-            # Cache serialisation failure (e.g. unpicklable object) — fall back
-            # to a live uncached run so the scan still completes.
-            st.warning(
-                f"⚠️ Cache layer failed ({type(_cache_err).__name__}). "
-                "Running live scan without caching — results will not be cached this time.",
-                icon="⚠️",
-            )
-            try:
-                raw = run_all_scrapers(
-                    max_pages, cutoff,
-                    progress_cb,
-                    region_terms=region_terms,
-                )
-            except Exception as _fallback_err:
-                st.error(f"Scan failed: {_fallback_err}")
-                pbar.empty()
-                st.stop()
-        # Save health snapshot captured during this scrape run
-        st.session_state.scraper_health = dict(_SCRAPER_HEALTH)
+        raw, _health_snapshot = _cached_scrape(max_pages, cutoff_ts_key, tuple(sorted(region_terms)))
+        # Write health into per-user session_state (never a shared global)
+        st.session_state.scraper_health = _health_snapshot
 
         cutoff_end_val = st.session_state.get("cutoff_end", datetime.max)
         filtered = []
@@ -5253,49 +4537,13 @@ def main():
         st.markdown('<div class="sec-head">💾 Saved Scans</div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Name and save scan results. Scans are persisted as JSON in '
-            '<code>saved_scans.json</code> in the app directory — they survive '
-            'refreshes and redeploys. Compare two saved scans side-by-side '
+            'Name and save scan results to session memory. Compare two saved scans side-by-side '
             'to track market changes between daily or weekly runs.</div>',
             unsafe_allow_html=True,
         )
 
-        # ── Persistent storage helpers ────────────────────────────────────────
-        _SCANS_FILE = "saved_scans.json"
-
-        def _load_scans() -> dict:
-            """Load scans from disk; return empty dict on any error."""
-            try:
-                with open(_SCANS_FILE, "r", encoding="utf-8") as fh:
-                    raw = json.load(fh)
-                # Deserialise DataFrames from records
-                result = {}
-                for lbl, sdata in raw.items():
-                    try:
-                        sdata["df"] = pd.DataFrame(sdata.get("df_records", []))
-                        result[lbl] = sdata
-                    except Exception:
-                        pass
-                return result
-            except Exception:
-                return {}
-
-        def _save_scans(scans: dict):
-            """Persist scans to disk. DataFrame → records (JSON-serialisable)."""
-            try:
-                serialisable = {}
-                for lbl, sdata in scans.items():
-                    entry = {k: v for k, v in sdata.items() if k != "df"}
-                    entry["df_records"] = sdata["df"].to_dict(orient="records")
-                    serialisable[lbl] = entry
-                with open(_SCANS_FILE, "w", encoding="utf-8") as fh:
-                    json.dump(serialisable, fh, ensure_ascii=False, default=str)
-            except Exception as e:
-                st.warning(f"⚠️ Could not persist scans to disk: {e}")
-
-        # Bootstrap session state from disk on first load
         if "saved_scans" not in st.session_state:
-            st.session_state.saved_scans = _load_scans()
+            st.session_state.saved_scans = {}
 
         col_save1, col_save2 = st.columns([3, 1])
         with col_save1:
@@ -5309,12 +4557,11 @@ def main():
                     label_key = scan_label_input.strip() or f"Scan {len(st.session_state.saved_scans)+1}"
                     _ts_saved = datetime.now().strftime("%d %b %Y %H:%M")
                     st.session_state.saved_scans[label_key] = {
-                        "df":       df.copy(),
+                        "df": df.copy(),
                         "saved_at": _ts_saved,
                         "articles": len(df),
-                        "filters":  str(filters),
+                        "filters": str(filters),
                     }
-                    _save_scans(st.session_state.saved_scans)
                     st.success(f"✅ Saved scan: **{label_key}** ({len(df)} articles)")
                 else:
                     st.warning("No articles in current view to save.")
@@ -5438,7 +4685,6 @@ def main():
             # Delete saved scan
             if st.button("🗑️ Delete This Saved Scan", key="delete_saved_scan"):
                 del st.session_state.saved_scans[sel_scan]
-                _save_scans(st.session_state.saved_scans)
                 st.rerun()
 
     # ─── TAB: AI-Powered Headline Scoring ────────────────────────────────────
@@ -5788,513 +5034,5 @@ def main():
     )
 
 
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  UNIT TESTS  —  run with:  python GlobalDCIntel_v5.py --test
-#
-#  Covers the enrichment functions most likely to silently regress:
-#    • detect_country        (O(1) compiled-regex index)
-#    • detect_mw             (capacity / acreage extraction)
-#    • is_dc_relevant        (three-tier relevance filter)
-#    • fuzzy_similar         (context-aware dedup threshold)
-#    • _headline_entity_density  (entity counting for threshold selection)
-#    • _tfidf_scores         (significance-weighted scorer)
-#    • _gn_parse_feed stub   (Google News feed parser)
-#
-#  Zero external dependencies — uses stdlib unittest only.
-#  Exit code 0 = all pass, 1 = any failure.
-# ═══════════════════════════════════════════════════════════════════════════════
-
-import unittest, sys as _sys
-
-class TestDetectCountry(unittest.TestCase):
-
-    def test_exact_name_us(self):
-        self.assertEqual(detect_country("New data center opens in United States"), "United States")
-
-    def test_exact_name_germany(self):
-        self.assertEqual(detect_country("Hyperscaler breaks ground in Germany"), "Germany")
-
-    def test_exact_name_singapore(self):
-        self.assertEqual(detect_country("Singapore announces moratorium review"), "Singapore")
-
-    def test_city_ashburn(self):
-        self.assertEqual(detect_country("Ashburn campus expands to 200MW"), "United States")
-
-    def test_city_frankfurt(self):
-        self.assertEqual(detect_country("Frankfurt data center campus"), "Germany")
-
-    def test_city_dubai(self):
-        self.assertEqual(detect_country("Dubai hyperscale facility announced"), "UAE")
-
-    def test_city_mumbai(self):
-        self.assertEqual(detect_country("Mumbai data centre plan"), "India")
-
-    def test_alias_uk(self):
-        self.assertEqual(detect_country("New UK data center investment"), "United Kingdom")
-
-    def test_abbreviation_uae(self):
-        self.assertEqual(detect_country("UAE announces new campus"), "UAE")
-
-    def test_abbreviation_ksa(self):
-        self.assertEqual(detect_country("KSA power deal signed"), "Saudi Arabia")
-
-    def test_no_country_returns_global(self):
-        self.assertEqual(detect_country("Hyperscale investment secured"), "Global")
-
-    def test_empty_string(self):
-        self.assertEqual(detect_country(""), "Global")
-
-    def test_lowercase_country(self):
-        self.assertEqual(detect_country("Data park opens in australia"), "Australia")
-
-    def test_mixed_case(self):
-        self.assertEqual(detect_country("TOKYO data center campus"), "Japan")
-
-    def test_word_boundary_columbia_vs_colombia(self):
-        self.assertEqual(detect_country("British Columbia data center"), "Canada")
-
-    def test_regression_netherlands(self):
-        self.assertEqual(detect_country("Amsterdam campus reaches 100MW"), "Netherlands")
-
-    def test_regression_brazil(self):
-        self.assertEqual(detect_country("Sao Paulo data centre approved"), "Brazil")
-
-
-class TestDetectMW(unittest.TestCase):
-
-    def test_mw_integer(self):
-        self.assertEqual(detect_mw("Plans a 200MW data center campus"), "200 MW")
-
-    def test_mw_decimal(self):
-        self.assertEqual(detect_mw("Approved for 1.5 GW facility"), "1.5 GW")
-
-    def test_mw_with_comma(self):
-        self.assertEqual(detect_mw("1,200MW substation approved"), "1200 MW")
-
-    def test_gw_uppercase(self):
-        self.assertEqual(detect_mw("2GW hyperscale park"), "2 GW")
-
-    def test_gigawatt_word(self):
-        self.assertIn("gigawatt", detect_mw("3 gigawatt nuclear-powered campus").lower())
-
-    def test_megawatt_word(self):
-        self.assertIn("megawatt", detect_mw("500 megawatt investment").lower())
-
-    def test_kilowatt(self):
-        self.assertEqual(detect_mw("High-density 500kW rack deployment"), "500 kW")
-
-    def test_acres(self):
-        self.assertIn("acres", detect_mw("200 acres site selection announced").lower())
-
-    def test_hectares(self):
-        self.assertIn("hectare", detect_mw("50 hectares land parcel secured").lower())
-
-    def test_no_capacity_returns_empty(self):
-        self.assertEqual(detect_mw("Data center investment deal closed"), "")
-
-    def test_empty_string(self):
-        self.assertEqual(detect_mw(""), "")
-
-    def test_mw_at_start(self):
-        self.assertEqual(detect_mw("100MW facility opens in Virginia"), "100 MW")
-
-    def test_does_not_confuse_mw_in_word(self):
-        self.assertIsInstance(detect_mw("Battery stores 500MWh of energy"), str)
-
-
-class TestIsDCRelevant(unittest.TestCase):
-
-    def test_data_center(self):
-        self.assertTrue(is_dc_relevant("New data center opens in Texas"))
-
-    def test_data_centre_british(self):
-        self.assertTrue(is_dc_relevant("UK data centre moratorium lifted"))
-
-    def test_colocation(self):
-        self.assertTrue(is_dc_relevant("Equinix expands colocation footprint"))
-
-    def test_hyperscale(self):
-        self.assertTrue(is_dc_relevant("Hyperscale campus breaks ground"))
-
-    def test_ai_factory(self):
-        self.assertTrue(is_dc_relevant("New AI factory announced in Malaysia"))
-
-    def test_digital_infrastructure(self):
-        self.assertTrue(is_dc_relevant("Digital infrastructure REIT files IPO"))
-
-    def test_megawatt(self):
-        self.assertTrue(is_dc_relevant("500 megawatt substation approved"))
-
-    def test_immersion_cooling(self):
-        self.assertTrue(is_dc_relevant("Immersion cooling trial at hyperscale facility"))
-
-    def test_pue(self):
-        self.assertTrue(is_dc_relevant("Facility achieves PUE of 1.15"))
-
-    def test_groundbreaking(self):
-        self.assertTrue(is_dc_relevant("Breaking ground ceremony held today"))
-
-    def test_sale_leaseback(self):
-        self.assertTrue(is_dc_relevant("Operator completes sale leaseback transaction"))
-
-    def test_two_weak_signals_pass(self):
-        self.assertTrue(is_dc_relevant("$2 billion investment in new compute campus"))
-
-    def test_one_weak_signal_fails(self):
-        self.assertFalse(is_dc_relevant("Pharma company signs a new partnership agreement"))
-
-    def test_currency_plus_acres_passes(self):
-        self.assertTrue(is_dc_relevant("$500 million deal for 100 acres"))
-
-    def test_unrelated_tech_news(self):
-        self.assertFalse(is_dc_relevant("Apple releases new iPhone model"))
-
-    def test_unrelated_finance_news(self):
-        self.assertFalse(is_dc_relevant("Federal Reserve raises interest rates again"))
-
-    def test_empty_string(self):
-        self.assertFalse(is_dc_relevant(""))
-
-    def test_regression_server_farm(self):
-        self.assertTrue(is_dc_relevant("Giant server farm planned for Nevada"))
-
-    def test_regression_carrier_hotel(self):
-        self.assertTrue(is_dc_relevant("Carrier hotel in Chicago expands capacity"))
-
-    def test_regression_datacenter_no_space(self):
-        self.assertTrue(is_dc_relevant("Datacenter construction approved by council"))
-
-
-class TestFuzzySimilar(unittest.TestCase):
-
-    # ── Obvious duplicates ────────────────────────────────────────────────────
-    def test_exact_same(self):
-        self.assertTrue(fuzzy_similar(
-            "Microsoft breaks ground on 200MW Virginia campus",
-            "Microsoft breaks ground on 200MW Virginia campus",
-        ))
-
-    def test_near_duplicate_source_suffix_stripped(self):
-        # Google News appends " - DataCenterDynamics" etc.
-        self.assertTrue(fuzzy_similar(
-            "Equinix opens new Frankfurt data center - DataCenterDynamics",
-            "Equinix opens new Frankfurt data center - DataCenter Knowledge",
-        ))
-
-    def test_entity_rich_cross_source_dup(self):
-        # Same deal, different words — entity-rich → tight threshold
-        self.assertTrue(fuzzy_similar(
-            "Microsoft announces 500MW data center campus in Virginia worth $10bn",
-            "Microsoft reveals 500MW Virginia data center campus in $10bn deal",
-        ))
-
-    # ── Legitimate non-duplicates ─────────────────────────────────────────────
-    def test_same_company_different_dates_not_dup(self):
-        # Generic expansion headline, no entity signals → loose threshold
-        # These are from different months and should NOT collapse
-        self.assertFalse(fuzzy_similar(
-            "Equinix expands data center footprint in Europe",
-            "Equinix expands data center footprint in Asia",
-        ))
-
-    def test_different_companies_not_dup(self):
-        self.assertFalse(fuzzy_similar(
-            "Google breaks ground on new data center in Iowa",
-            "Amazon breaks ground on new data center in Iowa",
-        ))
-
-    def test_different_mw_values_not_dup(self):
-        self.assertFalse(fuzzy_similar(
-            "NextDC announces 100MW Sydney campus",
-            "NextDC announces 300MW Sydney campus",
-        ))
-
-    def test_different_locations_not_dup(self):
-        self.assertFalse(fuzzy_similar(
-            "Equinix opens SG5 data center in Singapore",
-            "Equinix opens AM8 data center in Amsterdam",
-        ))
-
-    # ── Threshold selection ───────────────────────────────────────────────────
-    def test_entity_rich_threshold_is_tight(self):
-        h = "Microsoft 500MW Virginia campus $10bn deal"
-        self.assertLessEqual(_dedup_threshold(h), 0.82)
-
-    def test_generic_threshold_is_loose(self):
-        h = "Data center expansion announced"
-        self.assertGreaterEqual(_dedup_threshold(h), 0.88)
-
-
-class TestEntityDensity(unittest.TestCase):
-
-    def test_rich_headline(self):
-        # MW + deal size + company + location = 4 signals
-        score = _headline_entity_density(
-            "Microsoft breaks ground on 500MW data center campus in Virginia, $3bn deal"
-        )
-        self.assertGreaterEqual(score, 3)
-
-    def test_generic_headline(self):
-        score = _headline_entity_density("Hyperscale investment announced")
-        self.assertEqual(score, 0)
-
-    def test_company_only(self):
-        score = _headline_entity_density("Equinix reports strong Q3 results")
-        self.assertGreaterEqual(score, 1)
-
-
-class TestTFIDFScorer(unittest.TestCase):
-
-    def test_returns_correct_length(self):
-        headlines = ["data center opens", "500MW campus in Virginia", "investment deal"]
-        scores = _tfidf_scores(headlines)
-        self.assertEqual(len(scores), 3)
-
-    def test_signal_rich_headline_scores_higher(self):
-        headlines = [
-            "Microsoft opens 500MW Virginia data center worth $3bn",   # entity-rich
-            "Company announces data center plans",                       # generic
-        ]
-        scores = _tfidf_scores(headlines)
-        self.assertGreater(scores[0], scores[1])
-
-    def test_scores_are_non_negative(self):
-        headlines = ["foo bar baz", "data center opens in Texas", ""]
-        scores = _tfidf_scores(headlines)
-        for s in scores:
-            self.assertGreaterEqual(s, 0.0)
-
-    def test_single_headline(self):
-        scores = _tfidf_scores(["Microsoft 500MW Virginia campus"])
-        self.assertEqual(len(scores), 1)
-        self.assertGreaterEqual(scores[0], 0.0)
-
-    def test_empty_list(self):
-        scores = _tfidf_scores([])
-        self.assertEqual(scores, [])
-
-    def test_empty_headline_scores_zero(self):
-        scores = _tfidf_scores([""])
-        self.assertEqual(scores[0], 0.0)
-
-
-def _run_tests():
-    """Entry point for --test flag: runs all unit tests and exits."""
-    loader = unittest.TestLoader()
-    suite  = unittest.TestSuite()
-    for cls in (
-        TestDetectCountry,
-        TestDetectMW,
-        TestIsDCRelevant,
-        TestFuzzySimilar,
-        TestEntityDensity,
-        TestTFIDFScorer,
-    ):
-        suite.addTests(loader.loadTestsFromTestCase(cls))
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    _sys.exit(0 if result.wasSuccessful() else 1)
-
-
 if __name__ == "__main__":
-    if len(_sys.argv) > 1 and _sys.argv[1] == "--test":
-        _run_tests()
-    else:
-        main()
-#
-#  Covers the three enrichment functions most likely to silently regress:
-#    • detect_country   (country detection via compiled-regex index)
-#    • detect_mw        (capacity / acreage extraction)
-#    • is_dc_relevant   (three-tier relevance filter)
-#
-#  Zero external dependencies — uses stdlib unittest only.
-#  Exit code 0 = all pass, 1 = any failure.
-# ═══════════════════════════════════════════════════════════════════════════════
-
-import unittest, sys as _sys
-
-class TestDetectCountry(unittest.TestCase):
-
-    # ── Tier-1: exact country names ──────────────────────────────────────────
-    def test_exact_name_us(self):
-        self.assertEqual(detect_country("New data center opens in United States"), "United States")
-
-    def test_exact_name_germany(self):
-        self.assertEqual(detect_country("Hyperscaler breaks ground in Germany"), "Germany")
-
-    def test_exact_name_singapore(self):
-        self.assertEqual(detect_country("Singapore announces moratorium review"), "Singapore")
-
-    # ── City / alias detection ───────────────────────────────────────────────
-    def test_city_ashburn(self):
-        self.assertEqual(detect_country("Ashburn campus expands to 200MW"), "United States")
-
-    def test_city_frankfurt(self):
-        self.assertEqual(detect_country("Frankfurt data center campus"), "Germany")
-
-    def test_city_dubai(self):
-        self.assertEqual(detect_country("Dubai hyperscale facility announced"), "UAE")
-
-    def test_city_mumbai(self):
-        self.assertEqual(detect_country("Mumbai data centre plan"), "India")
-
-    def test_alias_uk(self):
-        # r"\bUK\b" pattern
-        self.assertEqual(detect_country("New UK data center investment"), "United Kingdom")
-
-    # ── Abbreviations ────────────────────────────────────────────────────────
-    def test_abbreviation_uae(self):
-        self.assertEqual(detect_country("UAE announces new campus"), "UAE")
-
-    def test_abbreviation_ksa(self):
-        self.assertEqual(detect_country("KSA power deal signed"), "Saudi Arabia")
-
-    # ── Fallback to Global ───────────────────────────────────────────────────
-    def test_no_country_returns_global(self):
-        self.assertEqual(detect_country("Hyperscale investment secured"), "Global")
-
-    def test_empty_string(self):
-        self.assertEqual(detect_country(""), "Global")
-
-    # ── Case insensitivity ───────────────────────────────────────────────────
-    def test_lowercase_country(self):
-        self.assertEqual(detect_country("Data park opens in australia"), "Australia")
-
-    def test_mixed_case(self):
-        self.assertEqual(detect_country("TOKYO data center campus"), "Japan")
-
-    # ── Word-boundary enforcement (should NOT match "Columbia" for Colombia) ─
-    def test_word_boundary_columbia_vs_colombia(self):
-        result = detect_country("British Columbia data center")
-        # Should be Canada (British Columbia is a province) not Colombia
-        self.assertEqual(result, "Canada")
-
-    # ── Regression: adding a new keyword shouldn't break existing ones ───────
-    def test_regression_netherlands(self):
-        self.assertEqual(detect_country("Amsterdam campus reaches 100MW"), "Netherlands")
-
-    def test_regression_brazil(self):
-        self.assertEqual(detect_country("Sao Paulo data centre approved"), "Brazil")
-
-
-class TestDetectMW(unittest.TestCase):
-
-    # ── MW detection ────────────────────────────────────────────────────────
-    def test_mw_integer(self):
-        self.assertEqual(detect_mw("Plans a 200MW data center campus"), "200 MW")
-
-    def test_mw_decimal(self):
-        self.assertEqual(detect_mw("Approved for 1.5 GW facility"), "1.5 GW")
-
-    def test_mw_with_comma(self):
-        self.assertEqual(detect_mw("1,200MW substation approved"), "1200 MW")
-
-    def test_gw_uppercase(self):
-        self.assertEqual(detect_mw("2GW hyperscale park"), "2 GW")
-
-    def test_gigawatt_word(self):
-        self.assertEqual(detect_mw("3 gigawatt nuclear-powered campus"), "3 GIGAWATT")
-
-    def test_megawatt_word(self):
-        self.assertEqual(detect_mw("500 megawatt investment"), "500 MEGAWATT")
-
-    def test_kilowatt(self):
-        self.assertEqual(detect_mw("High-density 500kW rack deployment"), "500 kW")
-
-    # ── Acres / hectares fallback ────────────────────────────────────────────
-    def test_acres(self):
-        self.assertIn("acres", detect_mw("200 acres site selection announced").lower())
-
-    def test_hectares(self):
-        self.assertIn("hectare", detect_mw("50 hectares land parcel secured").lower())
-
-    # ── Empty / no match ────────────────────────────────────────────────────
-    def test_no_capacity_returns_empty(self):
-        self.assertEqual(detect_mw("Data center investment deal closed"), "")
-
-    def test_empty_string(self):
-        self.assertEqual(detect_mw(""), "")
-
-    # ── Edge cases ───────────────────────────────────────────────────────────
-    def test_mw_at_start(self):
-        self.assertEqual(detect_mw("100MW facility opens in Virginia"), "100 MW")
-
-    def test_does_not_confuse_mw_in_word(self):
-        # "MWh" contains MW — function returns it; just check it doesn't crash
-        result = detect_mw("Battery stores 500MWh of energy")
-        self.assertIsInstance(result, str)
-
-
-class TestIsDCRelevant(unittest.TestCase):
-
-    # ── Tier-1 primary terms ─────────────────────────────────────────────────
-    def test_data_center(self):
-        self.assertTrue(is_dc_relevant("New data center opens in Texas"))
-
-    def test_data_centre_british(self):
-        self.assertTrue(is_dc_relevant("UK data centre moratorium lifted"))
-
-    def test_colocation(self):
-        self.assertTrue(is_dc_relevant("Equinix expands colocation footprint"))
-
-    def test_hyperscale(self):
-        self.assertTrue(is_dc_relevant("Hyperscale campus breaks ground"))
-
-    def test_ai_factory(self):
-        self.assertTrue(is_dc_relevant("New AI factory announced in Malaysia"))
-
-    def test_digital_infrastructure(self):
-        self.assertTrue(is_dc_relevant("Digital infrastructure REIT files IPO"))
-
-    # ── Tier-2 strong secondary ──────────────────────────────────────────────
-    def test_megawatt(self):
-        self.assertTrue(is_dc_relevant("500 megawatt substation approved"))
-
-    def test_immersion_cooling(self):
-        self.assertTrue(is_dc_relevant("Immersion cooling trial at hyperscale facility"))
-
-    def test_pue(self):
-        self.assertTrue(is_dc_relevant("Facility achieves PUE of 1.15"))
-
-    def test_groundbreaking(self):
-        self.assertTrue(is_dc_relevant("Breaking ground ceremony held today"))
-
-    def test_sale_leaseback(self):
-        self.assertTrue(is_dc_relevant("Operator completes sale leaseback transaction"))
-
-    # ── Tier-3 weak secondary (requires 2+ signals) ──────────────────────────
-    def test_two_weak_signals_pass(self):
-        # "billion" + "investment" both present → should pass
-        self.assertTrue(is_dc_relevant("$2 billion investment in new compute campus"))
-
-    def test_one_weak_signal_fails(self):
-        # A single non-currency term alone should NOT pass (no $ or billion etc.)
-        self.assertFalse(is_dc_relevant("Pharma company signs a new partnership agreement"))
-
-    def test_currency_plus_acres_passes(self):
-        self.assertTrue(is_dc_relevant("$500 million deal for 100 acres"))
-
-    # ── True negatives ───────────────────────────────────────────────────────
-    def test_unrelated_tech_news(self):
-        self.assertFalse(is_dc_relevant("Apple releases new iPhone model"))
-
-    def test_unrelated_finance_news(self):
-        self.assertFalse(is_dc_relevant("Federal Reserve raises interest rates again"))
-
-    def test_empty_string(self):
-        self.assertFalse(is_dc_relevant(""))
-
-    # ── Regression: adding new keywords shouldn't break old ones ────────────
-    def test_regression_server_farm(self):
-        self.assertTrue(is_dc_relevant("Giant server farm planned for Nevada"))
-
-    def test_regression_carrier_hotel(self):
-        self.assertTrue(is_dc_relevant("Carrier hotel in Chicago expands capacity"))
-
-    def test_regression_datacenter_no_space(self):
-        self.assertTrue(is_dc_relevant("Datacenter construction approved by council"))
-
-
+    main()
