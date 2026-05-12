@@ -86,6 +86,56 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 [data-testid="stSidebar"] * { color: #b8c8e0 !important; }
 [data-testid="stSidebar"] hr { border-color: #151f35 !important; }
 
+/* ── Sidebar: ALWAYS VISIBLE — prevent collapse entirely ───────────────────── */
+
+/* Hide the collapse-arrow button so users cannot close the sidebar */
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
+
+/* Force the sidebar to always stay expanded (overrides Streamlit's
+   data-collapsed attribute and any transform/translate it applies) */
+[data-testid="stSidebar"][aria-expanded="false"],
+[data-testid="stSidebar"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    min-width: 244px !important;
+    max-width: 244px !important;
+    width: 244px !important;
+    transform: none !important;
+    margin-left: 0 !important;
+    left: 0 !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* Show the reopen tab/button at all times (belt-and-suspenders) */
+[data-testid="stSidebarCollapsedControl"],
+div[data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    background: #0047e1 !important;
+    border-radius: 0 10px 10px 0 !important;
+    border: 1px solid #0060ff !important;
+    border-left: none !important;
+    width: 2rem !important;
+    z-index: 99999 !important;
+}
+[data-testid="stSidebarCollapsedControl"] button,
+div[data-testid="collapsedControl"] button {
+    color: #fff !important;
+    background: transparent !important;
+}
+[data-testid="stSidebarCollapsedControl"] svg,
+div[data-testid="collapsedControl"] svg {
+    fill: #fff !important;
+    stroke: #fff !important;
+}
+
 /* Sidebar Run button */
 [data-testid="stSidebar"] .stButton button {
     background: linear-gradient(135deg, #0047e1, #00b4ff) !important;
@@ -411,10 +461,9 @@ REGION_COLORS = {
 }
 
 SOURCE_META = {
-    "DataCenterDynamics":  {"color": "#0047e1", "short": "DCD"},
-    "DataCenter Knowledge":{"color": "#00b4ff", "short": "DCK"},
-    "DataCentreMagazine":  {"color": "#00e5c8", "short": "DCM"},
-    "DataCenterFrontier":  {"color": "#7ec8ff", "short": "DCF"},
+    "DataCenterDynamics": {"color": "#0047e1", "short": "DCD"},
+    "DataCenter Knowledge": {"color": "#00b4ff", "short": "DCK"},
+    "DataCenterFrontier":  {"color": "#00e5c8", "short": "DCF"},
     "Google News":         {"color": "#ffaa00", "short": "GNS"},
     "PR Newswire":         {"color": "#a855f7", "short": "PRN"},
     "BusinessWire":        {"color": "#ff6400", "short": "BIZ"},
@@ -662,25 +711,7 @@ for _c, _r in _EXTRA_COUNTRY_MAP.items():
     COUNTRY_TO_REGION.setdefault(_c, _r)
 
 
-
-# ─── Config: load TOPIC_KEYWORDS and KNOWN_COMPANIES from JSON ───────────────
-# These large lookup tables live in dc_config.json so they can be updated
-# without touching Python code.  Falls back to inline defaults on ImportError.
-import json as _json
-import os as _os
-
-_CONFIG_PATH = _os.path.join(_os.path.dirname(__file__), "dc_config.json")
-
-def _load_config():
-    try:
-        with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
-            return _json.load(_f)
-    except Exception:
-        return {}
-
-_cfg = _load_config()
-
-TOPIC_KEYWORDS = _cfg.get("topic_keywords", {
+TOPIC_KEYWORDS = {
     "Hyperscale": ["hyperscale","microsoft","google","amazon","aws","meta",
                    "apple","oracle","alibaba","tencent","bytedance",
                    "alphabet","openai","stargate","coreweave"],
@@ -709,9 +740,9 @@ TOPIC_KEYWORDS = _cfg.get("topic_keywords", {
                       "green","esg","water","pue","cooling","waste heat",
                       "recycle","circular","biodiversity","solar panel",
                       "wind power","offset"],
-})
+}
 
-KNOWN_COMPANIES = _cfg.get("known_companies", [
+KNOWN_COMPANIES = [
     "Microsoft","Google","Amazon","AWS","Meta","Apple","Oracle","Alibaba",
     "Tencent","ByteDance","Baidu","Huawei","Samsung","IBM","Intel","NVIDIA",
     "Equinix","Digital Realty","Iron Mountain","CoreSite","CyrusOne","NTT",
@@ -730,18 +761,12 @@ KNOWN_COMPANIES = _cfg.get("known_companies", [
     "CtrlS","NxtGen","Yotta","STT GDC","Keppel","Singtel","Telstra",
     "NextDC","Macquarie","AirTrunk","MEVSPACE","Beyond.pl","Atman",
     "DE-CIX","Interxion","euNetworks","Telehouse","Iomart","Pulsant",
-])
-
-
+]
 
 
 # ─── DCD constants ─────────────────────────────────────────────────────────
 DCD_BASE     = "https://www.datacenterdynamics.com"
 DCD_CHAN_TERM = "the-data-center-construction-channel"
-
-# ─── Additional source base URLs ────────────────────────────────────────────
-DCK_BASE = "https://www.datacenterknowledge.com"
-DCM_BASE = "https://datacentremagazine.com"
 
 # DCD region taxonomy terms → mapped to code2's Region labels
 # These are the actual URL ?term= slugs DCD uses in their site taxonomy
@@ -1082,195 +1107,28 @@ def fetch_google_news(query, source_label="Google News"):
     return results
 
 
-# ─── Scraper health tracking ────────────────────────────────────────────────
-# Health is stored in a plain dict that gets written into st.session_state
-# after each scrape run, so concurrent users never clobber each other.
-# _scrape_health_buf is a local accumulator used only inside run_all_scrapers.
-_scrape_health_buf: dict = {}   # module-level buffer; only lives during a scrape call
-
-def _record_health(source: str, count: int, errors: int, status: str):
-    """Accumulate per-source scrape health into the local buffer."""
-    _scrape_health_buf[source] = {
-        "articles": count,
-        "errors":   errors,
-        "status":   status,
-        "ts":       datetime.now().strftime("%H:%M:%S"),
-    }
-
-
-# ─── DataCenter Knowledge scraper ──────────────────────────────────────────
-DCK_BASE = "https://www.datacenterknowledge.com"
-
-def scrape_dck(cutoff, max_pages=5):
-    """Scrape DataCenter Knowledge news pages."""
-    articles = []
-    errors   = 0
-    seen     = set()
-    try:
-        for page in range(1, max_pages + 1):
-            url = DCK_BASE + "/news" + (f"?page={page}" if page > 1 else "")
-            soup = fetch_html(url)
-            if soup is None:
-                errors += 1
-                break
-            for a in soup.find_all("a", href=re.compile(r"/(data-centers|cloud|edge)/[^?#]+$")):
-                href = a.get("href", "")
-                if not href.startswith("http"):
-                    href = DCK_BASE + href
-                if href in seen:
-                    continue
-                seen.add(href)
-                h_tag = a.find(["h1","h2","h3","h4"])
-                headline = (h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)).strip()
-                if not headline or len(headline) < 12:
-                    continue
-                # date: walk up DOM
-                date_obj = None
-                node = a.parent
-                for _ in range(10):
-                    if node is None:
-                        break
-                    tt = node.find("time")
-                    if tt:
-                        date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
-                        if date_obj:
-                            break
-                    m = re.search(r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b", node.get_text(" ",strip=True), re.I)
-                    if m:
-                        date_obj = parse_date_str(m.group(0))
-                        break
-                    node = node.parent
-                if date_obj and date_obj < cutoff:
-                    break
-                if not is_dc_relevant(headline):
-                    continue
-                articles.append({
-                    "headline":  headline,
-                    "url":       href,
-                    "date_obj":  date_obj,
-                    "source":    "DataCenter Knowledge",
-                    "_priority": 2,
-                })
-            time.sleep(0.4)
-    except Exception as exc:
-        errors += 1
-        _record_health("DataCenter Knowledge", len(articles), errors, f"Error: {exc}")
-        return articles
-    _record_health("DataCenter Knowledge", len(articles), errors, "OK" if errors == 0 else "Partial")
-    return articles
-
-
-# ─── Data Centre Magazine scraper ──────────────────────────────────────────
-DCM_BASE = "https://datacentremagazine.com"
-
-def scrape_dcm(cutoff, max_pages=4):
-    """Scrape Data Centre Magazine."""
-    articles = []
-    errors   = 0
-    seen     = set()
-    try:
-        for page in range(1, max_pages + 1):
-            url = DCM_BASE + "/latest" + (f"?page={page}" if page > 1 else "")
-            soup = fetch_html(url)
-            if soup is None:
-                errors += 1
-                break
-            for a in soup.find_all("a", href=re.compile(r"/(data-centres|technology|sustainability)/[^?#]+")):
-                href = a.get("href", "")
-                if not href.startswith("http"):
-                    href = DCM_BASE + href
-                if href in seen:
-                    continue
-                seen.add(href)
-                h_tag = a.find(["h1","h2","h3","h4"])
-                headline = (h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)).strip()
-                if not headline or len(headline) < 12:
-                    continue
-                date_obj = None
-                node = a.parent
-                for _ in range(10):
-                    if node is None:
-                        break
-                    tt = node.find("time")
-                    if tt:
-                        date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
-                        if date_obj:
-                            break
-                    node = node.parent
-                if date_obj and date_obj < cutoff:
-                    break
-                if not is_dc_relevant(headline):
-                    continue
-                articles.append({
-                    "headline":  headline,
-                    "url":       href,
-                    "date_obj":  date_obj,
-                    "source":    "DataCentreMagazine",
-                    "_priority": 3,
-                })
-            time.sleep(0.4)
-    except Exception as exc:
-        errors += 1
-        _record_health("DataCentreMagazine", len(articles), errors, f"Error: {exc}")
-        return articles
-    _record_health("DataCentreMagazine", len(articles), errors, "OK" if errors == 0 else "Partial")
-    return articles
-
-
-# ─── run_all_scrapers: DCD + DCK + DCM + Google News ──────────────────────
+# ─── run_all_scrapers: DCD primary + Google News supplement ────────────────
 def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
     """
     region_terms: list of DCD region slug strings (e.g. ["north-america","europe"]).
                   Pass [] or None for global (no region filter on DCD).
-    Returns (filtered_articles, health_dict).
     """
-    global _scrape_health_buf
-    _scrape_health_buf = {}   # reset on each scan
-
     if region_terms is None:
         region_terms = []
 
     raw = []
-    failed_sources: list[str] = []
 
     # ── Step 1: DCD (primary, high-volume, construction channel) ──────────
     class _FakePbar:
-        def progress(self, frac, text=""): progress_cb(frac * 0.55, text)
+        def progress(self, frac, text=""): progress_cb(frac * 0.7, text)
 
-    try:
-        dcd_arts = scrape_dcd(cutoff, max_html_pages, region_terms, pbar=_FakePbar())
-        raw.extend(dcd_arts)
-        _record_health("DataCenterDynamics", len(dcd_arts), 0, "OK")
-        progress_cb(0.55, f"DCD: {len(dcd_arts)} articles")
-    except Exception as exc:
-        failed_sources.append(f"DCD: {exc}")
-        _record_health("DataCenterDynamics", 0, 1, f"Error: {exc}")
-        progress_cb(0.55, "DCD: failed")
+    dcd_arts = scrape_dcd(cutoff, max_html_pages, region_terms, pbar=_FakePbar())
+    raw.extend(dcd_arts)
+    progress_cb(0.70, f"DCD: {len(dcd_arts)} articles fetched")
 
-    # ── Step 2: DataCenter Knowledge ──────────────────────────────────────
-    progress_cb(0.58, "Scraping DataCenter Knowledge…")
-    try:
-        dck_arts = scrape_dck(cutoff, max_pages=min(max_html_pages, 6))
-        raw.extend(dck_arts)
-        progress_cb(0.62, f"DCK: {len(dck_arts)} articles")
-    except Exception as exc:
-        failed_sources.append(f"DCK: {exc}")
-        _record_health("DataCenter Knowledge", 0, 1, f"Error: {exc}")
-
-    # ── Step 3: Data Centre Magazine ──────────────────────────────────────
-    progress_cb(0.63, "Scraping Data Centre Magazine…")
-    try:
-        dcm_arts = scrape_dcm(cutoff, max_pages=min(max_html_pages, 4))
-        raw.extend(dcm_arts)
-        progress_cb(0.66, f"DCM: {len(dcm_arts)} articles")
-    except Exception as exc:
-        failed_sources.append(f"DCM: {exc}")
-        _record_health("DataCentreMagazine", 0, 1, f"Error: {exc}")
-
-    # ── Step 4: Google News supplement (runs in parallel) ─────────────────
-    progress_cb(0.68, "Fetching Google News supplement…")
+    # ── Step 2: Google News supplement (runs in parallel) ─────────────────
+    progress_cb(0.72, "Fetching Google News supplement…")
     gn_results = []
-    gn_errors  = 0
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(fetch_google_news, q, lbl): lbl for q, lbl in GNEWS_QUERIES}
         done = [0]
@@ -1278,19 +1136,14 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
             try:
                 gn_results.extend(f.result())
             except Exception:
-                gn_errors += 1
+                pass
             done[0] += 1
-            progress_cb(0.68 + 0.28 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
+            progress_cb(0.72 + 0.25 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
+
     raw.extend(gn_results)
-    _record_health("Google News", len(gn_results), gn_errors,
-                   "OK" if gn_errors == 0 else f"{gn_errors} query errors")
-    if failed_sources:
-        _record_health("_failed_sources", 0, len(failed_sources),
-                       " | ".join(failed_sources))
+    progress_cb(0.98, "Filtering and deduplicating…")
 
-    progress_cb(0.97, "Filtering and deduplicating…")
-
-    # ── Step 5: date cutoff + DC relevance filter ─────────────────────────
+    # ── Step 3: date cutoff + DC relevance filter ─────────────────────────
     filtered = []
     for item in raw:
         d = item.get("date_obj")
@@ -1300,14 +1153,13 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
             continue
         filtered.append(item)
 
-    return filtered, dict(_scrape_health_buf)
+    return filtered
 
 
-# ─── SCRAPE_SOURCES — all active sources ────────────────────────────────────
+# ─── Dummy SCRAPE_SOURCES (kept so the banner "N Sources Active" still works) ─
 SCRAPE_SOURCES = [
-    {"name": "DataCenterDynamics",     "url": DCD_BASE + "/en/news/",  "type": "html",  "priority": 1},
-    {"name": "DataCenter Knowledge",   "url": DCK_BASE + "/news",      "type": "html",  "priority": 2},
-    {"name": "DataCentreMagazine",     "url": DCM_BASE + "/latest",    "type": "html",  "priority": 3},
+    {"name": "DataCenterDynamics", "url": DCD_BASE + "/en/news/", "base": DCD_BASE,
+     "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$", "type": "html", "priority": 1},
     {"name": "Google News (Construction)",  "url": "", "type": "gnews", "priority": 10},
     {"name": "Google News (Approvals)",     "url": "", "type": "gnews", "priority": 10},
     {"name": "Google News (Hyperscalers)",  "url": "", "type": "gnews", "priority": 10},
@@ -2798,20 +2650,6 @@ def kpi(label, value, accent="blue", delta=""):
     )
 
 
-# ─── Cached scraper entry-point (module-level so @st.cache_data works) ───────
-# Defined here — outside main() — so Streamlit registers it once and the TTL
-# cache persists across button clicks and user sessions.
-# TTL = 2700 s (45 min).  Re-runs only when (max_pages, cutoff_ts, regions) change.
-@st.cache_data(ttl=2700, show_spinner=False)
-def _cached_scrape(max_p, cutoff_ts, regions_key):
-    """Cached wrapper around run_all_scrapers.  Returns (raw_articles, health_dict)."""
-    _cutoff  = datetime.fromtimestamp(cutoff_ts) if cutoff_ts != 0 else datetime.min
-    _regions = list(regions_key)
-    # progress_cb is not cacheable — pass a no-op inside the cache
-    articles, health = run_all_scrapers(max_p, _cutoff, lambda f, l="": None, region_terms=_regions)
-    return articles, health
-
-
 def main():
     st.set_page_config(
         page_title="Global Data Center Intelligence",
@@ -3386,10 +3224,9 @@ def main():
             if r in _region_map_reverse
         ]
 
-        cutoff_ts_key = int(cutoff.timestamp()) if cutoff != datetime.min else 0
-        raw, _health_snapshot = _cached_scrape(max_pages, cutoff_ts_key, tuple(sorted(region_terms)))
-        # Write health into per-user session_state (never a shared global)
-        st.session_state.scraper_health = _health_snapshot
+        raw = run_all_scrapers(max_pages, cutoff, progress_cb, region_terms=region_terms)
+
+        pbar.progress(1.0, text="Enriching and deduplicating...")
 
         cutoff_end_val = st.session_state.get("cutoff_end", datetime.max)
         filtered = []
@@ -3521,7 +3358,7 @@ def main():
     )
     st.markdown(pills_html, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab4b, tab5, tab_trend, tab_heatmap, tab_deal, tab_saved, tab_score, tab6, tab_health = st.tabs([
+    tab1, tab2, tab3, tab4, tab4b, tab5, tab_trend, tab_heatmap, tab_deal, tab_saved, tab_score, tab6 = st.tabs([
         "\U0001f4f0 Feed",
         "\U0001f5fa\ufe0f World Map",
         "\U0001f4ca Analytics",
@@ -3534,7 +3371,6 @@ def main():
         "\U0001f4be Saved Scans",
         "\U0001f916 AI Scoring",
         "\u2b07\ufe0f Export",
-        "\U0001f6a6 Source Health",
     ])
 
     with tab1:
@@ -3589,75 +3425,7 @@ def main():
 
     with tab2:
         st.markdown('<div class="sec-head">Global Activity Map</div>', unsafe_allow_html=True)
-
-        # ── Map mode selector ─────────────────────────────────────────────
-        map_mode = st.radio(
-            "Map display",
-            ["Choropleth (country fill)", "Bubble map (city/country pins)", "Both"],
-            index=0, horizontal=True, label_visibility="collapsed",
-        )
-
-        fig_map = chart_world_map(df)
-
-        if map_mode in ("Bubble map (city/country pins)", "Both"):
-            # Add scatter geo layer: one bubble per country, sized by article count
-            cc_scatter = df[df["Country"] != "Global"]["Country"].value_counts().reset_index()
-            cc_scatter.columns = ["Country", "Count"]
-            # Country centroid lookup (approximate)
-            _CENTROIDS = {
-                "United States":(37.09,-95.71),"Canada":(56.13,-106.35),"Mexico":(23.63,-102.55),
-                "United Kingdom":(55.38,-3.44),"Germany":(51.17,10.45),"France":(46.23,2.21),
-                "Netherlands":(52.13,5.29),"Ireland":(53.41,-8.24),"Sweden":(60.13,18.64),
-                "Norway":(60.47,8.47),"Denmark":(56.26,9.50),"Finland":(61.92,25.75),
-                "Spain":(40.46,-3.75),"Italy":(41.87,12.57),"Poland":(51.92,19.15),
-                "Switzerland":(46.82,8.23),"Austria":(47.52,14.55),"Belgium":(50.50,4.47),
-                "Portugal":(39.40,-8.22),"Romania":(45.94,24.97),"Czech Republic":(49.82,15.47),
-                "Singapore":(1.35,103.82),"Japan":(36.20,138.25),"South Korea":(35.91,127.77),
-                "Australia":(-25.27,133.78),"India":(20.59,78.96),"China":(35.86,104.20),
-                "Hong Kong":(22.32,114.17),"Taiwan":(23.70,120.96),"Malaysia":(4.21,108.96),
-                "Indonesia":(-0.79,113.92),"Thailand":(15.87,100.99),"Philippines":(12.88,121.77),
-                "New Zealand":(-40.90,174.89),"Vietnam":(14.06,108.28),
-                "Saudi Arabia":(23.89,45.08),"UAE":(23.42,53.85),"Qatar":(25.35,51.18),
-                "Bahrain":(26.03,50.55),"Kuwait":(29.31,47.48),"Oman":(21.51,55.92),
-                "Israel":(31.05,34.85),"Jordan":(30.59,36.24),"Egypt":(26.82,30.80),
-                "Brazil":(-14.24,-51.93),"Chile":(-35.68,-71.54),"Colombia":(4.57,-74.30),
-                "Argentina":(-38.42,-63.62),"Peru":(-9.19,-75.02),
-                "South Africa":(-30.56,22.94),"Nigeria":(9.08,8.68),"Kenya":(0.02,37.91),
-                "Ethiopia":(9.15,40.49),"Ghana":(7.95,-1.02),"Morocco":(31.79,-7.09),
-                "Tanzania":(-6.37,34.89),"Rwanda":(-1.94,29.87),
-            }
-            lats, lons, txts, sizes, cols = [], [], [], [], []
-            for _, row in cc_scatter.iterrows():
-                c = row["Country"]
-                if c in _CENTROIDS:
-                    lat, lon = _CENTROIDS[c]
-                    lats.append(lat); lons.append(lon)
-                    txts.append(f"<b>{c}</b><br>{row['Count']} articles")
-                    sizes.append(max(8, min(40, row["Count"] * 3)))
-                    cols.append(REGION_COLORS.get(COUNTRY_TO_REGION.get(c, "Global"), "#0047e1"))
-
-            if lats:
-                fig_map.add_trace(go.Scattergeo(
-                    lat=lats, lon=lons,
-                    mode="markers",
-                    marker=dict(
-                        size=sizes,
-                        color=cols,
-                        opacity=0.75,
-                        line=dict(color="#fff", width=0.5),
-                    ),
-                    hovertemplate="%{text}<extra></extra>",
-                    text=txts,
-                    name="Article volume",
-                    showlegend=False,
-                ))
-
-        if map_mode == "Bubble map (city/country pins)":
-            # Hide choropleth layer, show only bubbles
-            fig_map.data[0].update(showscale=False, colorscale=[[0,"#0d1b30"],[1,"#0d1b30"]], z=[0]*len(fig_map.data[0].z))
-
-        st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False})
-
+        st.plotly_chart(chart_world_map(df), use_container_width=True, config={"displayModeBar": False})
         st.markdown('<div class="sec-head">Country Breakdown</div>', unsafe_allow_html=True)
         cc_df = df[df["Country"] != "Global"]["Country"].value_counts().reset_index()
         cc_df.columns = ["Country", "Articles"]
@@ -4894,132 +4662,6 @@ def main():
             dark_table(df[[c for c in display_cols if c in df.columns]]),
             unsafe_allow_html=True,
         )
-
-    # ─── TAB: Source Health Panel ────────────────────────────────────────────
-    with tab_health:
-        st.markdown('<div class="sec-head">🚦 Source Health Dashboard</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div style="font-size:.82rem;color:#3a5480;margin-bottom:1rem;">'
-            'Real-time status of every data source from the last scan. '
-            'Shows per-source article count, error count, and status. '
-            'Red = failed, amber = partial, green = healthy.</div>',
-            unsafe_allow_html=True,
-        )
-
-        health = st.session_state.get("scraper_health", {})
-        if not health:
-            st.info("Run a scan first to populate source health data.")
-        else:
-            # Overall health KPIs
-            total_sources = len([k for k in health if not k.startswith("_")])
-            ok_sources    = len([v for k, v in health.items() if not k.startswith("_") and v["status"] == "OK"])
-            err_sources   = total_sources - ok_sources
-            total_arts_h  = sum(v["articles"] for k, v in health.items() if not k.startswith("_"))
-            total_errs_h  = sum(v["errors"]   for k, v in health.items() if not k.startswith("_"))
-
-            hkpi = (
-                '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
-                + kpi("Sources Polled",   total_sources, "blue",   "HTML + RSS + GNews")
-                + kpi("Healthy",          ok_sources,    "green",  "returned OK status")
-                + kpi("With Errors",      err_sources,   "red",    "partial or failed")
-                + kpi("Total Articles",   total_arts_h,  "cyan",   "across all sources")
-                + kpi("Total Errors",     total_errs_h,  "amber",  "HTTP/parse errors")
-                + '</div>'
-            )
-            st.markdown(hkpi, unsafe_allow_html=True)
-
-            # Per-source table
-            st.markdown('<div class="sec-head">Per-Source Breakdown</div>', unsafe_allow_html=True)
-            rows_h = ""
-            td_h = "padding:.55rem .9rem;font-size:.8rem;border-bottom:1px solid #101b2e;vertical-align:middle;"
-            th_h = ("background:#0f1e36;color:#b8c8e0;font-family:monospace;font-size:.65rem;"
-                    "letter-spacing:.08em;text-transform:uppercase;padding:.55rem .9rem;"
-                    "border-bottom:2px solid #0047e1;white-space:nowrap;")
-            for src_name, meta in sorted(health.items()):
-                if src_name.startswith("_"):
-                    continue
-                status = meta["status"]
-                status_color = (
-                    "#00e676" if status == "OK"
-                    else "#ffaa00" if "Partial" in status or "Error" not in status
-                    else "#ff2d6b"
-                )
-                status_icon  = "✅" if status == "OK" else ("⚠️" if "Partial" in status else "❌")
-                src_meta_d   = SOURCE_META.get(src_name, SOURCE_META["Unknown"])
-                art_bar_pct  = min(100, int(meta["articles"] / max(total_arts_h, 1) * 100))
-                rows_h += (
-                    f'<tr>'
-                    f'<td style="{td_h}background:#0b1628;">'
-                    f'<span style="background:{src_meta_d["color"]}22;color:{src_meta_d["color"]};'
-                    f'border:1px solid {src_meta_d["color"]}44;border-radius:4px;'
-                    f'padding:2px 6px;font-family:monospace;font-size:.65rem;">{src_meta_d["short"]}</span>'
-                    f' <span style="color:#b8c8e0;font-size:.8rem;">{src_name}</span></td>'
-                    f'<td style="{td_h}background:#060a10;color:#fff;font-family:monospace;">{meta["articles"]}'
-                    f'<div style="margin-top:4px;height:4px;border-radius:2px;background:#152038;width:100%;">'
-                    f'<div style="height:4px;border-radius:2px;background:{src_meta_d["color"]};width:{art_bar_pct}%;"></div>'
-                    f'</div></td>'
-                    f'<td style="{td_h}background:#0b1628;font-family:monospace;color:{"#ff2d6b" if meta["errors"] > 0 else "#3a5480"};">'
-                    f'{meta["errors"]}</td>'
-                    f'<td style="{td_h}background:#060a10;">'
-                    f'<span style="color:{status_color};font-size:.78rem;">{status_icon} {status}</span></td>'
-                    f'<td style="{td_h}background:#0b1628;font-family:monospace;font-size:.72rem;color:#3a5480;">'
-                    f'{meta.get("ts","—")}</td>'
-                    f'</tr>'
-                )
-            st.markdown(
-                '<div style="overflow-x:auto;border-radius:10px;border:1px solid #152038;margin-bottom:1rem;">'
-                '<table style="width:100%;border-collapse:collapse;background:#060a10;">'
-                f'<thead><tr>'
-                f'<th style="{th_h}">Source</th>'
-                f'<th style="{th_h}">Articles</th>'
-                f'<th style="{th_h}">Errors</th>'
-                f'<th style="{th_h}">Status</th>'
-                f'<th style="{th_h}">Fetched At</th>'
-                f'</tr></thead>'
-                f'<tbody>{rows_h}</tbody>'
-                f'</table></div>',
-                unsafe_allow_html=True,
-            )
-
-            # Failed sources detail (if any)
-            failed_meta = health.get("_failed_sources")
-            if failed_meta and failed_meta.get("status"):
-                st.markdown('<div class="sec-head">⚠️ Failed Source Details</div>', unsafe_allow_html=True)
-                for line in failed_meta["status"].split(" | "):
-                    st.markdown(
-                        f'<div style="background:#1a0a0a;border:1px solid #ff2d6b44;border-radius:8px;'
-                        f'padding:.6rem 1rem;margin-bottom:.4rem;font-family:monospace;font-size:.78rem;color:#ff2d6b;">'
-                        f'❌ {line}</div>',
-                        unsafe_allow_html=True,
-                    )
-
-            # Interactive map showing article coverage by source
-            st.markdown('<div class="sec-head">Source Contribution Chart</div>', unsafe_allow_html=True)
-            src_names_h  = [k for k in health if not k.startswith("_")]
-            src_counts_h = [health[k]["articles"] for k in src_names_h]
-            src_cols_h   = [SOURCE_META.get(k, SOURCE_META["Unknown"])["color"] for k in src_names_h]
-            if src_counts_h and sum(src_counts_h) > 0:
-                fig_src_pie = go.Figure(go.Pie(
-                    labels=src_names_h, values=src_counts_h, hole=0.5,
-                    marker=dict(colors=src_cols_h, line=dict(color=_BG, width=2)),
-                    textinfo="label+percent",
-                    textfont=dict(color=_TITLE, size=10),
-                    hovertemplate="<b>%{label}</b>: %{value} articles (%{percent})<extra></extra>",
-                ))
-                fig_src_pie.update_layout(
-                    paper_bgcolor=_PAPER, plot_bgcolor=_BG,
-                    font=dict(family=_FONT, color=_TEXT),
-                    height=320, margin=dict(l=14, r=14, t=36, b=14),
-                    showlegend=True,
-                    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=9)),
-                    title=dict(text="Article Share by Source", font=dict(color=_TITLE, size=13), x=0.01),
-                    annotations=[dict(
-                        text=f"<b>{sum(src_counts_h)}</b><br><span style='font-size:9px'>total</span>",
-                        x=0.5, y=0.5, showarrow=False,
-                        font=dict(size=13, color=_TITLE, family=_FONT),
-                    )],
-                )
-                st.plotly_chart(fig_src_pie, use_container_width=True, config={"displayModeBar": False})
 
     # ── Platform footer ───────────────────────────────────────────────────────
     st.markdown(
