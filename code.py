@@ -2887,32 +2887,41 @@ def main():
             off_s = ""
         return d.strftime("%A, %d %B %Y  \u00b7  %H:%M") + f"  {tz_label} ({off_s})"
 
-    # ── Load Wood Mackenzie logo as base64 for GitHub deployment ─────────────
-    import base64, os as _os
-    _logo_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "wood_mac.png")
-    try:
-        with open(_logo_path, "rb") as _f:
-            _logo_b64 = base64.b64encode(_f.read()).decode()
-        _logo_src = f"data:image/png;base64,{_logo_b64}"
-    except Exception:
-        _logo_src = ""
-
     with st.sidebar:
+        # Wood Mackenzie SVG logo (white) — no file dependency, always visible on dark bg
+        _wm_svg = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" width="160" height="36">
+          <!-- W-chevron mark -->
+          <g>
+            <!-- Left outer leg -->
+            <polygon points="0,36 7,36 16,14 9,14" fill="#ffffff"/>
+            <!-- Left inner leg -->
+            <polygon points="16,14 23,36 30,36 23,14" fill="#ffffff"/>
+            <!-- Right inner leg -->
+            <polygon points="23,14 30,36 37,36 30,14" fill="#ffffff"/>
+            <!-- Right outer leg -->
+            <polygon points="30,14 37,36 44,36 37,14" fill="#ffffff"/>
+          </g>
+          <!-- "Wood" text -->
+          <text x="52" y="26" font-family="Arial,Helvetica,sans-serif" font-size="15"
+                font-weight="700" fill="#ffffff" letter-spacing="0.3">Wood</text>
+          <!-- "Mackenzie" text -->
+          <text x="52" y="40" font-family="Arial,Helvetica,sans-serif" font-size="13"
+                font-weight="400" fill="#ffffff" letter-spacing="0.3">Mackenzie</text>
+        </svg>
+        """
         st.markdown(
             '<div style="padding:.9rem 0 .4rem;">'
             # Logo flush to the right
-            '<div style="display:flex;justify-content:flex-end;margin-bottom:.55rem;">'
-            + (f'<img src="{_logo_src}" alt="Wood Mackenzie" '
-               'style="height:38px;width:auto;object-fit:contain;"/>'
-               if _logo_src else
-               '<div style="font-family:Syne,sans-serif;font-size:.88rem;font-weight:800;color:#0047e1;">Wood Mackenzie</div>')
-            + '</div>'
-            # Main label
+            '<div style="display:flex;justify-content:flex-end;margin-bottom:.65rem;">'
+            + _wm_svg +
+            '</div>'
+            # Line 1: Global Data Center
             '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
-            'letter-spacing:.02em;margin-bottom:.18rem;">Global Data Center Intelligence</div>'
-            # Sub-label
-            '<div style="font-family:monospace;font-size:.55rem;letter-spacing:.14em;color:#1a2e50;'
-            'text-transform:uppercase;margin-bottom:.22rem;">Intelligence Platform</div>'
+            'letter-spacing:.02em;margin-bottom:.06rem;">Global Data Center</div>'
+            # Line 2: Intelligence Platform
+            '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#00b4ff;'
+            'letter-spacing:.02em;margin-bottom:.28rem;">Intelligence Platform</div>'
             # Built By
             '<div style="font-family:monospace;font-size:.58rem;letter-spacing:.08em;color:#2a3e60;">'
             'Built By <span style="color:#0047e1;font-weight:600;">Sharugh</span></div>'
@@ -3156,7 +3165,8 @@ def main():
     st.markdown(
         f'<div class="gl-banner">'
         f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} Sources Active</div>'
-        f'<div class="banner-title">Global Data Center <span>Intelligence</span></div>'
+        f'<div class="banner-title">Global Data Center</div>'
+        f'<div class="banner-title" style="margin-top:-.15rem;"><span>Intelligence</span> Platform</div>'
         f'<div class="banner-sub">Real-time aggregation across trade press, RSS feeds & Google News \u00b7 '
         f'Auto-tagged by region, topic, company & capacity \u00b7 '
         f'Deduplicated across all sources</div>'
