@@ -2887,34 +2887,30 @@ def main():
             off_s = ""
         return d.strftime("%A, %d %B %Y  \u00b7  %H:%M") + f"  {tz_label} ({off_s})"
 
+    # ── Load Wood Mackenzie logo from assets/logo.png (base64 for HTML embed) ──
+    import base64 as _b64, os as _os
+    _logo_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "assets", "logo.png")
+    try:
+        with open(_logo_path, "rb") as _lf:
+            _logo_b64 = _b64.b64encode(_lf.read()).decode()
+        _logo_img_tag = (
+            f'<img src="data:image/png;base64,{_logo_b64}" '
+            f'alt="Wood Mackenzie" '
+            f'style="height:44px;width:auto;object-fit:contain;display:block;"/>'
+        )
+    except FileNotFoundError:
+        # Fallback text if file is missing from repo
+        _logo_img_tag = (
+            '<div style="font-family:Arial Black,sans-serif;font-size:.95rem;'
+            'font-weight:900;color:#ffffff;letter-spacing:.02em;">Wood<br>Mackenzie</div>'
+        )
+
     with st.sidebar:
-        # Wood Mackenzie SVG logo (white) — no file dependency, always visible on dark bg
-        _wm_svg = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" width="160" height="36">
-          <!-- W-chevron mark -->
-          <g>
-            <!-- Left outer leg -->
-            <polygon points="0,36 7,36 16,14 9,14" fill="#ffffff"/>
-            <!-- Left inner leg -->
-            <polygon points="16,14 23,36 30,36 23,14" fill="#ffffff"/>
-            <!-- Right inner leg -->
-            <polygon points="23,14 30,36 37,36 30,14" fill="#ffffff"/>
-            <!-- Right outer leg -->
-            <polygon points="30,14 37,36 44,36 37,14" fill="#ffffff"/>
-          </g>
-          <!-- "Wood" text -->
-          <text x="52" y="26" font-family="Arial,Helvetica,sans-serif" font-size="15"
-                font-weight="700" fill="#ffffff" letter-spacing="0.3">Wood</text>
-          <!-- "Mackenzie" text -->
-          <text x="52" y="40" font-family="Arial,Helvetica,sans-serif" font-size="13"
-                font-weight="400" fill="#ffffff" letter-spacing="0.3">Mackenzie</text>
-        </svg>
-        """
         st.markdown(
             '<div style="padding:.9rem 0 .4rem;">'
             # Logo flush to the right
             '<div style="display:flex;justify-content:flex-end;margin-bottom:.65rem;">'
-            + _wm_svg +
+            + _logo_img_tag +
             '</div>'
             # Line 1: Global Data Center
             '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
