@@ -2887,38 +2887,13 @@ def main():
             off_s = ""
         return d.strftime("%A, %d %B %Y  \u00b7  %H:%M") + f"  {tz_label} ({off_s})"
 
-    # ── Load Wood Mackenzie logo from assets/logo.png (base64 for HTML embed) ──
-    import base64 as _b64, os as _os
-    _logo_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "assets", "logo.png")
-    try:
-        with open(_logo_path, "rb") as _lf:
-            _logo_b64 = _b64.b64encode(_lf.read()).decode()
-        _logo_img_tag = (
-            f'<img src="data:image/png;base64,{_logo_b64}" '
-            f'alt="Wood Mackenzie" '
-            f'style="height:44px;width:auto;object-fit:contain;display:block;"/>'
-        )
-    except FileNotFoundError:
-        # Fallback text if file is missing from repo
-        _logo_img_tag = (
-            '<div style="font-family:Arial Black,sans-serif;font-size:.95rem;'
-            'font-weight:900;color:#ffffff;letter-spacing:.02em;">Wood<br>Mackenzie</div>'
-        )
-
     with st.sidebar:
         st.markdown(
             '<div style="padding:.9rem 0 .4rem;">'
-            # Logo flush to the right
-            '<div style="display:flex;justify-content:flex-end;margin-bottom:.65rem;">'
-            + _logo_img_tag +
-            '</div>'
-            # Line 1: Global Data Center
             '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
             'letter-spacing:.02em;margin-bottom:.06rem;">Global Data Center</div>'
-            # Line 2: Intelligence Platform
             '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#00b4ff;'
             'letter-spacing:.02em;margin-bottom:.28rem;">Intelligence Platform</div>'
-            # Built By
             '<div style="font-family:monospace;font-size:.58rem;letter-spacing:.08em;color:#2a3e60;">'
             'Built By <span style="color:#0047e1;font-weight:600;">Sharugh</span></div>'
             '</div>',
