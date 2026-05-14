@@ -735,17 +735,13 @@ for _op, _data in GLOBAL_GRID_OPERATORS.items():
 
 ALL_ISO_RTO_KW_LIST = sorted(set(ISO_RTO_KEYWORDS.keys()))
 
-# Pre-compile one combined regex — longest keywords first to avoid sub-phrase shadowing
-_ISO_RTO_SORTED_KWS = sorted(ISO_RTO_KEYWORDS.keys(), key=len, reverse=True)
-_ISO_RTO_COMBINED_RE = re.compile(
-    "|".join(re.escape(k) for k in _ISO_RTO_SORTED_KWS),
-    re.I,
-)
-
 def detect_iso_rto(text):
     """Return the ISO/RTO/grid-operator relevant to this article, or empty string."""
-    m = _ISO_RTO_COMBINED_RE.search(text.lower())
-    return ISO_RTO_KEYWORDS.get(m.group(0).lower(), "") if m else ""
+    t = text.lower()
+    for kw, iso in ISO_RTO_KEYWORDS.items():
+        if kw in t:
+            return iso
+    return ""
 
 COUNTRY_KEYWORDS = {k: [k] for k in COUNTRY_TO_REGION}
 COUNTRY_KEYWORDS.update({
@@ -1418,48 +1414,7 @@ GNEWS_QUERIES = [
     ("data center water permit drought concern cooling water ESG impact", "Google News"),
 ]
 
-RSS_SOURCES = [
-    # DataCenter Knowledge — real RSS feed, no Cloudflare
-    {
-        "name": "DataCenter Knowledge",
-        "url": "https://www.datacenterknowledge.com/rss.xml",
-        "priority": 5,
-    },
-    # DataCenter Frontier — real RSS feed, no Cloudflare
-    {
-        "name": "DataCenterFrontier",
-        "url": "https://datacenterfrontier.com/feed/",
-        "priority": 5,
-    },
-]
-
-
-def _fetch_rss_source(src):
-    """Fetch a single RSS feed and return list of raw article dicts."""
-    results = []
-    try:
-        feed = feedparser.parse(src["url"])
-        for entry in feed.entries:
-            headline = entry.get("title", "").strip()
-            url_val  = entry.get("link",  "").strip()
-            if not headline or not url_val:
-                continue
-            date_obj = None
-            if hasattr(entry, "published_parsed") and entry.published_parsed:
-                try:
-                    date_obj = datetime(*entry.published_parsed[:6])
-                except Exception:
-                    pass
-            results.append({
-                "headline":  headline,
-                "url":       url_val,
-                "date_obj":  date_obj,
-                "source":    src["name"],
-                "_priority": src["priority"],
-            })
-    except Exception:
-        pass
-    return results
+RSS_SOURCES = []   # All sources are HTML-scraped directly
 
 
 # ─── Date parser (app15 style — fast and clean) ────────────────────────────
@@ -1498,8 +1453,6 @@ def parse_date_str(raw):
 
 
 # ─── HTTP fetcher (app15 style — cloudscraper first, fallback requests) ────
-import threading as _threading
-
 _DCD_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -1510,44 +1463,18 @@ _DCD_HEADERS = {
     "Referer": "https://www.datacenterdynamics.com/",
 }
 
-# Thread-local storage: each scraper thread gets its own cloudscraper/requests session
-# This avoids connection-pool contention and Cloudflare fingerprint sharing
-_tl = _threading.local()
-
-def _get_session():
-    """Return (or lazily create) a per-thread HTTP session."""
-    if not hasattr(_tl, "session"):
-        try:
-            import cloudscraper as _cs_mod
-            _tl.session = _cs_mod.create_scraper(
-                browser={"browser": "chrome", "platform": "windows", "mobile": False}
-            )
-            _tl.use_cs = True
-        except ImportError:
-            import requests as _req_mod
-            _tl.session = _req_mod.Session()
-            _tl.use_cs = False
-    return _tl.session, _tl.use_cs
-
-def fetch_html(url, retries=3):
-    """Fetch URL with per-thread session and exponential backoff on rate-limit."""
-    sess, use_cs = _get_session()
+def fetch_html(url, retries=2):
     for attempt in range(retries):
         try:
-            if use_cs:
-                r = sess.get(url, timeout=22)
+            if _USE_CS:
+                r = _CS.get(url, timeout=20)
             else:
-                r = sess.get(url, headers=_DCD_HEADERS, timeout=22)
-            if r.status_code in (429, 503):
-                # Rate-limited — back off and retry
-                wait = 3 * (2 ** attempt)
-                time.sleep(wait)
-                continue
+                r = _CS.get(url, headers=_DCD_HEADERS, timeout=20)
             r.raise_for_status()
             return BeautifulSoup(r.text, "html.parser")
         except Exception:
-            if attempt < retries - 1:
-                time.sleep(2 * (attempt + 1))
+            if attempt == 0:
+                time.sleep(2)
     return None
 
 
@@ -1626,95 +1553,86 @@ def _parse_articles_from_soup(soup, source_name, base_url):
 # ─── DCD scraper: construction channel × region terms (app15 engine) ───────
 def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
     """
-    Scrapes DCD construction channel across all term-sets in parallel.
+    Scrapes DCD using:
+      ?term=the-data-center-construction-channel
+      &term=<region_slug>      (one per selected region, or all if none selected)
+      &term=<extra_stage_term> (approved / site-selection / etc.)
+      &page=N
 
-    Parallelism strategy:
-    - Each url_set runs in its own thread with its OWN cloudscraper session.
-      This is critical: sharing a single session across threads causes Cloudflare
-      to fingerprint and rate-limit. Per-thread sessions look like separate browsers.
-    - 3 parallel workers (conservative — avoids Cloudflare 429 at scale).
-    - Per-page sleep = 0.35 s within each thread (polite, effective rate ~8.5 req/s total).
-    - Exponential backoff on 429/503 handled inside fetch_html automatically.
+    This is exactly what makes app15 fetch more articles — DCD's own
+    pre-filtered construction channel returns only DC construction content,
+    so almost every article is relevant regardless of region.
 
-    region_terms: list of DCD slug strings. Empty = global (no region filter).
+    region_terms: list of DCD slug strings from DCD_REGION_TERMS keys.
+                  Empty list = scrape ALL regions (no region term added).
     """
-    # Warm up session (helps Cloudflare cookie handshake succeed)
+    # Warm up DCD session (app15 does this too — helps bypass Cloudflare)
     fetch_html(DCD_BASE + "/en/")
 
+    all_articles = []
+    seen_urls    = set()
+
+    # Build the set of term combinations to scrape:
+    # 1. Construction channel + each selected region  (one URL per region)
+    # 2. Each extra stage term (no region filter — global)
+    # 3. Bare construction channel with no region (always included as catch-all)
+
     url_sets = []
+
+    # If specific regions selected, add one URL per region
     if region_terms:
         for rterm in region_terms:
             url_sets.append([DCD_CHAN_TERM, rterm])
     else:
+        # No region filter — just the construction channel (global)
         url_sets.append([DCD_CHAN_TERM])
 
+    # Extra stage terms (approved, site-selection, etc.) — always global
     for extra in DCD_EXTRA_TERMS:
         url_sets.append([DCD_CHAN_TERM, extra])
 
     total_fetches = len(url_sets) * max_pages
     fetched       = [0]
-    pbar_lock     = _threading.Lock()
 
-    def _scrape_term_set(terms):
-        local_arts = []
-        local_seen = set()
+    for terms in url_sets:
         for page in range(1, max_pages + 1):
+            # Build URL: ?term=A&term=B&page=N
             params = "&".join(f"term={t}" for t in terms)
             if page > 1:
                 params += f"&page={page}"
             url = f"{DCD_BASE}/en/news/?{params}"
 
-            # Thread-safe progress update
-            with pbar_lock:
-                fetched[0] += 1
-                frac = min(fetched[0] / total_fetches, 1.0)
+            fetched[0] += 1
             if pbar:
                 pbar.progress(
-                    frac,
-                    text=f"⚡ DCD Scan: [{', '.join(terms).upper()}] · Page {page}/{max_pages}",
+                    min(fetched[0] / total_fetches, 1.0),
+                    text=f"⚡ Neural Scan: Probing {', '.join(terms).upper()} · Page {page}/{max_pages}",
                 )
 
-            soup = fetch_html(url)   # uses per-thread session with built-in backoff
+            soup = fetch_html(url)
             if not soup:
                 break
 
-            page_arts   = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
+            page_arts = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
             new_on_page = 0
-            stop        = False
+            stop = False
 
             for art in page_arts:
                 norm_url = art["url"].rstrip("/")
-                if norm_url in local_seen:
+                if norm_url in seen_urls:
                     continue
-                local_seen.add(norm_url)
+                seen_urls.add(norm_url)
                 d = art["date_obj"]
                 if d and d < cutoff:
                     stop = True
                     break
-                local_arts.append(art)
+                all_articles.append(art)
                 new_on_page += 1
 
             if stop or new_on_page == 0:
                 break
 
-            time.sleep(0.35)   # polite per-page delay within each thread
-
-        return local_arts
-
-    # 3 workers = safe parallel rate without Cloudflare triggering
-    all_articles = []
-    seen_urls    = set()
-    with ThreadPoolExecutor(max_workers=min(3, len(url_sets))) as pool:
-        futures = [pool.submit(_scrape_term_set, terms) for terms in url_sets]
-        for f in as_completed(futures):
-            try:
-                for art in f.result():
-                    norm_url = art["url"].rstrip("/")
-                    if norm_url not in seen_urls:
-                        seen_urls.add(norm_url)
-                        all_articles.append(art)
-            except Exception:
-                pass
+            time.sleep(0.5)
 
     return all_articles
 
@@ -1760,29 +1678,18 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
 
     raw = []
 
-    # ── Step 1: DCD (primary, parallel per-thread sessions) ───────────────────
+    # ── Step 1: DCD (primary, high-volume, construction channel) ──────────
     class _FakePbar:
-        def progress(self, frac, text=""): progress_cb(frac * 0.60, text)
+        def progress(self, frac, text=""): progress_cb(frac * 0.7, text)
 
     dcd_arts = scrape_dcd(cutoff, max_html_pages, region_terms, pbar=_FakePbar())
     raw.extend(dcd_arts)
-    progress_cb(0.60, f"DCD: {len(dcd_arts)} articles fetched")
+    progress_cb(0.70, f"DCD: {len(dcd_arts)} articles fetched")
 
-    # ── Step 2: DCK + DCF RSS feeds (parallel, no Cloudflare) ────────────────
-    progress_cb(0.62, "Fetching DCK / DCF RSS feeds…")
-    with ThreadPoolExecutor(max_workers=len(RSS_SOURCES)) as pool:
-        rss_futures = [pool.submit(_fetch_rss_source, src) for src in RSS_SOURCES]
-        for f in as_completed(rss_futures):
-            try:
-                raw.extend(f.result())
-            except Exception:
-                pass
-    progress_cb(0.65, f"RSS feeds done — {len(raw)} total so far")
-
-    # ── Step 3: Google News (25 workers — pure RSS, no rate limit) ────────────
-    progress_cb(0.67, "Fetching Google News supplement…")
+    # ── Step 2: Google News supplement (runs in parallel) ─────────────────
+    progress_cb(0.72, "Fetching Google News supplement…")
     gn_results = []
-    with ThreadPoolExecutor(max_workers=25) as pool:
+    with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(fetch_google_news, q, lbl): lbl for q, lbl in GNEWS_QUERIES}
         done = [0]
         for f in as_completed(futures):
@@ -1791,27 +1698,28 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
             except Exception:
                 pass
             done[0] += 1
-            progress_cb(0.67 + 0.25 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
+            progress_cb(0.72 + 0.25 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
 
     raw.extend(gn_results)
-    progress_cb(0.93, f"All sources done — {len(raw)} raw articles. Filtering…")
+    progress_cb(0.98, "Filtering and deduplicating…")
 
-    # ── Step 4: date cutoff + DC relevance filter ──────────────────────────────
-    filtered = [
-        item for item in raw
-        if not (item.get("date_obj") and item["date_obj"] < cutoff)
-        and is_dc_relevant(item["headline"])
-    ]
+    # ── Step 3: date cutoff + DC relevance filter ─────────────────────────
+    filtered = []
+    for item in raw:
+        d = item.get("date_obj")
+        if d and d < cutoff:
+            continue
+        if not is_dc_relevant(item["headline"]):
+            continue
+        filtered.append(item)
 
     return filtered
 
 
-# ─── SCRAPE_SOURCES — used for banner display + KPI card ─────────────────────
+# ─── Dummy SCRAPE_SOURCES (kept so the banner "N Sources Active" still works) ─
 SCRAPE_SOURCES = [
     {"name": "DataCenterDynamics", "url": DCD_BASE + "/en/news/", "base": DCD_BASE,
      "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$", "type": "html", "priority": 1},
-    {"name": "DataCenter Knowledge",  "url": "https://www.datacenterknowledge.com/rss.xml",  "type": "rss", "priority": 5},
-    {"name": "DataCenterFrontier",    "url": "https://datacenterfrontier.com/feed/",          "type": "rss", "priority": 5},
     {"name": "Google News (Construction)",  "url": "", "type": "gnews", "priority": 10},
     {"name": "Google News (Approvals)",     "url": "", "type": "gnews", "priority": 10},
     {"name": "Google News (Hyperscalers)",  "url": "", "type": "gnews", "priority": 10},
@@ -2042,20 +1950,12 @@ def detect_deal_size(text):
     return ""
 
 
-# Pre-compile all company patterns once at import time — avoids re.compile() per article
-_COMPANY_PATTERNS = [
-    (co, re.compile(r"\b" + re.escape(co) + r"\b", re.I))
-    for co in KNOWN_COMPANIES
-]
-
 def detect_companies(text):
     found = []
-    for co, pat in _COMPANY_PATTERNS:
-        if pat.search(text):
+    for co in KNOWN_COMPANIES:
+        if re.search(r"\b" + re.escape(co) + r"\b", text, re.I):
             found.append(co)
-            if len(found) == 4:   # short-circuit after finding 4
-                break
-    return ", ".join(found) if found else ""
+    return ", ".join(found[:4]) if found else ""
 
 
 def detect_sentiment(text):
@@ -2109,12 +2009,8 @@ def fuzzy_similar(a, b, threshold=0.88):
 def deduplicate(articles):
     """
     1. URL-based exact dedup (same URL = same article).
-    2. Fast fuzzy headline dedup via token-bucket blocking.
-       - Build an inverted index: word-token → set of kept article indices.
-       - For each new article, only compare against candidates sharing ≥1 token.
-       - Run SequenceMatcher only when Jaccard pre-filter (≥50% token overlap) passes.
-       Complexity: O(n · avg_bucket_size) instead of O(n²).
-       DCD articles (_priority=1) win over Google News (_priority=10) on ties.
+    2. Fuzzy headline dedup — when two articles match, keep the one from
+       the source with the lowest _priority number (DCD = 1 wins).
     """
     # Step 1: URL dedup — sort by priority so DCD URLs win ties
     seen_urls = {}
@@ -2123,45 +2019,21 @@ def deduplicate(articles):
         if url and url not in seen_urls:
             seen_urls[url] = art
     url_deduped = list(seen_urls.values())
+
+    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
     url_deduped.sort(key=lambda x: x.get("_priority", 99))
-
-    keep        = []
-    kept_norm   = []
-    token_index = {}   # token → set of indices in `keep`
-
+    keep = []
+    seen_headlines = []
     for art in url_deduped:
-        hl   = art.get("Headline", art.get("headline", ""))
-        norm = _normalise_headline(hl)
-        toks = set(norm.split())
-
-        # Gather candidate indices via token overlap
-        candidates = set()
-        for tok in toks:
-            if tok in token_index:
-                candidates.update(token_index[tok])
-
+        hl = art.get("Headline", art.get("headline", ""))
         is_dup = False
-        for idx in candidates:
-            cand = kept_norm[idx]
-            if norm == cand:
-                is_dup = True; break
-            shorter, longer = (norm, cand) if len(norm) <= len(cand) else (cand, norm)
-            if len(shorter) >= 30 and shorter in longer:
-                is_dup = True; break
-            cand_toks = set(cand.split())
-            if toks and cand_toks:
-                jaccard = len(toks & cand_toks) / len(toks | cand_toks)
-                if jaccard >= 0.5:
-                    if SequenceMatcher(None, norm, cand).ratio() >= 0.88:
-                        is_dup = True; break
-
+        for seen in seen_headlines:
+            if fuzzy_similar(hl, seen):
+                is_dup = True
+                break
         if not is_dup:
-            idx = len(keep)
             keep.append(art)
-            kept_norm.append(norm)
-            for tok in toks:
-                token_index.setdefault(tok, set()).add(idx)
-
+            seen_headlines.append(hl)
     return keep
 
 
@@ -4090,9 +3962,7 @@ def main():
                 continue
             filtered.append(item)
 
-        # Parallel enrichment — all detector functions are stateless/thread-safe
-        with ThreadPoolExecutor(max_workers=12) as _ep:
-            enriched = list(_ep.map(enrich, filtered))
+        enriched = [enrich(i) for i in filtered]
         deduped  = deduplicate(enriched)
 
         df_full = (
@@ -4194,7 +4064,7 @@ def main():
 
     kpi_html = (
         '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
-        + kpi("Sources Polled", len(SCRAPE_SOURCES), "blue", "DCD · DCK · DCF · GNews")
+        + kpi("Sources Polled", len(SCRAPE_SOURCES), "blue", "DCD · DCK · DCW · DCM")
         + kpi("Raw Articles", st.session_state.raw_count, "cyan", "before dedup & filter")
         + kpi("Unique Articles", len(df_full), "green", "after deduplication")
         + kpi("Filtered View", len(df), "amber", "current filters applied")
