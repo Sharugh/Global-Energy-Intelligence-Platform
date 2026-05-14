@@ -735,12 +735,20 @@ for _op, _data in GLOBAL_GRID_OPERATORS.items():
 
 ALL_ISO_RTO_KW_LIST = sorted(set(ISO_RTO_KEYWORDS.keys()))
 
+# Pre-build one combined regex for fast ISO/RTO detection
+# Sorted longest-first so longer phrases match before their sub-phrases
+_ISO_RTO_SORTED_KWS = sorted(ISO_RTO_KEYWORDS.keys(), key=len, reverse=True)
+_ISO_RTO_COMBINED_RE = re.compile(
+    "|".join(re.escape(k) for k in _ISO_RTO_SORTED_KWS),
+    re.I,
+)
+
 def detect_iso_rto(text):
     """Return the ISO/RTO/grid-operator relevant to this article, or empty string."""
     t = text.lower()
-    for kw, iso in ISO_RTO_KEYWORDS.items():
-        if kw in t:
-            return iso
+    m = _ISO_RTO_COMBINED_RE.search(t)
+    if m:
+        return ISO_RTO_KEYWORDS.get(m.group(0).lower(), "")
     return ""
 
 COUNTRY_KEYWORDS = {k: [k] for k in COUNTRY_TO_REGION}
@@ -1565,74 +1573,87 @@ def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
 
     region_terms: list of DCD slug strings from DCD_REGION_TERMS keys.
                   Empty list = scrape ALL regions (no region term added).
+
+    PERFORMANCE: url_sets are scraped in parallel (one thread per term-set).
+    Within each thread, pages are fetched sequentially (respects Cloudflare rate limit)
+    with a reduced sleep of 0.25s (halved from original 0.5s).
     """
-    # Warm up DCD session (app15 does this too — helps bypass Cloudflare)
+    # Warm up DCD session (helps bypass Cloudflare)
     fetch_html(DCD_BASE + "/en/")
 
-    all_articles = []
-    seen_urls    = set()
-
-    # Build the set of term combinations to scrape:
-    # 1. Construction channel + each selected region  (one URL per region)
-    # 2. Each extra stage term (no region filter — global)
-    # 3. Bare construction channel with no region (always included as catch-all)
-
+    # Build the set of term combinations to scrape
     url_sets = []
-
-    # If specific regions selected, add one URL per region
     if region_terms:
         for rterm in region_terms:
             url_sets.append([DCD_CHAN_TERM, rterm])
     else:
-        # No region filter — just the construction channel (global)
         url_sets.append([DCD_CHAN_TERM])
 
-    # Extra stage terms (approved, site-selection, etc.) — always global
     for extra in DCD_EXTRA_TERMS:
         url_sets.append([DCD_CHAN_TERM, extra])
 
     total_fetches = len(url_sets) * max_pages
-    fetched       = [0]
+    fetched       = [0]          # shared counter (protected by GIL for simple int ops)
+    lock          = __import__("threading").Lock()
 
-    for terms in url_sets:
+    def _scrape_term_set(terms):
+        """Scrape all pages for one term-set; returns list of article dicts."""
+        local_arts   = []
+        local_seen   = set()
         for page in range(1, max_pages + 1):
-            # Build URL: ?term=A&term=B&page=N
             params = "&".join(f"term={t}" for t in terms)
             if page > 1:
                 params += f"&page={page}"
             url = f"{DCD_BASE}/en/news/?{params}"
 
-            fetched[0] += 1
+            with lock:
+                fetched[0] += 1
+                frac = min(fetched[0] / total_fetches, 1.0)
             if pbar:
-                pbar.progress(
-                    min(fetched[0] / total_fetches, 1.0),
-                    text=f"⚡ Neural Scan: Probing {', '.join(terms).upper()} · Page {page}/{max_pages}",
-                )
+                pbar.progress(frac, text=f"⚡ Neural Scan: Probing {', '.join(terms).upper()} · Page {page}/{max_pages}")
 
             soup = fetch_html(url)
             if not soup:
                 break
 
-            page_arts = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
+            page_arts   = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
             new_on_page = 0
-            stop = False
+            stop        = False
 
             for art in page_arts:
                 norm_url = art["url"].rstrip("/")
-                if norm_url in seen_urls:
+                if norm_url in local_seen:
                     continue
-                seen_urls.add(norm_url)
+                local_seen.add(norm_url)
                 d = art["date_obj"]
                 if d and d < cutoff:
                     stop = True
                     break
-                all_articles.append(art)
+                local_arts.append(art)
                 new_on_page += 1
 
             if stop or new_on_page == 0:
                 break
 
-            time.sleep(0.5)
+            time.sleep(0.25)          # reduced from 0.5 s — still polite
+
+        return local_arts
+
+    # Run term-sets in parallel (cap at 6 workers to avoid Cloudflare throttle)
+    all_articles = []
+    seen_urls    = set()
+    max_dcd_workers = min(6, len(url_sets))
+    with ThreadPoolExecutor(max_workers=max_dcd_workers) as pool:
+        futures = [pool.submit(_scrape_term_set, terms) for terms in url_sets]
+        for f in as_completed(futures):
+            try:
+                for art in f.result():
+                    norm_url = art["url"].rstrip("/")
+                    if norm_url not in seen_urls:
+                        seen_urls.add(norm_url)
+                        all_articles.append(art)
+            except Exception:
+                pass
 
     return all_articles
 
@@ -1689,7 +1710,7 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
     # ── Step 2: Google News supplement (runs in parallel) ─────────────────
     progress_cb(0.72, "Fetching Google News supplement…")
     gn_results = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=20) as pool:
         futures = {pool.submit(fetch_google_news, q, lbl): lbl for q, lbl in GNEWS_QUERIES}
         done = [0]
         for f in as_completed(futures):
@@ -1950,12 +1971,20 @@ def detect_deal_size(text):
     return ""
 
 
+# ── Pre-compile company patterns once at import time (major speed-up) ─────────
+_COMPANY_PATTERNS = [
+    (co, re.compile(r"\b" + re.escape(co) + r"\b", re.I))
+    for co in KNOWN_COMPANIES
+]
+
 def detect_companies(text):
     found = []
-    for co in KNOWN_COMPANIES:
-        if re.search(r"\b" + re.escape(co) + r"\b", text, re.I):
+    for co, pat in _COMPANY_PATTERNS:
+        if pat.search(text):
             found.append(co)
-    return ", ".join(found[:4]) if found else ""
+            if len(found) == 4:
+                break
+    return ", ".join(found) if found else ""
 
 
 def detect_sentiment(text):
@@ -2009,8 +2038,12 @@ def fuzzy_similar(a, b, threshold=0.88):
 def deduplicate(articles):
     """
     1. URL-based exact dedup (same URL = same article).
-    2. Fuzzy headline dedup — when two articles match, keep the one from
-       the source with the lowest _priority number (DCD = 1 wins).
+    2. Fast fuzzy headline dedup using token-bucket blocking to avoid O(n²).
+       - Normalise each headline to a word-set.
+       - Build an inverted index: token → list of kept article indices.
+       - For a new article, only compare against articles that share ≥1 token
+         (Jaccard pre-filter), then run SequenceMatcher only on that small set.
+       This reduces comparisons from O(n²) to O(n · avg_bucket_size).
     """
     # Step 1: URL dedup — sort by priority so DCD URLs win ties
     seen_urls = {}
@@ -2020,20 +2053,56 @@ def deduplicate(articles):
             seen_urls[url] = art
     url_deduped = list(seen_urls.values())
 
-    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
+    # Step 2: Fast fuzzy headline dedup — sort by priority first so DCD is kept
     url_deduped.sort(key=lambda x: x.get("_priority", 99))
-    keep = []
-    seen_headlines = []
+
+    keep = []                    # kept article objects
+    kept_norm = []               # normalised headline strings for kept articles
+    token_index = {}             # token → set of indices in `keep`
+
     for art in url_deduped:
         hl = art.get("Headline", art.get("headline", ""))
+        norm = _normalise_headline(hl)
+        tokens = set(norm.split())
+
+        # Gather candidate indices via token overlap (blocking step)
+        candidates = set()
+        for tok in tokens:
+            if tok in token_index:
+                candidates.update(token_index[tok])
+
+        # Check only candidate kept articles (not all of them)
         is_dup = False
-        for seen in seen_headlines:
-            if fuzzy_similar(hl, seen):
+        for idx in candidates:
+            cand_norm = kept_norm[idx]
+            # Quick exact check
+            if norm == cand_norm:
                 is_dup = True
                 break
+            # Substring check (short vs long headline of same story)
+            shorter, longer = (norm, cand_norm) if len(norm) <= len(cand_norm) else (cand_norm, norm)
+            if len(shorter) >= 30 and shorter in longer:
+                is_dup = True
+                break
+            # SequenceMatcher only if Jaccard overlap is promising (fast pre-filter)
+            cand_tokens = set(cand_norm.split())
+            if tokens and cand_tokens:
+                jaccard = len(tokens & cand_tokens) / len(tokens | cand_tokens)
+                if jaccard >= 0.5:
+                    ratio = SequenceMatcher(None, norm, cand_norm).ratio()
+                    if ratio >= 0.88:
+                        is_dup = True
+                        break
+
         if not is_dup:
+            idx = len(keep)
             keep.append(art)
-            seen_headlines.append(hl)
+            kept_norm.append(norm)
+            for tok in tokens:
+                if tok not in token_index:
+                    token_index[tok] = set()
+                token_index[tok].add(idx)
+
     return keep
 
 
@@ -3962,7 +4031,9 @@ def main():
                 continue
             filtered.append(item)
 
-        enriched = [enrich(i) for i in filtered]
+        # Parallel enrichment — enrich() is pure CPU/regex, safe to parallelise
+        with ThreadPoolExecutor(max_workers=8) as _enrich_pool:
+            enriched = list(_enrich_pool.map(enrich, filtered))
         deduped  = deduplicate(enriched)
 
         df_full = (
