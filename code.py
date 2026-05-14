@@ -2163,6 +2163,9 @@ def deduplicate(articles):
                 token_index.setdefault(tok, set()).add(idx)
 
     return keep
+
+
+def enrich(raw_item):
     hl = raw_item["headline"]
     d = raw_item.get("date_obj")
     country = detect_country(hl)
