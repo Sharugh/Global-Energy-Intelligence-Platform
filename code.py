@@ -4,10 +4,8 @@ import io
 import time
 import math
 import textwrap
-import feedparser
 from collections import Counter
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
 
 # ── Platform metadata ─────────────────────────────────────────────────────────
@@ -1198,32 +1196,21 @@ KNOWN_COMPANIES = [
 ]
 
 
-# ─── DCD constants ─────────────────────────────────────────────────────────
-DCD_BASE     = "https://www.datacenterdynamics.com"
-DCD_CHAN_TERM = "the-data-center-construction-channel"
+# ─── DCD URL constants ─────────────────────────────────────────────────────
+DCD_BASE             = "https://www.datacenterdynamics.com"
+# Construction channel: DCD's own filtered term-based URL (proven to work)
+DCD_CONSTRUCTION_URL = DCD_BASE + "/en/news/?term=the-data-center-construction-channel"
+# General news: the plain news listing
+DCD_GENERAL_URL      = DCD_BASE + "/en/news/"
 
-# DCD region taxonomy terms → mapped to code2's Region labels
-# These are the actual URL ?term= slugs DCD uses in their site taxonomy
-DCD_REGION_TERMS = {
-    "north-america":  "North America",
-    "europe":         "Europe",
-    "asia-pacific":   "Asia Pacific",
-    "middle-east":    "Middle East",
-    "africa":         "Africa",
-    "latin-america":  "Latin America",
-}
+# ─── News-type labels (used in sidebar filter) ─────────────────────────────
+NEWS_TYPE_CONSTRUCTION = "Construction"
+NEWS_TYPE_GENERAL      = "General News"
 
-# DCD project-stage / topic terms for extra coverage
-DCD_EXTRA_TERMS = [
-    "approved",
-    "site-selection",
-    "disclosed-projects",
-    "project-announcement",
-    "expansion",
-    "extension",
-]
+# REMOVED: DCD_CHAN_TERM, DCD_REGION_TERMS, DCD_EXTRA_TERMS, GNEWS_QUERIES, RSS_SOURCES
+# The app now scrapes only the two DCD channels above.
 
-GNEWS_QUERIES = [
+_GNEWS_QUERIES_REMOVED = [
     # Construction / physical build
     ("data center construction campus groundbreaking opening", "Google News"),
     ("data center broke ground topping out opens ribbon cutting", "Google News"),
@@ -1405,17 +1392,7 @@ GNEWS_QUERIES = [
     ("data center lease pre-lease capacity agreement megawatt announcement", "Google News"),
     ("data center REIT dividend infrastructure fund deployment capital", "Google News"),
     ("data center IPO listing secondary market infrastructure equity raise", "Google News"),
-    ("data center M&A acquisition merger takeover portfolio deal", "Google News"),
-    ("data center carbon free 24/7 clean energy PPA nuclear hydrogen", "Google News"),
-    ("data center liquid cooling immersion cooling high-density GPU cluster", "Google News"),
-    ("data center modular prefab containerized turnkey deployment campus", "Google News"),
-    ("data center campus ribbon cutting inauguration opening ceremony MW", "Google News"),
-    ("data center county supervisor board hearing objection opposition moratorium", "Google News"),
-    ("data center water permit drought concern cooling water ESG impact", "Google News"),
-]
-
-RSS_SOURCES = []   # All sources are HTML-scraped directly
-
+]   # end of _GNEWS_QUERIES_REMOVED — not used
 
 # ─── Date parser (app15 style — fast and clean) ────────────────────────────
 MONTHS = {
@@ -1478,18 +1455,20 @@ def fetch_html(url, retries=2):
     return None
 
 
-# ─── Article parser (app15 logic + <time datetime> + ISO date fallback) ────
+# ─── Article parser — DCD HTML pages ──────────────────────────────────────
 def _parse_articles_from_soup(soup, source_name, base_url):
     """
-    app15-style parser: finds all <a href="/en/news/..."> links,
-    extracts headline from h1-h4 inside the link, climbs DOM for date.
-    Works for DCD only (href pattern ^/en/news/).
-    Enhanced: also checks <time datetime="..."> and ISO dates in text.
+    Parses DCD listing pages.  Finds all <a href="/en/(news|analysis|opinion|
+    dcd-data-center-construction-channel-news)/..."> links, extracts headline
+    from h1–h5 inside the link, then climbs the DOM for a date.
+    Works for both the general news and construction-channel URLs.
     """
     articles = []
     seen = set()
 
-    for a in soup.find_all("a", href=re.compile(r"^/en/(news|analysis|opinion)/[^?#]+/$")):
+    for a in soup.find_all("a", href=re.compile(
+        r"^/en/(news|analysis|opinion|dcd-data-center-construction-channel-news)/[^?#]+/$"
+    )):
         href = a["href"]
         if href in seen:
             continue
@@ -1550,182 +1529,120 @@ def _parse_articles_from_soup(soup, source_name, base_url):
     return articles
 
 
-# ─── DCD scraper: construction channel × region terms (app15 engine) ───────
-def scrape_dcd(cutoff, max_pages, region_terms, pbar=None):
+# ─── DCD scraper: scrapes a single base URL across N pages ─────────────────
+def _scrape_dcd_channel(base_url, source_name, cutoff, max_pages, progress_cb, label="DCD"):
     """
-    Scrapes DCD using:
-      ?term=the-data-center-construction-channel
-      &term=<region_slug>      (one per selected region, or all if none selected)
-      &term=<extra_stage_term> (approved / site-selection / etc.)
-      &page=N
+    Generic DCD channel scraper.  Paginates base_url with &page=N (or ?page=N)
+    until we hit an article older than cutoff or a page returns nothing new.
 
-    This is exactly what makes app15 fetch more articles — DCD's own
-    pre-filtered construction channel returns only DC construction content,
-    so almost every article is relevant regardless of region.
-
-    region_terms: list of DCD slug strings from DCD_REGION_TERMS keys.
-                  Empty list = scrape ALL regions (no region term added).
+    base_url    : channel root — may already contain query params (e.g. ?term=…)
+    source_name : label stored in article["source"]
+    cutoff      : datetime — articles older than this are dropped
+    max_pages   : upper page limit
+    progress_cb : callable(fraction 0→1, text)
     """
-    # Warm up DCD session (app15 does this too — helps bypass Cloudflare)
-    fetch_html(DCD_BASE + "/en/")
+    fetch_html(DCD_BASE + "/en/")   # warm-up (helps bypass Cloudflare)
 
     all_articles = []
     seen_urls    = set()
 
-    # Build the set of term combinations to scrape:
-    # 1. Construction channel + each selected region  (one URL per region)
-    # 2. Each extra stage term (no region filter — global)
-    # 3. Bare construction channel with no region (always included as catch-all)
+    # Work out whether base_url already has a query string
+    _has_qs = "?" in base_url
 
-    url_sets = []
+    for page in range(1, max_pages + 1):
+        if page == 1:
+            url = base_url
+        else:
+            sep = "&" if _has_qs else "?"
+            url = f"{base_url}{sep}page={page}"
 
-    # If specific regions selected, add one URL per region
-    if region_terms:
-        for rterm in region_terms:
-            url_sets.append([DCD_CHAN_TERM, rterm])
-    else:
-        # No region filter — just the construction channel (global)
-        url_sets.append([DCD_CHAN_TERM])
+        progress_cb(
+            min(page / max_pages, 1.0),
+            f"⚡ Scanning {label} · Page {page}/{max_pages}",
+        )
 
-    # Extra stage terms (approved, site-selection, etc.) — always global
-    for extra in DCD_EXTRA_TERMS:
-        url_sets.append([DCD_CHAN_TERM, extra])
+        soup = fetch_html(url)
+        if not soup:
+            break
 
-    total_fetches = len(url_sets) * max_pages
-    fetched       = [0]
+        page_arts  = _parse_articles_from_soup(soup, source_name, DCD_BASE)
+        new_on_page = 0
+        stop        = False
 
-    for terms in url_sets:
-        for page in range(1, max_pages + 1):
-            # Build URL: ?term=A&term=B&page=N
-            params = "&".join(f"term={t}" for t in terms)
-            if page > 1:
-                params += f"&page={page}"
-            url = f"{DCD_BASE}/en/news/?{params}"
-
-            fetched[0] += 1
-            if pbar:
-                pbar.progress(
-                    min(fetched[0] / total_fetches, 1.0),
-                    text=f"⚡ Neural Scan: Probing {', '.join(terms).upper()} · Page {page}/{max_pages}",
-                )
-
-            soup = fetch_html(url)
-            if not soup:
+        for art in page_arts:
+            norm_url = art["url"].rstrip("/")
+            if norm_url in seen_urls:
+                continue
+            seen_urls.add(norm_url)
+            d = art["date_obj"]
+            if d and d < cutoff:
+                stop = True
                 break
+            all_articles.append(art)
+            new_on_page += 1
 
-            page_arts = _parse_articles_from_soup(soup, "DataCenterDynamics", DCD_BASE)
-            new_on_page = 0
-            stop = False
+        if stop or new_on_page == 0:
+            break
 
-            for art in page_arts:
-                norm_url = art["url"].rstrip("/")
-                if norm_url in seen_urls:
-                    continue
-                seen_urls.add(norm_url)
-                d = art["date_obj"]
-                if d and d < cutoff:
-                    stop = True
-                    break
-                all_articles.append(art)
-                new_on_page += 1
-
-            if stop or new_on_page == 0:
-                break
-
-            time.sleep(0.5)
+        time.sleep(0.4)
 
     return all_articles
 
 
-# ─── Google News fetcher ───────────────────────────────────────────────────
-def fetch_google_news(query, source_label="Google News"):
-    results = []
-    try:
-        q   = query.replace(" ", "+")
-        url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
-            headline = entry.get("title", "").strip()
-            url_val  = entry.get("link",  "").strip()
-            if not headline or not url_val:
-                continue
-            date_obj = None
-            if hasattr(entry, "published_parsed") and entry.published_parsed:
-                try:
-                    date_obj = datetime(*entry.published_parsed[:6])
-                except Exception:
-                    pass
-            results.append({
-                "headline":  headline,
-                "url":       url_val,
-                "date_obj":  date_obj,
-                "source":    source_label,
-                "_priority": 10,
-            })
-    except Exception:
-        pass
-    return results
-
-
-# ─── run_all_scrapers: DCD primary + Google News supplement ────────────────
-def run_all_scrapers(max_html_pages, cutoff, progress_cb, region_terms=None):
+# ─── run_all_scrapers: dispatches to the chosen DCD channel(s) ─────────────
+def run_all_scrapers(max_html_pages, cutoff, progress_cb,
+                     news_types=None, region_terms=None):
     """
-    region_terms: list of DCD region slug strings (e.g. ["north-america","europe"]).
-                  Pass [] or None for global (no region filter on DCD).
+    news_types : list containing any of ["Construction", "General News"].
+                 Pass [] or None to scrape both channels.
+    region_terms : ignored (kept for API compatibility) — filtering by
+                   region/country/company is done post-scrape in main().
     """
-    if region_terms is None:
-        region_terms = []
+    if not news_types:
+        news_types = [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
 
     raw = []
 
-    # ── Step 1: DCD (primary, high-volume, construction channel) ──────────
-    class _FakePbar:
-        def progress(self, frac, text=""): progress_cb(frac * 0.7, text)
+    # ── Construction channel ──────────────────────────────────────────────
+    if NEWS_TYPE_CONSTRUCTION in news_types:
+        def _cb_c(frac, text=""):
+            progress_cb(frac * (0.5 if NEWS_TYPE_GENERAL in news_types else 1.0), text)
 
-    dcd_arts = scrape_dcd(cutoff, max_html_pages, region_terms, pbar=_FakePbar())
-    raw.extend(dcd_arts)
-    progress_cb(0.70, f"DCD: {len(dcd_arts)} articles fetched")
+        arts = _scrape_dcd_channel(
+            DCD_CONSTRUCTION_URL, "DCD Construction",
+            cutoff, max_html_pages, _cb_c, label="Construction Channel",
+        )
+        raw.extend(arts)
+        progress_cb(
+            0.5 if NEWS_TYPE_GENERAL in news_types else 1.0,
+            f"Construction channel: {len(arts)} articles fetched",
+        )
 
-    # ── Step 2: Google News supplement (runs in parallel) ─────────────────
-    progress_cb(0.72, "Fetching Google News supplement…")
-    gn_results = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(fetch_google_news, q, lbl): lbl for q, lbl in GNEWS_QUERIES}
-        done = [0]
-        for f in as_completed(futures):
-            try:
-                gn_results.extend(f.result())
-            except Exception:
-                pass
-            done[0] += 1
-            progress_cb(0.72 + 0.25 * (done[0] / len(GNEWS_QUERIES)), "Google News…")
+    # ── General news channel ──────────────────────────────────────────────
+    if NEWS_TYPE_GENERAL in news_types:
+        base_frac = 0.5 if NEWS_TYPE_CONSTRUCTION in news_types else 0.0
 
-    raw.extend(gn_results)
-    progress_cb(0.98, "Filtering and deduplicating…")
+        def _cb_g(frac, text=""):
+            progress_cb(base_frac + frac * (1.0 - base_frac), text)
 
-    # ── Step 3: date cutoff + DC relevance filter ─────────────────────────
-    filtered = []
-    for item in raw:
-        d = item.get("date_obj")
-        if d and d < cutoff:
-            continue
-        if not is_dc_relevant(item["headline"]):
-            continue
-        filtered.append(item)
+        arts = _scrape_dcd_channel(
+            DCD_GENERAL_URL, "DCD General News",
+            cutoff, max_html_pages, _cb_g, label="General News",
+        )
+        raw.extend(arts)
+        progress_cb(1.0, f"General news: {len(arts)} articles fetched")
 
-    return filtered
+    return raw
 
 
-# ─── Dummy SCRAPE_SOURCES (kept so the banner "N Sources Active" still works) ─
+# ─── SCRAPE_SOURCES: displayed in the banner "N Sources Active" ─────────────
 SCRAPE_SOURCES = [
-    {"name": "DataCenterDynamics", "url": DCD_BASE + "/en/news/", "base": DCD_BASE,
-     "link_pattern": r"^/en/(news|analysis|opinion)/[^?#]+/$", "type": "html", "priority": 1},
-    {"name": "Google News (Construction)",  "url": "", "type": "gnews", "priority": 10},
-    {"name": "Google News (Approvals)",     "url": "", "type": "gnews", "priority": 10},
-    {"name": "Google News (Hyperscalers)",  "url": "", "type": "gnews", "priority": 10},
-    {"name": "Google News (Power/Energy)",  "url": "", "type": "gnews", "priority": 10},
-    {"name": "Google News (Investment)",    "url": "", "type": "gnews", "priority": 10},
+    {"name": "DCD Construction Channel",
+     "url":  DCD_CONSTRUCTION_URL, "type": "html", "priority": 1},
+    {"name": "DCD General News",
+     "url":  DCD_GENERAL_URL,      "type": "html", "priority": 1},
 ]
+
 def is_dc_relevant(text):
     t = text.lower()
     # Primary: any of these alone = relevant
@@ -3616,9 +3533,41 @@ def main():
         )
         st.markdown(
             f'<div style="font-size:.68rem;color:#1a2e50;margin-top:-.3rem;margin-bottom:.4rem;">'
-            f'Up to {max_pages} page{"s" if max_pages != 1 else ""} per DCD term scraped</div>',
+            f'Up to {max_pages} page{"s" if max_pages != 1 else ""} per DCD channel scraped</div>',
             unsafe_allow_html=True,
         )
+
+        # ── News Type ─────────────────────────────────────────────────────────
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+            'text-transform:uppercase;margin:.9rem 0 .2rem;">📰 News Type</div>',
+            unsafe_allow_html=True,
+        )
+        news_type_sel = st.multiselect(
+            "News Type",
+            [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL],
+            default=[NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL],
+            placeholder="Select channel(s)…",
+            label_visibility="collapsed",
+            help=(
+                "Construction → DCD Data Center Construction Channel\n"
+                "General News → DCD General News feed"
+            ),
+        )
+        # Friendly label shown under the selector
+        _nt_labels = {
+            NEWS_TYPE_CONSTRUCTION: "🏗️ Construction Channel",
+            NEWS_TYPE_GENERAL:      "📰 General News",
+        }
+        if news_type_sel:
+            st.markdown(
+                '<div style="font-size:.68rem;color:#1a2e50;margin-top:-.3rem;margin-bottom:.4rem;">'
+                + " · ".join(_nt_labels[n] for n in news_type_sel if n in _nt_labels)
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.warning("Select at least one news channel.")
 
         use_html  = True
         use_rss   = True
@@ -3657,163 +3606,169 @@ def main():
                 t = typed.strip().lower()
                 return [c for c in candidates if t in c.lower()]
 
-            all_regions_av   = sorted(df_full["Region"].unique().tolist())
-            all_countries_av = sorted(df_full["Country"].unique().tolist())
-            all_topics_av    = sorted(df_full["Topic"].unique().tolist())
-            all_sents_av     = sorted(df_full["Sentiment"].unique().tolist())
-
-            # Build company list from data
-            _all_co_raw = []
-            for v in df_full["Companies"]:
-                if v:
-                    _all_co_raw.extend([c.strip() for c in str(v).split(",")])
-            all_companies_av = sorted(set(c for c in _all_co_raw if c))
-
-            # ── 1. Region ─────────────────────────────────────────────────────
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">🌐 Region</div>',
-                unsafe_allow_html=True,
-            )
-            sel_regions = st.multiselect(
-                "Region", all_regions_av, default=[],
-                placeholder="All regions", label_visibility="collapsed",
-                key=_fk("f_regions"),
-            )
-
-            # ── 2. Country (filtered by region) ───────────────────────────────
-            all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
-            if sel_regions:
-                world_pool = sorted([c for c in all_world_countries
-                                     if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
+            # Guard: if df_full is empty or missing expected columns, show warning and skip filters
+            _required_cols = {"Region", "Country", "Topic", "Sentiment", "Companies"}
+            if df_full.empty or not _required_cols.issubset(set(df_full.columns)):
+                st.warning("No data loaded yet — run a scan first to enable filters.")
             else:
-                world_pool = all_world_countries
 
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">🌍 Country</div>',
-                unsafe_allow_html=True,
-            )
-            sel_countries = st.multiselect(
-                "Country", world_pool, default=[],
-                placeholder="All countries", label_visibility="collapsed",
-                key=_fk("f_countries"),
-            )
+             all_regions_av   = sorted(df_full["Region"].dropna().unique().tolist())
+             all_countries_av = sorted(df_full["Country"].dropna().unique().tolist())
+             all_topics_av    = sorted(df_full["Topic"].dropna().unique().tolist())
+             all_sents_av     = sorted(df_full["Sentiment"].dropna().unique().tolist())
 
-            # ── 3. State (filtered by country) ────────────────────────────────
-            state_pool = []
-            for c in (sel_countries if sel_countries else world_pool):
-                state_pool.extend(COUNTRY_STATES.get(c, []))
-            state_pool = sorted(set(state_pool))
+             # Build company list from data
+             _all_co_raw = []
+             for v in df_full["Companies"]:
+                 if v:
+                     _all_co_raw.extend([c.strip() for c in str(v).split(",")])
+             all_companies_av = sorted(set(c for c in _all_co_raw if c))
 
-            sel_states = []
-            if state_pool:
-                st.markdown(
-                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                    'text-transform:uppercase;margin:.9rem 0 .2rem;">📍 State / Province</div>',
-                    unsafe_allow_html=True,
-                )
-                sel_states = st.multiselect(
-                    "State", state_pool, default=[],
-                    placeholder="All states/provinces", label_visibility="collapsed",
-                    key=_fk("f_states"),
-                )
+             # ── 1. Region ──────────────────────────────────────────────────
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🌐 Region</div>',
+                 unsafe_allow_html=True,
+             )
+             sel_regions = st.multiselect(
+                 "Region", all_regions_av, default=[],
+                 placeholder="All regions", label_visibility="collapsed",
+                 key=_fk("f_regions"),
+             )
 
-            # ── ISO / RTO Filter ────────────────────────────────────────────
-            _all_iso_in_data = sorted(set(
-                v for v in df_full.get("ISO / RTO", pd.Series(dtype=str)).tolist()
-                if v and str(v) != "nan" and str(v).strip()
-            )) if "ISO / RTO" in df_full.columns else []
-            _iso_pool = sorted(set(_all_iso_in_data + list(US_ISO_RTO.keys()) + list(GLOBAL_GRID_OPERATORS.keys())))
-            if _iso_pool:
-                st.markdown(
-                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                    'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ ISO / RTO / Grid</div>',
-                    unsafe_allow_html=True,
-                )
-                sel_iso_rto = st.multiselect(
-                    "ISO/RTO", _iso_pool, default=[],
-                    placeholder="All grid operators", label_visibility="collapsed",
-                    key=_fk("f_iso_rto"),
-                )
-            else:
-                sel_iso_rto = []
+             # ── 2. Country (filtered by region) ───────────────────────────
+             all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
+             if sel_regions:
+                 world_pool = sorted([c for c in all_world_countries
+                                      if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
+             else:
+                 world_pool = all_world_countries
 
-            # ── 4. Company ────────────────────────────────────────────────────
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">🏢 Company</div>',
-                unsafe_allow_html=True,
-            )
-            full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
-            sel_companies = st.multiselect(
-                "Company", full_co_pool, default=[],
-                placeholder="All companies — type to search", label_visibility="collapsed",
-                key=_fk("f_companies"),
-            )
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🌍 Country</div>',
+                 unsafe_allow_html=True,
+             )
+             sel_countries = st.multiselect(
+                 "Country", world_pool, default=[],
+                 placeholder="All countries", label_visibility="collapsed",
+                 key=_fk("f_countries"),
+             )
 
-            # ── 5. Topic ──────────────────────────────────────────────────────
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">🏷️ Topic</div>',
-                unsafe_allow_html=True,
-            )
-            sel_topics = st.multiselect(
-                "Topic", all_topics_av, default=[],
-                placeholder="All topics", label_visibility="collapsed",
-                key=_fk("f_topics"),
-            )
+             # ── 3. State (filtered by country) ────────────────────────────
+             state_pool = []
+             for c in (sel_countries if sel_countries else world_pool):
+                 state_pool.extend(COUNTRY_STATES.get(c, []))
+             state_pool = sorted(set(state_pool))
 
-            # ── 6. Project Status ─────────────────────────────────────────────
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">📊 Project Status</div>',
-                unsafe_allow_html=True,
-            )
-            sel_sents = st.multiselect(
-                "Status", all_sents_av, default=[],
-                placeholder="All statuses", label_visibility="collapsed",
-                key=_fk("f_sents"),
-            )
+             sel_states = []
+             if state_pool:
+                 st.markdown(
+                     '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                     'text-transform:uppercase;margin:.9rem 0 .2rem;">📍 State / Province</div>',
+                     unsafe_allow_html=True,
+                 )
+                 sel_states = st.multiselect(
+                     "State", state_pool, default=[],
+                     placeholder="All states/provinces", label_visibility="collapsed",
+                     key=_fk("f_states"),
+                 )
 
-            # ── 7. Keyword ────────────────────────────────────────────────────
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">🔤 Keyword</div>',
-                unsafe_allow_html=True,
-            )
-            keyword = st.text_input(
-                "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
-                label_visibility="collapsed", key=_fk("f_keyword"),
-            )
+             # ── ISO / RTO Filter ───────────────────────────────────────────
+             _all_iso_in_data = sorted(set(
+                 v for v in df_full.get("ISO / RTO", pd.Series(dtype=str)).tolist()
+                 if v and str(v) != "nan" and str(v).strip()
+             )) if "ISO / RTO" in df_full.columns else []
+             _iso_pool = sorted(set(_all_iso_in_data + list(US_ISO_RTO.keys()) + list(GLOBAL_GRID_OPERATORS.keys())))
+             if _iso_pool:
+                 st.markdown(
+                     '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                     'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ ISO / RTO / Grid</div>',
+                     unsafe_allow_html=True,
+                 )
+                 sel_iso_rto = st.multiselect(
+                     "ISO/RTO", _iso_pool, default=[],
+                     placeholder="All grid operators", label_visibility="collapsed",
+                     key=_fk("f_iso_rto"),
+                 )
+             else:
+                 sel_iso_rto = []
 
-            # ── 8. Min Capacity (MW) ──────────────────────────────────────────
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
-                unsafe_allow_html=True,
-            )
-            min_mw = st.number_input(
-                "Min MW", min_value=0, value=0,
-                step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
-            )
+             # ── 4. Company ─────────────────────────────────────────────────
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🏢 Company</div>',
+                 unsafe_allow_html=True,
+             )
+             full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
+             sel_companies = st.multiselect(
+                 "Company", full_co_pool, default=[],
+                 placeholder="All companies — type to search", label_visibility="collapsed",
+                 key=_fk("f_companies"),
+             )
 
-            # Collect into session_state filters
-            st.session_state.filters = {
-                "regions":        sel_regions,
-                "topics":         sel_topics,
-                "sources":        [],           # not user-facing, always all
-                "sents":          sel_sents,
-                "keyword":        keyword,
-                "min_mw":         min_mw,
-                "date_from":      None,
-                "date_to":        None,
-                "countries":      sel_countries,
-                "states":         sel_states,
-                "company_search": "",           # replaced by sel_companies below
-                "companies":      sel_companies,
-                "iso_rto":        sel_iso_rto if "sel_iso_rto" in dir() else [],
-            }
+             # ── 5. Topic ───────────────────────────────────────────────────
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🏷️ Topic</div>',
+                 unsafe_allow_html=True,
+             )
+             sel_topics = st.multiselect(
+                 "Topic", all_topics_av, default=[],
+                 placeholder="All topics", label_visibility="collapsed",
+                 key=_fk("f_topics"),
+             )
+
+             # ── 6. Project Status ──────────────────────────────────────────
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">📊 Project Status</div>',
+                 unsafe_allow_html=True,
+             )
+             sel_sents = st.multiselect(
+                 "Status", all_sents_av, default=[],
+                 placeholder="All statuses", label_visibility="collapsed",
+                 key=_fk("f_sents"),
+             )
+
+             # ── 7. Keyword ─────────────────────────────────────────────────
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🔤 Keyword</div>',
+                 unsafe_allow_html=True,
+             )
+             keyword = st.text_input(
+                 "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
+                 label_visibility="collapsed", key=_fk("f_keyword"),
+             )
+
+             # ── 8. Min Capacity (MW) ───────────────────────────────────────
+             st.markdown(
+                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                 'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
+                 unsafe_allow_html=True,
+             )
+             min_mw = st.number_input(
+                 "Min MW", min_value=0, value=0,
+                 step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
+             )
+
+             # Collect into session_state filters
+             st.session_state.filters = {
+                 "regions":        sel_regions,
+                 "topics":         sel_topics,
+                 "sources":        [],
+                 "sents":          sel_sents,
+                 "keyword":        keyword,
+                 "min_mw":         min_mw,
+                 "date_from":      None,
+                 "date_to":        None,
+                 "countries":      sel_countries,
+                 "states":         sel_states,
+                 "company_search": "",
+                 "companies":      sel_companies,
+                 "iso_rto":        sel_iso_rto if "sel_iso_rto" in dir() else [],
+             }
 
         st.divider()
         go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
@@ -3823,12 +3778,12 @@ def main():
     _sa_sig = "\u00a9 Sharugh A"
     st.markdown(
         f'<div class="gl-banner">'
-        f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} Sources Active</div>'
+        f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} DCD Channels Active</div>'
         f'<div class="banner-title">Global Data Center</div>'
         f'<div class="banner-title" style="margin-top:-.15rem;"><span>Intelligence</span> Platform</div>'
-        f'<div class="banner-sub">Real-time aggregation across trade press, RSS feeds & Google News \u00b7 '
+        f'<div class="banner-sub">Real-time scraping of DataCenterDynamics Construction & General News channels \u00b7 '
         f'Auto-tagged by region, topic, company & capacity \u00b7 '
-        f'Deduplicated across all sources</div>'
+        f'Filtered by region, country, company &amp; more</div>'
         f'<div class="banner-ts">\U0001f550 {now_str}'
         f'</div>'
         f'</div>',
@@ -3850,8 +3805,8 @@ def main():
             '<div style="font-size:.82rem;color:#6a80a8;line-height:1.7;margin-bottom:.9rem;">'
             'This platform is a <b style="color:#b8c8e0">real-time intelligence tool</b> built for Wood Mac analysts, '
             'strategists, and clients tracking the global data center market. It automatically scrapes, '
-            'enriches, and surfaces the most relevant news from specialist trade publications — saving hours '
-            'of manual research every day.'
+            'enriches, and surfaces the most relevant news from DataCenterDynamics — the industry\'s leading '
+            'trade publication — saving hours of manual research every day.'
             '</div>'
             '<div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.9rem;">'
             '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
@@ -3863,16 +3818,17 @@ def main():
             '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
             '<span style="font-size:.75rem;color:#00e5c8;font-family:Syne,sans-serif;font-weight:700;">What does it do?</span>'
             '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
-            'Scrapes DataCenterDynamics, DataCenter Knowledge, DataCenter Frontier and more · '
-            'Auto-tags every article by region, topic, sentiment, company, capacity (MW/GW) and deal size · '
-            'Deduplicates across sources · Scores articles by market significance.</div>'
+            'Scrapes DCD Construction Channel &amp; DCD General News on demand · '
+            'Filters by news type, region, country, company, topic, sentiment &amp; keyword · '
+            'Auto-tags every article: Topic, Sentiment, Capacity (MW/GW), Deal Size &amp; company names · '
+            'Scores articles by market significance.</div>'
             '</div>'
             '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
             '<span style="font-size:.75rem;color:#ffaa00;font-family:Syne,sans-serif;font-weight:700;">How to use it</span>'
             '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
-            '1. Set your date range and scrape depth in the left panel.<br>'
-            '2. Click <b style="color:#b8c8e0">Run Global Scan</b> to pull live articles.<br>'
-            '3. Use filters to drill into regions, countries, topics, or companies.<br>'
+            '1. Choose <b style="color:#b8c8e0">News Type</b> (Construction, General News, or both) and date range.<br>'
+            '2. Set scrape depth and click <b style="color:#b8c8e0">Run Global Scan</b> to pull live articles.<br>'
+            '3. Use filters to drill into regions, countries, topics, companies, or keywords.<br>'
             '4. Explore tabs: Feed · Map · Analytics · Deal Flow · AI Scoring · Export.</div>'
             '</div>'
             '</div>'
@@ -3884,19 +3840,20 @@ def main():
             unsafe_allow_html=True,
         )
         features = [
-            ("\U0001f578\ufe0f", "Multi-Source Scraping",
-             "Full-depth scraping of DataCenterDynamics, DataCenter Knowledge, "
-             "Data Center World and Data Centre Magazine — all pages, maximum depth, "
-             "DCD prioritised as primary source for deduplication."),
+            ("\U0001f578\ufe0f", "DCD Direct Scraping",
+             "Scrapes DataCenterDynamics Construction Channel and General News directly — "
+             "the industry's most authoritative data center trade publication. "
+             "Select one or both channels before running a scan."),
             ("\U0001f30d", "Global Coverage",
              "Covers 45+ countries across all continents with country/region auto-detection "
              "using 500+ geographic keywords and city names."),
             ("\U0001f9e0", "Smart Enrichment",
              "Every article auto-tagged: Topic, Sentiment (Approved/Proposed/Opened/Challenged), "
              "Capacity (MW/GW), Deal Size ($bn/$m), and up to 4 company names."),
-            ("\u26a1", "Deduplication",
-             "Fuzzy title matching (82% similarity threshold) collapses the same story "
-             "appearing across multiple sources into a single clean record."),
+            ("\u26a1", "Post-Scrape Filtering",
+             "After scraping, filter by region, country, state/province, company, "
+             "topic, project status, keyword, and minimum capacity — all applied "
+             "instantly without re-scraping."),
             ("\U0001f5fa\ufe0f", "World Map",
              "Choropleth map showing article volume by country — instantly see "
              "where global data center activity is hottest."),
@@ -3939,18 +3896,12 @@ def main():
         def progress_cb(frac, label=""):
             pbar.progress(min(frac, 1.0), text=f"⚡ GDCI Intelligence Sweep · {label}")
 
-        # Map user-selected regions → DCD region slug terms
-        # If the user hasn't selected any regions yet (filters cleared on go_btn),
-        # we pass [] which means "no region filter" = full global scan on DCD.
-        _region_map_reverse = {v: k for k, v in DCD_REGION_TERMS.items()}
-        _pre_selected_regions = st.session_state.get("filters", {}).get("regions", [])
-        region_terms = [
-            _region_map_reverse[r]
-            for r in _pre_selected_regions
-            if r in _region_map_reverse
-        ]
+        # Determine which DCD channels to scrape based on sidebar selection.
+        # news_type_sel is the multiselect from the sidebar; default = both channels.
+        _chosen_news_types = news_type_sel if news_type_sel else [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
 
-        raw = run_all_scrapers(max_pages, cutoff, progress_cb, region_terms=region_terms)
+        raw = run_all_scrapers(max_pages, cutoff, progress_cb,
+                               news_types=_chosen_news_types)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
 
@@ -3965,16 +3916,25 @@ def main():
         enriched = [enrich(i) for i in filtered]
         deduped  = deduplicate(enriched)
 
-        df_full = (
-            pd.DataFrame(deduped)
-            .drop(columns=["_date_obj"], errors="ignore")
-            .sort_values("Date", ascending=False)
-            .reset_index(drop=True)
-        )
+        _df_raw = pd.DataFrame(deduped).drop(columns=["_date_obj"], errors="ignore")
+        if "Date" in _df_raw.columns and not _df_raw.empty:
+            _df_raw = _df_raw.sort_values("Date", ascending=False)
+        df_full = _df_raw.reset_index(drop=True)
+
         st.session_state.df_full   = df_full
         st.session_state.raw_count = len(raw)
         st.session_state.scan_time = fmt_local(now_local())
         pbar.empty()
+
+        if df_full.empty:
+            st.warning(
+                "No articles were returned from DataCenterDynamics. "
+                "This can happen when the site blocks automated requests "
+                "(common on cloud-hosted deployments). "
+                "Try again in a moment, or reduce the scrape depth."
+            )
+            st.stop()
+
         st.rerun()
 
     df_full = st.session_state.df_full
@@ -4064,7 +4024,7 @@ def main():
 
     kpi_html = (
         '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
-        + kpi("Sources Polled", len(SCRAPE_SOURCES), "blue", "DCD · DCK · DCW · DCM")
+        + kpi("DCD Channels", len(SCRAPE_SOURCES), "blue", "Construction · General News")
         + kpi("Raw Articles", st.session_state.raw_count, "cyan", "before dedup & filter")
         + kpi("Unique Articles", len(df_full), "green", "after deduplication")
         + kpi("Filtered View", len(df), "amber", "current filters applied")
