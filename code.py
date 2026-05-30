@@ -428,6 +428,30 @@ hr { border-color: #152038 !important; }
     filter: brightness(1.3) !important;
     transform: scale(1.05) !important;
 }
+
+/* ── Plotly chart container glow on hover ─────────────────────────────────── */
+[data-testid="stPlotlyChart"] {
+    border-radius: 10px !important;
+    transition: box-shadow 0.25s ease !important;
+}
+[data-testid="stPlotlyChart"]:hover {
+    box-shadow: 0 0 28px rgba(0, 71, 225, 0.13) !important;
+}
+
+/* ── Futuristic sidebar filter group labels ────────────────────────────────── */
+[data-testid="stSidebar"] .filter-group-label {
+    font-size: .62rem !important;
+    color: #1e3a5a !important;
+    letter-spacing: .12em !important;
+    text-transform: uppercase !important;
+    font-family: 'DM Mono', monospace !important;
+}
+
+/* ── Sidebar number input spinner ──────────────────────────────────────────── */
+[data-testid="stSidebar"] input[type="number"]:focus {
+    border-color: #0047e1 !important;
+    box-shadow: 0 0 0 2px rgba(0,71,225,0.18) !important;
+}
 </style>
 """
 
@@ -2778,14 +2802,28 @@ def _dark(fig, height=320):
         paper_bgcolor=_PAPER, plot_bgcolor=_BG,
         font=dict(family=_FONT, color=_TEXT),
         height=height,
-        margin=dict(l=14, r=14, t=36, b=14),
-        xaxis=dict(gridcolor=_GRID, linecolor=_GRID,
-                   tickfont=dict(size=10, color=_TEXT),
-                   title_font=dict(color=_TEXT)),
-        yaxis=dict(gridcolor=_GRID, linecolor=_GRID,
-                   tickfont=dict(size=10, color=_TEXT),
-                   title_font=dict(color=_TEXT)),
+        margin=dict(l=14, r=14, t=44, b=14),
+        xaxis=dict(
+            gridcolor="#0f1e36", gridwidth=1,
+            linecolor=_GRID, linewidth=1,
+            tickfont=dict(size=10, color=_TEXT),
+            title_font=dict(color=_TEXT),
+            zeroline=False,
+        ),
+        yaxis=dict(
+            gridcolor="#0f1e36", gridwidth=1,
+            linecolor=_GRID, linewidth=1,
+            tickfont=dict(size=10, color=_TEXT),
+            title_font=dict(color=_TEXT),
+            zeroline=False,
+        ),
         showlegend=False,
+        hoverlabel=dict(
+            bgcolor="#0d1e38",
+            bordercolor="#0047e1",
+            font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
+        ),
+        hovermode="closest",
     )
     return fig
 
@@ -2797,13 +2835,23 @@ def chart_topic_bar(df):
     colors = [TOPIC_COLORS.get(t, "#2e4470") for t in tc["Topic"]]
     fig = go.Figure(go.Bar(
         x=tc["Count"], y=tc["Topic"], orientation="h",
-        marker=dict(color=colors, line=dict(width=0)),
+        marker=dict(
+            color=colors,
+            line=dict(width=0),
+            opacity=0.88,
+        ),
         text=tc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11),
-        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
+        hoverlabel=dict(bgcolor="#0d1e38", bordercolor="#0047e1",
+                        font=dict(color="#ccdaf5", size=12)),
     ))
-    _dark(fig, 300)
-    fig.update_layout(title=dict(text="Articles by Topic", font=dict(color=_TITLE, size=13), x=0.01))
+    _dark(fig, 320)
+    fig.update_layout(
+        title=dict(text="Articles by Topic", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        xaxis=dict(showgrid=True, gridcolor="#0f1e36"),
+        bargap=0.28,
+    )
     return fig
 
 
@@ -2814,13 +2862,16 @@ def chart_region_bar(df):
     colors = [REGION_COLORS.get(r, "#2e4470") for r in rc["Region"]]
     fig = go.Figure(go.Bar(
         x=rc["Count"], y=rc["Region"], orientation="h",
-        marker=dict(color=colors, line=dict(width=0)),
+        marker=dict(color=colors, line=dict(width=0), opacity=0.88),
         text=rc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11),
-        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
     ))
-    _dark(fig, 280)
-    fig.update_layout(title=dict(text="Articles by Region", font=dict(color=_TITLE, size=13), x=0.01))
+    _dark(fig, 300)
+    fig.update_layout(
+        title=dict(text="Articles by Region", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        bargap=0.28,
+    )
     return fig
 
 
@@ -2830,18 +2881,21 @@ def chart_country_bar(df, top_n=20):
     cc = cc.sort_values("Count")
     n = len(cc)
     c_colors = [
-        f"rgba({int(0 + 71*i/max(n-1,1))}, {int(71 + (180-71)*i/max(n-1,1))}, {int(225 + (255-225)*i/max(n-1,1))}, 0.85)"
+        f"rgba({int(0 + 71*i/max(n-1,1))}, {int(71 + (180-71)*i/max(n-1,1))}, {int(225 + (255-225)*i/max(n-1,1))}, 0.88)"
         for i in range(n)
     ]
     fig = go.Figure(go.Bar(
         x=cc["Count"], y=cc["Country"], orientation="h",
         marker=dict(color=c_colors, line=dict(width=0)),
         text=cc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=10),
-        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+        textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
     ))
-    _dark(fig, max(320, top_n * 22))
-    fig.update_layout(title=dict(text=f"Top {top_n} Countries", font=dict(color=_TITLE, size=13), x=0.01))
+    _dark(fig, max(340, top_n * 24))
+    fig.update_layout(
+        title=dict(text=f"Top {top_n} Countries", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        bargap=0.22,
+    )
     return fig
 
 
@@ -2856,15 +2910,17 @@ def chart_timeline(df):
     fig.add_trace(go.Scatter(
         x=daily["Date"], y=daily["Articles"],
         mode="lines+markers",
-        line=dict(color="#00b4ff", width=2.5),
-        marker=dict(color="#0047e1", size=5, line=dict(color="#00b4ff", width=1.5)),
-        fill="tozeroy", fillcolor="rgba(0,71,225,0.07)",
-        hovertemplate="<b>%{x}</b><br>%{y} articles<extra></extra>",
+        line=dict(color="#00b4ff", width=2.5, shape="spline", smoothing=0.8),
+        marker=dict(color="#0047e1", size=6, line=dict(color="#00b4ff", width=1.5),
+                    symbol="circle"),
+        fill="tozeroy", fillcolor="rgba(0,71,225,0.09)",
+        hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
     ))
-    _dark(fig, 240)
+    _dark(fig, 260)
     fig.update_layout(
-        title=dict(text="Publication Volume Over Time", font=dict(color=_TITLE, size=13), x=0.01),
+        title=dict(text="Publication Volume Over Time", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
         yaxis_title="Articles",
+        xaxis=dict(showgrid=False),
     )
     return fig
 
@@ -2880,13 +2936,16 @@ def chart_sentiment(df):
     colors = [sent_colors.get(s, "#2e4470") for s in sc["Sentiment"]]
     fig = go.Figure(go.Bar(
         x=sc["Sentiment"], y=sc["Count"],
-        marker=dict(color=colors, line=dict(width=0)),
+        marker=dict(color=colors, line=dict(width=0), opacity=0.88),
         text=sc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11),
-        hovertemplate="<b>%{x}</b>: %{y}<extra></extra>",
+        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
     ))
-    _dark(fig, 280)
-    fig.update_layout(title=dict(text="Article Sentiment / Status", font=dict(color=_TITLE, size=13), x=0.01))
+    _dark(fig, 290)
+    fig.update_layout(
+        title=dict(text="Article Sentiment / Status", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        bargap=0.3,
+    )
     return fig
 
 
@@ -2895,24 +2954,30 @@ def chart_donut(df):
     tc.columns = ["Topic", "Count"]
     colors = [TOPIC_COLORS.get(t, "#2e4470") for t in tc["Topic"]]
     fig = go.Figure(go.Pie(
-        labels=tc["Topic"], values=tc["Count"], hole=0.55,
-        marker=dict(colors=colors, line=dict(color=_BG, width=2)),
+        labels=tc["Topic"], values=tc["Count"], hole=0.6,
+        marker=dict(colors=colors, line=dict(color=_BG, width=3)),
         textinfo="label+percent",
         textfont=dict(color=_TITLE, size=11),
-        hovertemplate="<b>%{label}</b>: %{value} (%{percent})<extra></extra>",
+        hovertemplate="<b>%{label}</b><br>📰 %{value} articles (%{percent})<extra></extra>",
+        pull=[0.03] * len(tc),
     ))
     fig.update_layout(
         paper_bgcolor=_PAPER, plot_bgcolor=_BG,
         font=dict(family=_FONT, color=_TEXT),
-        height=340, margin=dict(l=14, r=14, t=36, b=14),
+        height=360, margin=dict(l=14, r=14, t=44, b=14),
         showlegend=True,
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10),
+                    orientation="v", x=1.02, y=0.5),
+        hoverlabel=dict(
+            bgcolor="#0d1e38", bordercolor="#0047e1",
+            font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
+        ),
         annotations=[dict(
             text=f"<b>{len(df)}</b><br><span style='font-size:10px'>articles</span>",
             x=0.5, y=0.5, showarrow=False,
             font=dict(size=15, color=_TITLE, family=_FONT),
         )],
-        title=dict(text="Topic Share", font=dict(color=_TITLE, size=13), x=0.01),
+        title=dict(text="Topic Share", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
     )
     return fig
 
@@ -2924,13 +2989,16 @@ def chart_source_bar(df):
     colors = [SOURCE_META.get(s, SOURCE_META["Unknown"])["color"] for s in sc["Source"]]
     fig = go.Figure(go.Bar(
         x=sc["Count"], y=sc["Source"], orientation="h",
-        marker=dict(color=colors, line=dict(width=0)),
+        marker=dict(color=colors, line=dict(width=0), opacity=0.88),
         text=sc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11),
-        hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
     ))
-    _dark(fig, 280)
-    fig.update_layout(title=dict(text="Articles by Source", font=dict(color=_TITLE, size=13), x=0.01))
+    _dark(fig, 290)
+    fig.update_layout(
+        title=dict(text="Articles by Source", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        bargap=0.28,
+    )
     return fig
 
 
@@ -3575,200 +3643,227 @@ def main():
 
         st.divider()
 
-        if "df_full" in st.session_state and st.session_state.df_full is not None:
+        # ── FILTER PANEL — always visible from the start ──────────────────────
+        # Filter version counter (incremented on "Clear All" to reset widget keys)
+        if "_filter_ver" not in st.session_state:
+            st.session_state["_filter_ver"] = 0
+        _fv = st.session_state["_filter_ver"]
+        def _fk(name): return f"{name}_v{_fv}"
+
+        def _fuzzy_resolve(typed, candidates):
+            if not typed:
+                return []
+            t = typed.strip().lower()
+            return [c for c in candidates if t in c.lower()]
+
+        # Pull live data if available, else use empty fallbacks
+        _data_loaded = "df_full" in st.session_state and st.session_state.df_full is not None
+        if _data_loaded:
             df_full = st.session_state.df_full
+            all_regions_av   = sorted(df_full["Region"].dropna().unique().tolist())
+            all_countries_av = sorted(df_full["Country"].dropna().unique().tolist())
+            all_topics_av    = sorted(df_full["Topic"].dropna().unique().tolist())
+            all_sents_av     = sorted(df_full["Sentiment"].dropna().unique().tolist())
+            _all_co_raw = []
+            for v in df_full["Companies"]:
+                if v:
+                    _all_co_raw.extend([c.strip() for c in str(v).split(",")])
+            all_companies_av = sorted(set(c for c in _all_co_raw if c))
+            _all_iso_in_data = sorted(set(
+                v for v in df_full.get("ISO / RTO", pd.Series(dtype=str)).tolist()
+                if v and str(v) != "nan" and str(v).strip()
+            )) if "ISO / RTO" in df_full.columns else []
+        else:
+            all_regions_av   = sorted(REGION_COLORS.keys())
+            all_countries_av = sorted(COUNTRY_TO_REGION.keys())
+            all_topics_av    = sorted(TOPIC_COLORS.keys())
+            all_sents_av     = ["Opened / Live", "Approved", "Proposed",
+                                 "Under Construction", "Challenged", "News"]
+            all_companies_av = KNOWN_COMPANIES
+            _all_iso_in_data = []
 
-            # ── Filter version counter (incremented on clear to force new widget keys) ──
-            if "_filter_ver" not in st.session_state:
-                st.session_state["_filter_ver"] = 0
-            _fv = st.session_state["_filter_ver"]
-            def _fk(name): return f"{name}_v{_fv}"   # versioned key
+        # ── SECTION HEADER ────────────────────────────────────────────────────
+        st.markdown(
+            '<div style="background:linear-gradient(90deg,rgba(0,71,225,0.12),transparent);'
+            'border-left:3px solid #0047e1;border-radius:0 6px 6px 0;'
+            'padding:.45rem .75rem;margin-bottom:.6rem;">'
+            '<span style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+            'font-size:.8rem;letter-spacing:.05em;">🔍 REFINE RESULTS</span>'
+            + ('<br><span style="font-size:.65rem;color:#1a3a60;font-family:monospace;">'
+               'Run scan first to filter live data</span>' if not _data_loaded else '')
+            + '</div>',
+            unsafe_allow_html=True,
+        )
 
-            # ── REFINE RESULTS heading + Clear All ──────────────────────────────
+        # ── GROUP 1 · SEARCH ──────────────────────────────────────────────────
+        st.markdown(
+            '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
+            'text-transform:uppercase;font-family:monospace;margin:.7rem 0 .35rem .05rem;">'
+            '▸ SEARCH</div>',
+            unsafe_allow_html=True,
+        )
+
+        # 1a. Keyword  ← now FIRST
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin-bottom:.2rem;">🔤 Keyword</div>',
+            unsafe_allow_html=True,
+        )
+        keyword = st.text_input(
+            "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
+            label_visibility="collapsed", key=_fk("f_keyword"),
+        )
+
+        # 1b. Company
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin:.75rem 0 .2rem;">🏢 Company</div>',
+            unsafe_allow_html=True,
+        )
+        full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
+        sel_companies = st.multiselect(
+            "Company", full_co_pool, default=[],
+            placeholder="All companies — type to search",
+            label_visibility="collapsed", key=_fk("f_companies"),
+        )
+
+        # ── GROUP 2 · GEOGRAPHY ───────────────────────────────────────────────
+        st.markdown(
+            '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
+            'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
+            '▸ GEOGRAPHY</div>',
+            unsafe_allow_html=True,
+        )
+
+        # 2a. Region
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin-bottom:.2rem;">🌐 Region</div>',
+            unsafe_allow_html=True,
+        )
+        sel_regions = st.multiselect(
+            "Region", all_regions_av, default=[],
+            placeholder="All regions", label_visibility="collapsed",
+            key=_fk("f_regions"),
+        )
+
+        # 2b. Country (cascades from region)
+        all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
+        if sel_regions:
+            world_pool = sorted([c for c in all_world_countries
+                                  if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
+        else:
+            world_pool = all_world_countries
+
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin:.75rem 0 .2rem;">🌍 Country</div>',
+            unsafe_allow_html=True,
+        )
+        sel_countries = st.multiselect(
+            "Country", world_pool, default=[],
+            placeholder="All countries", label_visibility="collapsed",
+            key=_fk("f_countries"),
+        )
+
+        # 2c. State (cascades from country, only if applicable)
+        state_pool = []
+        for c in (sel_countries if sel_countries else world_pool):
+            state_pool.extend(COUNTRY_STATES.get(c, []))
+        state_pool = sorted(set(state_pool))
+
+        sel_states = []
+        if state_pool:
             st.markdown(
-                '<div style="display:flex;justify-content:space-between;align-items:center;'
-                'margin-bottom:.4rem;">'
-                '<span style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
-                'font-size:.82rem;letter-spacing:.04em;">🔍 REFINE RESULTS</span>'
-                '</div>',
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin:.75rem 0 .2rem;">📍 State / Province</div>',
                 unsafe_allow_html=True,
             )
-            if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters_btn"):
-                # Bump version → all widget keys change → Streamlit treats them as new → default=[] takes effect
-                st.session_state["_filter_ver"] = _fv + 1
-                st.session_state.pop("filters", None)
-                st.rerun()
+            sel_states = st.multiselect(
+                "State", state_pool, default=[],
+                placeholder="All states/provinces", label_visibility="collapsed",
+                key=_fk("f_states"),
+            )
 
-            # ── Helper: map typed-but-unlisted value to closest match ─────────
-            def _fuzzy_resolve(typed, candidates):
-                if not typed:
-                    return []
-                t = typed.strip().lower()
-                return [c for c in candidates if t in c.lower()]
+        # 2d. ISO / RTO / Grid
+        _iso_pool = sorted(set(_all_iso_in_data + list(US_ISO_RTO.keys()) + list(GLOBAL_GRID_OPERATORS.keys())))
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin:.75rem 0 .2rem;">⚡ ISO / RTO / Grid</div>',
+            unsafe_allow_html=True,
+        )
+        sel_iso_rto = st.multiselect(
+            "ISO/RTO", _iso_pool, default=[],
+            placeholder="All grid operators", label_visibility="collapsed",
+            key=_fk("f_iso_rto"),
+        )
 
-            # Guard: if df_full is empty or missing expected columns, show warning and skip filters
-            _required_cols = {"Region", "Country", "Topic", "Sentiment", "Companies"}
-            if df_full.empty or not _required_cols.issubset(set(df_full.columns)):
-                st.warning("No data loaded yet — run a scan first to enable filters.")
-            else:
+        # ── GROUP 3 · CONTENT ─────────────────────────────────────────────────
+        st.markdown(
+            '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
+            'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
+            '▸ CONTENT</div>',
+            unsafe_allow_html=True,
+        )
 
-             all_regions_av   = sorted(df_full["Region"].dropna().unique().tolist())
-             all_countries_av = sorted(df_full["Country"].dropna().unique().tolist())
-             all_topics_av    = sorted(df_full["Topic"].dropna().unique().tolist())
-             all_sents_av     = sorted(df_full["Sentiment"].dropna().unique().tolist())
+        # 3a. Topic
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin-bottom:.2rem;">🏷️ Topic</div>',
+            unsafe_allow_html=True,
+        )
+        sel_topics = st.multiselect(
+            "Topic", all_topics_av, default=[],
+            placeholder="All topics", label_visibility="collapsed",
+            key=_fk("f_topics"),
+        )
 
-             # Build company list from data
-             _all_co_raw = []
-             for v in df_full["Companies"]:
-                 if v:
-                     _all_co_raw.extend([c.strip() for c in str(v).split(",")])
-             all_companies_av = sorted(set(c for c in _all_co_raw if c))
+        # 3b. Project Status
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin:.75rem 0 .2rem;">📊 Project Status</div>',
+            unsafe_allow_html=True,
+        )
+        sel_sents = st.multiselect(
+            "Status", all_sents_av, default=[],
+            placeholder="All statuses", label_visibility="collapsed",
+            key=_fk("f_sents"),
+        )
 
-             # ── 1. Region ──────────────────────────────────────────────────
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🌐 Region</div>',
-                 unsafe_allow_html=True,
-             )
-             sel_regions = st.multiselect(
-                 "Region", all_regions_av, default=[],
-                 placeholder="All regions", label_visibility="collapsed",
-                 key=_fk("f_regions"),
-             )
+        # 3c. Min Capacity
+        st.markdown(
+            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+            'text-transform:uppercase;margin:.75rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
+            unsafe_allow_html=True,
+        )
+        min_mw = st.number_input(
+            "Min MW", min_value=0, value=0,
+            step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
+        )
 
-             # ── 2. Country (filtered by region) ───────────────────────────
-             all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
-             if sel_regions:
-                 world_pool = sorted([c for c in all_world_countries
-                                      if COUNTRY_TO_REGION.get(c, "Global") in sel_regions])
-             else:
-                 world_pool = all_world_countries
+        # ── Clear All ─────────────────────────────────────────────────────────
+        st.markdown('<div style="margin-top:.6rem;"></div>', unsafe_allow_html=True)
+        if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters_btn"):
+            st.session_state["_filter_ver"] = _fv + 1
+            st.session_state.pop("filters", None)
+            st.rerun()
 
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🌍 Country</div>',
-                 unsafe_allow_html=True,
-             )
-             sel_countries = st.multiselect(
-                 "Country", world_pool, default=[],
-                 placeholder="All countries", label_visibility="collapsed",
-                 key=_fk("f_countries"),
-             )
-
-             # ── 3. State (filtered by country) ────────────────────────────
-             state_pool = []
-             for c in (sel_countries if sel_countries else world_pool):
-                 state_pool.extend(COUNTRY_STATES.get(c, []))
-             state_pool = sorted(set(state_pool))
-
-             sel_states = []
-             if state_pool:
-                 st.markdown(
-                     '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                     'text-transform:uppercase;margin:.9rem 0 .2rem;">📍 State / Province</div>',
-                     unsafe_allow_html=True,
-                 )
-                 sel_states = st.multiselect(
-                     "State", state_pool, default=[],
-                     placeholder="All states/provinces", label_visibility="collapsed",
-                     key=_fk("f_states"),
-                 )
-
-             # ── ISO / RTO Filter ───────────────────────────────────────────
-             _all_iso_in_data = sorted(set(
-                 v for v in df_full.get("ISO / RTO", pd.Series(dtype=str)).tolist()
-                 if v and str(v) != "nan" and str(v).strip()
-             )) if "ISO / RTO" in df_full.columns else []
-             _iso_pool = sorted(set(_all_iso_in_data + list(US_ISO_RTO.keys()) + list(GLOBAL_GRID_OPERATORS.keys())))
-             if _iso_pool:
-                 st.markdown(
-                     '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                     'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ ISO / RTO / Grid</div>',
-                     unsafe_allow_html=True,
-                 )
-                 sel_iso_rto = st.multiselect(
-                     "ISO/RTO", _iso_pool, default=[],
-                     placeholder="All grid operators", label_visibility="collapsed",
-                     key=_fk("f_iso_rto"),
-                 )
-             else:
-                 sel_iso_rto = []
-
-             # ── 4. Company ─────────────────────────────────────────────────
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🏢 Company</div>',
-                 unsafe_allow_html=True,
-             )
-             full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
-             sel_companies = st.multiselect(
-                 "Company", full_co_pool, default=[],
-                 placeholder="All companies — type to search", label_visibility="collapsed",
-                 key=_fk("f_companies"),
-             )
-
-             # ── 5. Topic ───────────────────────────────────────────────────
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🏷️ Topic</div>',
-                 unsafe_allow_html=True,
-             )
-             sel_topics = st.multiselect(
-                 "Topic", all_topics_av, default=[],
-                 placeholder="All topics", label_visibility="collapsed",
-                 key=_fk("f_topics"),
-             )
-
-             # ── 6. Project Status ──────────────────────────────────────────
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">📊 Project Status</div>',
-                 unsafe_allow_html=True,
-             )
-             sel_sents = st.multiselect(
-                 "Status", all_sents_av, default=[],
-                 placeholder="All statuses", label_visibility="collapsed",
-                 key=_fk("f_sents"),
-             )
-
-             # ── 7. Keyword ─────────────────────────────────────────────────
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">🔤 Keyword</div>',
-                 unsafe_allow_html=True,
-             )
-             keyword = st.text_input(
-                 "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
-                 label_visibility="collapsed", key=_fk("f_keyword"),
-             )
-
-             # ── 8. Min Capacity (MW) ───────────────────────────────────────
-             st.markdown(
-                 '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-                 'text-transform:uppercase;margin:.9rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
-                 unsafe_allow_html=True,
-             )
-             min_mw = st.number_input(
-                 "Min MW", min_value=0, value=0,
-                 step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
-             )
-
-             # Collect into session_state filters
-             st.session_state.filters = {
-                 "regions":        sel_regions,
-                 "topics":         sel_topics,
-                 "sources":        [],
-                 "sents":          sel_sents,
-                 "keyword":        keyword,
-                 "min_mw":         min_mw,
-                 "date_from":      None,
-                 "date_to":        None,
-                 "countries":      sel_countries,
-                 "states":         sel_states,
-                 "company_search": "",
-                 "companies":      sel_companies,
-                 "iso_rto":        sel_iso_rto if "sel_iso_rto" in dir() else [],
-             }
+        # Persist filters to session state
+        st.session_state.filters = {
+            "regions":        sel_regions,
+            "topics":         sel_topics,
+            "sources":        [],
+            "sents":          sel_sents,
+            "keyword":        keyword,
+            "min_mw":         min_mw,
+            "date_from":      None,
+            "date_to":        None,
+            "countries":      sel_countries,
+            "states":         sel_states,
+            "company_search": "",
+            "companies":      sel_companies,
+            "iso_rto":        sel_iso_rto,
+        }
 
         st.divider()
         go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
@@ -4168,7 +4263,7 @@ def main():
             co_df_sorted = co_df.sort_values("Articles")
             n = len(co_df_sorted)
             co_colors = [
-                f"rgba({int(0+71*i/max(n-1,1))},{int(71+(180-71)*i/max(n-1,1))},{int(225+(255-225)*i/max(n-1,1))},0.85)"
+                f"rgba({int(0+71*i/max(n-1,1))},{int(71+(180-71)*i/max(n-1,1))},{int(225+(255-225)*i/max(n-1,1))},0.88)"
                 for i in range(n)
             ]
             fig_co = go.Figure(go.Bar(
@@ -4176,12 +4271,13 @@ def main():
                 orientation="h",
                 marker=dict(color=co_colors, line=dict(width=0)),
                 text=co_df_sorted["Articles"], textposition="outside",
-                textfont=dict(color=_TITLE, size=10),
-                hovertemplate="<b>%{y}</b>: %{x} mentions<extra></extra>",
+                textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                hovertemplate="<b>%{y}</b><br>📰 %{x} mentions<extra></extra>",
             ))
             _dark(fig_co, max(300, n * 22))
             fig_co.update_layout(
-                title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13), x=0.01)
+                title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                bargap=0.22,
             )
             st.plotly_chart(fig_co, use_container_width=True, config={"displayModeBar": False})
 
@@ -4267,12 +4363,13 @@ def main():
                     marker=dict(color=sc_colors, line=dict(width=0)),
                     text=sc_sorted["Articles"],
                     textposition="outside",
-                    textfont=dict(color=_TITLE, size=10),
-                    hovertemplate="<b>%{y}</b>: %{x} articles<extra></extra>",
+                    textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                    hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
                 ))
                 _dark(fig_st, max(320, n_sc * 22))
                 fig_st.update_layout(
-                    title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13), x=0.01)
+                    title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                    bargap=0.22,
                 )
                 st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False})
 
@@ -4340,13 +4437,14 @@ def main():
                             x=tp_df["Topic"], y=tp_df["Count"],
                             marker=dict(color=tp_colors, line=dict(width=0)),
                             text=tp_df["Count"], textposition="outside",
-                            textfont=dict(color=_TITLE, size=10),
-                            hovertemplate="<b>%{x}</b>: %{y}<extra></extra>",
+                            textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                            hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
                         ))
                         _dark(fig_tp, 220)
                         fig_tp.update_layout(
-                            title=dict(text=f"Topics — {sel_state}", font=dict(color=_TITLE, size=11), x=0.01),
+                            title=dict(text=f"Topics — {sel_state}", font=dict(color=_TITLE, size=11, family="Syne, sans-serif"), x=0.01),
                             xaxis=dict(tickfont=dict(size=9)),
+                            bargap=0.3,
                         )
                         st.plotly_chart(fig_tp, use_container_width=True, config={"displayModeBar": False})
 
@@ -5102,12 +5200,16 @@ def main():
                 x=score_dist["Score Range"].astype(str),
                 y=score_dist["Articles"],
                 marker_color=score_colors[:len(score_dist)],
+                marker_line_width=0,
                 text=score_dist["Articles"], textposition="outside",
-                textfont=dict(color=_TITLE, size=10),
-                hovertemplate="<b>Score %{x}</b>: %{y} articles<extra></extra>",
+                textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                hovertemplate="<b>Score %{x}</b><br>📰 %{y} articles<extra></extra>",
             ))
-            _dark(fig_score, 260)
-            fig_score.update_layout(title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13), x=0.01))
+            _dark(fig_score, 270)
+            fig_score.update_layout(
+                title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                bargap=0.3,
+            )
             st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
 
             # High-signal articles with orange top-strip
