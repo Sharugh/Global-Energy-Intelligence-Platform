@@ -71,32 +71,46 @@ _HEADERS = {
 
 CUSTOM_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500&family=Inter:wght@300;400;500;600&display=swap');
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.stApp { background: #05080f; color: #e2eaf8; }
 
-/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: #05080f; }
-::-webkit-scrollbar-thumb { background: #1a2d4a; border-radius: 4px; }
+/* ── Root background — deep space navy with subtle noise texture ─────────── */
+.stApp {
+    background: #040810;
+    color: #dde8f8;
+    background-image:
+        radial-gradient(ellipse 80% 50% at 60% -10%, rgba(0,71,225,0.07) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 40% at 0% 60%, rgba(0,180,255,0.04) 0%, transparent 60%);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #152540; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #0047e1; }
 
 /* ── Global transitions (exclude Plotly to avoid lag) ─────────────────────── */
 *:not(.plotly-graph-div):not(.plotly-graph-div *) {
-    transition: background 0.15s ease, border-color 0.15s ease,
-                box-shadow 0.18s ease, opacity 0.15s ease, transform 0.15s ease;
+    transition: background 0.15s ease, border-color 0.18s ease,
+                box-shadow 0.2s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
-/* ── Sidebar shell ─────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #070d1c 0%, #060a16 100%) !important;
-    border-right: 1px solid #0f1e35 !important;
+    background: linear-gradient(180deg, #050b1a 0%, #040810 100%) !important;
+    border-right: 1px solid rgba(0,71,225,0.12) !important;
+    box-shadow: 2px 0 32px rgba(0,0,0,0.5) !important;
 }
-[data-testid="stSidebar"] * { color: #b0c4de !important; }
-[data-testid="stSidebar"] hr { border-color: #0f1e35 !important; }
+[data-testid="stSidebar"] * { color: #a0b8d8 !important; }
+[data-testid="stSidebar"] hr {
+    border-color: rgba(0,71,225,0.12) !important;
+    margin: .6rem 0 !important;
+}
 
-/* ── Sidebar: always expanded ──────────────────────────────────────────────── */
+/* ── Sidebar always-expanded ─────────────────────────────────────────────── */
 [data-testid="stSidebarCollapseButton"] { display: none !important; }
 [data-testid="stSidebar"][aria-expanded="false"],
 [data-testid="stSidebar"] {
@@ -120,269 +134,328 @@ div[data-testid="collapsedControl"] button { color:#fff!important; background:tr
 [data-testid="stSidebarCollapsedControl"] svg,
 div[data-testid="collapsedControl"] svg { fill:#fff!important; stroke:#fff!important; }
 
-/* ── Sidebar buttons ───────────────────────────────────────────────────────── */
-[data-testid="stSidebar"] .stButton button {
-    background: linear-gradient(135deg, #0044d4, #0090e0) !important;
-    color: #fff !important; border: none !important; border-radius: 9px !important;
-    font-family: 'Syne', sans-serif !important; font-weight: 700 !important;
-    font-size: 0.88rem !important; letter-spacing: 0.05em !important;
-    padding: 0.6rem 1rem !important;
-    box-shadow: 0 2px 12px rgba(0,71,225,0.25) !important;
+/* ── Sidebar radio buttons ───────────────────────────────────────────────── */
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    font-size: .78rem !important;
+    padding: .28rem .5rem !important;
+    border-radius: 5px !important;
+    cursor: pointer !important;
 }
-[data-testid="stSidebar"] .stButton button:hover {
-    opacity: .88 !important;
-    box-shadow: 0 4px 20px rgba(0,71,225,0.4) !important;
-    transform: translateY(-1px) !important;
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background: rgba(0,71,225,0.1) !important;
 }
 
-/* ── Sidebar multiselect ───────────────────────────────────────────────────── */
-[data-testid="stSidebar"] [data-baseweb="select"] { background: #080f1e !important; }
+/* ── Sidebar buttons ─────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] .stButton button {
+    background: linear-gradient(135deg, #0038b8, #006dd4) !important;
+    color: #fff !important; border: none !important; border-radius: 8px !important;
+    font-family: 'Syne', sans-serif !important; font-weight: 700 !important;
+    font-size: .83rem !important; letter-spacing: .05em !important;
+    padding: .55rem 1rem !important;
+    box-shadow: 0 2px 14px rgba(0,71,225,0.22), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+}
+[data-testid="stSidebar"] .stButton button:hover {
+    background: linear-gradient(135deg, #0044d4, #0090e0) !important;
+    box-shadow: 0 4px 22px rgba(0,71,225,0.38), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    transform: translateY(-1px) !important;
+}
+[data-testid="stSidebar"] .stButton button:active { transform: translateY(0) !important; }
+
+/* ── Sidebar run button ───────────────────────────────────────────────────── */
+[data-testid="stSidebar"] .stButton:last-of-type button {
+    font-size: .9rem !important;
+    padding: .65rem 1rem !important;
+    letter-spacing: .07em !important;
+    background: linear-gradient(135deg, #0044d4 0%, #0078c8 50%, #0090e0 100%) !important;
+    box-shadow: 0 3px 20px rgba(0,71,225,0.35), 0 0 0 1px rgba(0,144,224,0.2) !important;
+}
+
+/* ── Sidebar multiselect ─────────────────────────────────────────────────── */
+[data-testid="stSidebar"] [data-baseweb="select"] { background: transparent !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] > div:first-child {
-    background: #080f1e !important; border: 1px solid #172540 !important;
-    border-radius: 8px !important;
+    background: #070e1c !important; border: 1px solid #162540 !important;
+    border-radius: 7px !important; min-height: 32px !important;
 }
 [data-testid="stSidebar"] [data-baseweb="select"] > div:first-child:focus-within {
-    border-color: #0047e1 !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.2) !important;
+    border-color: rgba(0,71,225,0.6) !important;
+    box-shadow: 0 0 0 2px rgba(0,71,225,0.15) !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] span { color: #2e4870 !important; }
+[data-testid="stSidebar"] [data-baseweb="select"] span { color: #1e3356 !important; }
 [data-testid="stSidebar"] [data-baseweb="tag"] {
-    background: #0e2040 !important; border: 1px solid #0047e1 !important;
+    background: rgba(0,71,225,0.12) !important; border: 1px solid rgba(0,71,225,0.3) !important;
     border-radius: 5px !important;
 }
-[data-testid="stSidebar"] [data-baseweb="tag"] span { color: #70b0ff !important; }
-[data-testid="stSidebar"] [data-baseweb="tag"] [role="presentation"] svg { fill: #2e4870 !important; }
+[data-testid="stSidebar"] [data-baseweb="tag"] span { color: #5090e0 !important; }
+[data-testid="stSidebar"] [data-baseweb="tag"] [role="presentation"] svg { fill: #1e3356 !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] input {
-    background: transparent !important; color: #c0d0e8 !important;
+    background: transparent !important; color: #b0c8e8 !important;
     caret-color: #0047e1 !important;
 }
 
-/* ── Dropdown menus ────────────────────────────────────────────────────────── */
+/* ── Dropdown menus ──────────────────────────────────────────────────────── */
 [data-baseweb="popover"], [data-baseweb="menu"],
 [role="listbox"], ul[data-baseweb="menu"] {
-    background: #08111f !important; border: 1px solid #172540 !important;
-    border-radius: 10px !important; box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
+    background: #07101f !important; border: 1px solid #162540 !important;
+    border-radius: 10px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,71,225,0.1) !important;
+    backdrop-filter: blur(20px) !important;
 }
 [data-baseweb="menu"] li, [role="option"], [data-baseweb="menu"] [role="option"] {
-    background: #08111f !important; color: #a8bcd4 !important;
+    background: transparent !important; color: #8aaccc !important;
+    font-size: .8rem !important;
 }
 [data-baseweb="menu"] li:hover, [role="option"]:hover,
 [data-baseweb="menu"] [role="option"]:hover {
-    background: #0e2040 !important; color: #fff !important;
+    background: rgba(0,71,225,0.1) !important; color: #d0e4ff !important;
 }
 [data-baseweb="menu"] [aria-selected="true"],
 [role="option"][aria-selected="true"] {
-    background: #0e2040 !important; color: #00b4ff !important;
+    background: rgba(0,71,225,0.14) !important; color: #60a4ff !important;
 }
 [data-baseweb="popover"] input, [data-baseweb="menu"] input {
-    background: #05080f !important; border: 1px solid #172540 !important;
-    color: #c0d0e8 !important; border-radius: 6px !important;
+    background: #050c18 !important; border: 1px solid #162540 !important;
+    color: #b0c8e8 !important; border-radius: 6px !important;
 }
 
-/* ── Sidebar text / number / date inputs ───────────────────────────────────── */
+/* ── Sidebar text inputs ─────────────────────────────────────────────────── */
 [data-testid="stSidebar"] .stTextInput input,
 [data-testid="stSidebar"] input[type="number"],
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
-    background: #080f1e !important; border: 1px solid #172540 !important;
-    border-radius: 8px !important; color: #c8d8f0 !important;
+    background: #070e1c !important; border: 1px solid #162540 !important;
+    border-radius: 7px !important; color: #b0c8e8 !important;
+    font-size: .8rem !important;
 }
 [data-testid="stSidebar"] .stTextInput input:focus,
 [data-testid="stSidebar"] input[type="number"]:focus,
 [data-testid="stSidebar"] [data-testid="stDateInput"] input:focus {
-    border-color: #0047e1 !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.2) !important;
+    border-color: rgba(0,71,225,0.5) !important;
+    box-shadow: 0 0 0 2px rgba(0,71,225,0.12) !important;
+}
+/* Slider track */
+[data-testid="stSidebar"] [data-testid="stSlider"] [role="slider"] {
+    background: #0047e1 !important;
+    box-shadow: 0 0 8px rgba(0,71,225,0.5) !important;
 }
 
-/* ── Main content inputs ───────────────────────────────────────────────────── */
-.stMultiSelect [data-baseweb="select"] { background: #080f1e !important; border-color: #122035 !important; }
-.stSelectbox [data-baseweb="select"] > div { background: #080f1e !important; border-color: #122035 !important; }
+/* ── Main content inputs ─────────────────────────────────────────────────── */
+.stMultiSelect [data-baseweb="select"] { background: #070e1c !important; border-color: #122035 !important; }
+.stSelectbox [data-baseweb="select"] > div { background: #070e1c !important; border-color: #122035 !important; }
 .stTextInput input {
-    background: #080f1e !important; border: 1px solid #122035 !important;
-    border-radius: 8px !important; color: #c8d8f0 !important;
+    background: #070e1c !important; border: 1px solid #122035 !important;
+    border-radius: 8px !important; color: #b0c8e8 !important;
 }
-.stTextInput input:focus { border-color: #0047e1 !important; }
+.stTextInput input:focus { border-color: rgba(0,71,225,0.5) !important; }
 
-/* ── Tabs ──────────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   TABS — pill-style floating
+══════════════════════════════════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
-    background: #080f1e !important; border-radius: 11px !important;
-    padding: 4px !important; gap: 3px !important;
-    border: 1px solid #122035 !important;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4) !important;
+    background: rgba(7,14,28,0.7) !important;
+    border-radius: 12px !important;
+    padding: 4px !important; gap: 2px !important;
+    border: 1px solid rgba(0,71,225,0.1) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.02) !important;
+    backdrop-filter: blur(12px) !important;
 }
 .stTabs [data-baseweb="tab"] {
-    background: transparent !important; color: #334d6e !important;
+    background: transparent !important; color: #2e4a6a !important;
     border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
-    font-weight: 600 !important; font-size: .78rem !important;
-    letter-spacing: .04em !important; padding: .42rem 1rem !important;
+    font-weight: 600 !important; font-size: .76rem !important;
+    letter-spacing: .04em !important; padding: .4rem .95rem !important;
 }
 .stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
-    background: rgba(0,71,225,0.1) !important; color: #c0d0e8 !important;
+    background: rgba(0,71,225,0.08) !important; color: #8ab0d8 !important;
 }
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg,#0044d4,#0090e0) !important;
+    background: linear-gradient(135deg, #0038b8, #006dd4) !important;
     color: #fff !important;
-    box-shadow: 0 2px 10px rgba(0,71,225,0.35) !important;
+    box-shadow: 0 2px 12px rgba(0,71,225,0.35), inset 0 1px 0 rgba(255,255,255,0.1) !important;
 }
-.stTabs [data-baseweb="tab-panel"] { padding-top: 1.1rem !important; }
+.stTabs [data-baseweb="tab-panel"] { padding-top: 1.2rem !important; }
 
-/* ── Download buttons ──────────────────────────────────────────────────────── */
+/* ── Download buttons ────────────────────────────────────────────────────── */
 .stDownloadButton button {
-    background: linear-gradient(135deg, #002a0a, #004d14) !important;
-    color: #00e676 !important; border: 1px solid #009e40 !important;
-    border-radius: 9px !important; font-family: 'Syne', sans-serif !important;
+    background: linear-gradient(135deg, #001f07, #003812) !important;
+    color: #00e676 !important; border: 1px solid rgba(0,158,64,0.4) !important;
+    border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
     font-weight: 700 !important; letter-spacing: .04em !important;
-    box-shadow: 0 2px 10px rgba(0,150,70,0.2) !important;
+    box-shadow: 0 2px 12px rgba(0,150,70,0.15), inset 0 1px 0 rgba(0,230,118,0.05) !important;
 }
 .stDownloadButton button:hover {
-    opacity: .85 !important;
-    box-shadow: 0 4px 16px rgba(0,150,70,0.35) !important;
+    background: linear-gradient(135deg, #002a0a, #004d14) !important;
+    box-shadow: 0 4px 20px rgba(0,150,70,0.28) !important;
     transform: translateY(-1px) !important;
 }
 
-/* ── Banner ────────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   BANNER
+══════════════════════════════════════════════════════════════════════════ */
 .gl-banner {
-    background: linear-gradient(135deg, #060e1c 0%, #09183a 50%, #060e1c 100%);
-    border: 1px solid #102035; border-radius: 18px;
-    padding: 2rem 2.5rem; margin-bottom: 1.6rem;
+    background: linear-gradient(135deg, #050c1c 0%, #081838 45%, #050c1c 100%);
+    border: 1px solid rgba(0,71,225,0.15);
+    border-radius: 16px;
+    padding: 1.8rem 2.2rem; margin-bottom: 1.4rem;
     position: relative; overflow: hidden;
-    box-shadow: 0 4px 40px rgba(0,71,225,0.08);
+    box-shadow: 0 4px 48px rgba(0,71,225,0.08), 0 0 0 1px rgba(0,180,255,0.04);
 }
 .gl-banner::before {
-    content: ''; position: absolute; top: -90px; right: -50px;
-    width: 340px; height: 340px;
-    background: radial-gradient(circle, rgba(0,71,225,0.18) 0%, transparent 68%);
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 360px; height: 360px;
+    background: radial-gradient(circle, rgba(0,71,225,0.15) 0%, transparent 65%);
     border-radius: 50%;
 }
 .gl-banner::after {
-    content: ''; position: absolute; bottom: -60px; left: 20%;
-    width: 260px; height: 260px;
-    background: radial-gradient(circle, rgba(0,180,255,0.1) 0%, transparent 68%);
+    content: ''; position: absolute; bottom: -50px; left: 20%;
+    width: 280px; height: 280px;
+    background: radial-gradient(circle, rgba(0,180,255,0.08) 0%, transparent 65%);
     border-radius: 50%;
 }
 .banner-eyebrow {
-    font-family: 'DM Mono', monospace; font-size: .65rem;
+    font-family: 'DM Mono', monospace; font-size: .62rem;
     letter-spacing: .22em; color: #00b4ff;
-    text-transform: uppercase; margin-bottom: .5rem;
+    text-transform: uppercase; margin-bottom: .45rem;
     display: flex; align-items: center; gap: .5rem;
 }
 .banner-eyebrow::before {
-    content: ''; display: inline-block; width: 6px; height: 6px;
+    content: ''; display: inline-block; width: 5px; height: 5px;
     background: #00b4ff; border-radius: 50%;
     animation: pulse-dot 2s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(0,180,255,0.6);
 }
 @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.7); }
+    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 6px rgba(0,180,255,0.6); }
+    50% { opacity: 0.4; transform: scale(0.65); box-shadow: 0 0 2px rgba(0,180,255,0.2); }
 }
 .banner-title {
-    font-family: 'Syne', sans-serif; font-size: 2rem;
-    font-weight: 800; color: #fff; line-height: 1.1; margin-bottom: .35rem;
+    font-family: 'Syne', sans-serif; font-size: 1.85rem;
+    font-weight: 800; color: #f0f6ff; line-height: 1.1; margin-bottom: .3rem;
+    letter-spacing: -0.01em;
 }
 .banner-title span { color: #00b4ff; }
-.banner-sub { font-size: .82rem; color: #5a7298; font-weight: 300; line-height: 1.6; }
+.banner-sub { font-size: .8rem; color: #3a5878; font-weight: 300; line-height: 1.7; }
 .banner-ts {
-    font-family: 'DM Mono', monospace; font-size: .65rem;
-    color: #1e3356; margin-top: .8rem; letter-spacing: .06em;
+    font-family: 'DM Mono', monospace; font-size: .6rem;
+    color: #162840; margin-top: .7rem; letter-spacing: .06em;
 }
 
-/* ── Section headings ──────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   SECTION HEADINGS
+══════════════════════════════════════════════════════════════════════════ */
 .sec-head {
-    font-family: 'Syne', sans-serif; font-size: .85rem; font-weight: 700;
-    color: #a8bcd4; letter-spacing: .08em; text-transform: uppercase;
-    border-left: 3px solid #0047e1; padding-left: .75rem;
-    margin: 1.8rem 0 1rem 0;
+    font-family: 'DM Mono', monospace; font-size: .65rem; font-weight: 500;
+    color: #3a5a80; letter-spacing: .16em; text-transform: uppercase;
+    border-left: 2px solid #0047e1; padding-left: .7rem;
+    margin: 1.6rem 0 .9rem 0;
     position: relative;
+    display: flex; align-items: center; gap: .5rem;
 }
 .sec-head::after {
-    content: ''; position: absolute; left: 0; bottom: -6px;
-    width: 40px; height: 1px;
-    background: linear-gradient(90deg, #0047e1, transparent);
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, rgba(0,71,225,0.2), transparent);
 }
-.sec-head:hover { border-left-color: #00b4ff !important; color: #fff !important; cursor: default; }
 
-/* ── Pills ─────────────────────────────────────────────────────────────────── */
-.pill-row { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: 1.4rem; }
+/* ── Pills ───────────────────────────────────────────────────────────────── */
+.pill-row { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.2rem; }
 .pill {
-    background: #080f1e; border: 1px solid #122035; border-radius: 20px;
-    padding: .35rem .9rem; font-size: .76rem; color: #5a7298;
-    display: flex; align-items: center; gap: .38rem;
+    background: rgba(7,14,28,0.6); border: 1px solid #0f1e32; border-radius: 20px;
+    padding: .3rem .85rem; font-size: .74rem; color: #3a5878;
+    display: flex; align-items: center; gap: .35rem;
+    backdrop-filter: blur(8px);
 }
-.pill b { color: #e2eaf8; }
-.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #0047e1; flex-shrink: 0; }
+.pill b { color: #d8e8f8; }
+.pill-dot { width: 5px; height: 5px; border-radius: 50%; background: #0047e1; flex-shrink: 0; }
 .pill:hover {
-    border-color: #0047e1 !important; background: #0d1e3c !important;
-    color: #c0d0e8 !important; cursor: default;
+    border-color: rgba(0,71,225,0.35) !important; background: rgba(0,71,225,0.08) !important;
+    color: #90b8e0 !important; cursor: default;
 }
 
-/* ── Global misc ───────────────────────────────────────────────────────────── */
-hr { border-color: #0f1e35 !important; }
+/* ── Global misc ─────────────────────────────────────────────────────────── */
+hr { border-color: #0a1525 !important; }
 #MainMenu, footer, header { visibility: hidden; }
 
-/* ── KPI cards ─────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   KPI CARDS
+══════════════════════════════════════════════════════════════════════════ */
 .kpi-card {
-    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease !important;
+    background: rgba(7,14,28,0.7) !important;
+    border: 1px solid rgba(0,71,225,0.12) !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(12px) !important;
+    transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease !important;
 }
 .kpi-card:hover {
-    transform: translateY(-3px) !important; border-color: #0047e1 !important;
-    box-shadow: 0 10px 36px rgba(0,71,225,0.22) !important;
+    transform: translateY(-3px) !important;
+    border-color: rgba(0,71,225,0.4) !important;
+    box-shadow: 0 12px 40px rgba(0,71,225,0.18), 0 0 0 1px rgba(0,71,225,0.1) !important;
 }
 
-/* ── Table ─────────────────────────────────────────────────────────────────── */
-.dc-table tr:hover td { background: #0c1d38 !important; }
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.dc-table tr:hover td {
+    background: rgba(0,71,225,0.06) !important;
+    transition: background 0.12s ease !important;
+}
 
-/* ── Hover cards ───────────────────────────────────────────────────────────── */
-.hover-card { transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease !important; }
+/* ── Hover & feature cards ───────────────────────────────────────────────── */
+.hover-card {
+    transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease !important;
+}
 .hover-card:hover {
-    transform: translateY(-2px) !important; border-color: #0047e1 !important;
-    box-shadow: 0 6px 28px rgba(0,71,225,0.18) !important;
+    transform: translateY(-2px) !important;
+    border-color: rgba(0,71,225,0.35) !important;
+    box-shadow: 0 8px 32px rgba(0,71,225,0.15) !important;
 }
-.feature-card { transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease !important; cursor: default; }
+.feature-card {
+    transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease !important;
+    cursor: default;
+}
 .feature-card:hover {
-    transform: translateY(-4px) !important; border-color: #0047e1 !important;
-    box-shadow: 0 12px 40px rgba(0,71,225,0.2) !important;
+    transform: translateY(-4px) !important;
+    border-color: rgba(0,71,225,0.4) !important;
+    box-shadow: 0 14px 44px rgba(0,71,225,0.18) !important;
 }
-.saved-scan-card { transition: border-color 0.18s ease, box-shadow 0.18s ease !important; }
+.saved-scan-card { transition: border-color 0.18s ease, box-shadow 0.2s ease !important; }
 .saved-scan-card:hover {
-    border-color: #a855f7 !important; box-shadow: 0 4px 20px rgba(168,85,247,0.15) !important;
+    border-color: rgba(168,85,247,0.4) !important;
+    box-shadow: 0 4px 24px rgba(168,85,247,0.14) !important;
 }
-.article-card-wrap { transition: border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease !important; }
+.article-card-wrap {
+    transition: border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
+}
 .article-card-wrap:hover {
-    border-color: #0047e1 !important; box-shadow: 0 6px 28px rgba(0,71,225,0.14) !important;
+    border-color: rgba(0,71,225,0.4) !important;
+    box-shadow: 0 6px 32px rgba(0,71,225,0.12) !important;
     transform: translateY(-1px) !important;
 }
 .score-badge { transition: filter 0.15s ease, transform 0.15s ease !important; }
 .score-badge:hover { filter: brightness(1.3) !important; transform: scale(1.06) !important; }
 
-/* ── Plotly chart wrapper ──────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   PLOTLY CHART WRAPPER
+══════════════════════════════════════════════════════════════════════════ */
 [data-testid="stPlotlyChart"] {
     border-radius: 12px !important;
-    border: 1px solid #0f1e35 !important;
-    overflow: hidden !important;
-    transition: border-color 0.2s ease, box-shadow 0.25s ease !important;
+    border: 1px solid rgba(0,71,225,0.1) !important;
+    overflow: visible !important;
+    transition: border-color 0.22s ease, box-shadow 0.25s ease !important;
+    background: rgba(7,12,24,0.5) !important;
+    backdrop-filter: blur(8px) !important;
 }
 [data-testid="stPlotlyChart"]:hover {
-    border-color: #1a3060 !important;
-    box-shadow: 0 2px 32px rgba(0,71,225,0.1) !important;
+    border-color: rgba(0,71,225,0.22) !important;
+    box-shadow: 0 4px 40px rgba(0,71,225,0.1) !important;
 }
 
-/* ── Sidebar run button special override ────────────────────────────────────── */
-[data-testid="stSidebar"] .stButton:last-of-type button {
-    background: linear-gradient(135deg, #0044d4 0%, #0090e0 100%) !important;
-    font-size: .95rem !important;
-    padding: .7rem 1rem !important;
-    letter-spacing: .06em !important;
-}
-
-/* ── Progress bar ──────────────────────────────────────────────────────────── */
+/* ── Progress bar ────────────────────────────────────────────────────────── */
 [data-testid="stProgressBar"] > div > div {
     background: linear-gradient(90deg, #0047e1, #00b4ff) !important;
     border-radius: 4px !important;
+    box-shadow: 0 0 8px rgba(0,71,225,0.4) !important;
 }
 
-/* ── Info / warning / error alerts ────────────────────────────────────────── */
+/* ── Info / warning / error alerts ──────────────────────────────────────── */
 [data-testid="stAlert"] {
-    background: #080f1e !important; border-radius: 10px !important;
-    border: 1px solid #172540 !important;
+    background: rgba(7,14,28,0.7) !important; border-radius: 10px !important;
+    border: 1px solid rgba(0,71,225,0.15) !important;
+    backdrop-filter: blur(10px) !important;
 }
 </style>
 """
@@ -2721,8 +2794,8 @@ def build_excel(df):
     return buf.read()
 
 
-_BG = "#060a10"
-_PAPER = "#0b1628"
+_BG = "#040810"
+_PAPER = "#070e1c"
 _GRID = "#152038"
 _TEXT = "#6a80a8"
 _TITLE = "#b8c8e0"
@@ -2751,9 +2824,11 @@ def _dark(fig, height=320):
         ),
         showlegend=False,
         hoverlabel=dict(
-            bgcolor="#0d1e38",
+            bgcolor="#0b1928",
             bordercolor="#0047e1",
-            font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
+            font=dict(color="#ccdaf5", size=13, family="Inter, sans-serif"),
+            align="left",
+            namelength=-1,
         ),
         hovermode="closest",
     )
@@ -2776,7 +2851,8 @@ def chart_topic_bar(df):
         textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
         hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
         hoverlabel=dict(bgcolor="#0d1e38", bordercolor="#0047e1",
-                        font=dict(color="#ccdaf5", size=12)),
+                        font=dict(color="#ccdaf5", size=13),
+                        align="left", namelength=-1),
     ))
     _dark(fig, 320)
     fig.update_layout(
@@ -2902,7 +2978,8 @@ def chart_donut(df):
                     orientation="v", x=1.02, y=0.5),
         hoverlabel=dict(
             bgcolor="#0d1e38", bordercolor="#0047e1",
-            font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
+            font=dict(color="#ccdaf5", size=13, family="Inter, sans-serif"),
+            align="left", namelength=-1,
         ),
         annotations=[dict(
             text=f"<b>{len(df)}</b><br><span style='font-size:10px'>articles</span>",
@@ -3030,7 +3107,9 @@ def chart_world_map(df):
         hoverlabel=dict(
             bgcolor="#0b1628",
             bordercolor="#0047e1",
-            font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
+            font=dict(color="#ccdaf5", size=13, family="Inter, sans-serif"),
+            align="left",
+            namelength=-1,
         ),
     )
     return fig
@@ -3050,7 +3129,7 @@ def dark_table(df_in, max_rows=300):
     )
     rows = ""
     for i, (_, row) in enumerate(df_in.head(max_rows).iterrows()):
-        bg = "#0b1628" if i % 2 == 0 else "#060a10"
+        bg = "rgba(6,12,22,0.9)" if i % 2 == 0 else "rgba(4,8,16,0.85)"
         cells = ""
         for col in df_in.columns:
             v = str(row[col]) if row[col] is not None else ""
@@ -3179,7 +3258,7 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
     )
 
     return (
-        f'<div class="article-card-wrap" style="background:#0b1628;border:1px solid {border_color};border-radius:10px;'
+        f'<div class="article-card-wrap" style="background:rgba(7,14,28,0.85);border:1px solid {border_color};border-radius:10px;'
         f'padding:.85rem 1.1rem;display:flex;justify-content:space-between;'
         f'align-items:flex-start;gap:.9rem;margin-bottom:.45rem;position:relative;">'
         f'{top_strip}'
@@ -3219,17 +3298,19 @@ def kpi(label, value, accent="blue", delta=""):
         "red":   ("#ff2d6b", "#ff0044"),
     }
     c1, c2 = accent_map.get(accent, accent_map["blue"])
-    delta_html = f'<div style="font-size:.7rem;color:#2a3e60;margin-top:.25rem;">{delta}</div>' if delta else ""
+    delta_html = f'<div style="font-size:.68rem;color:#2a4060;margin-top:.2rem;">{delta}</div>' if delta else ""
     return (
-        f'<div class="kpi-card" style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;'
+        f'<div class="kpi-card" style="flex:1;min-width:150px;background:linear-gradient(145deg,rgba(7,14,28,0.85),rgba(5,10,20,0.9));border:1px solid rgba(0,71,225,0.12);'
         f'border-radius:12px;padding:1.1rem 1.3rem;position:relative;overflow:hidden;" '
         f'title="{label}">'
         f'<div style="position:absolute;top:0;left:0;right:0;height:2px;'
-        f'background:linear-gradient(90deg,{c1},{c2});"></div>'
-        f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;'
-        f'text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">{label}</div>'
-        f'<div style="font-family:Syne,sans-serif;font-size:1.9rem;font-weight:800;'
-        f'color:#fff;line-height:1;">{value}</div>'
+        f'background:linear-gradient(90deg,{c1},{c2});opacity:0.9;"></div>'
+        f'<div style="position:absolute;top:-20px;right:-10px;width:70px;height:70px;'
+        f'background:radial-gradient(circle,{c1}18,transparent 70%);border-radius:50%;"></div>'
+        f'<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
+        f'text-transform:uppercase;color:#2a4068;margin-bottom:.35rem;">{label}</div>'
+        f'<div style="font-family:Syne,sans-serif;font-size:1.8rem;font-weight:800;'
+        f'color:#f0f6ff;line-height:1;">{value}</div>'
         f'{delta_html}</div>'
     )
 
@@ -3616,11 +3697,11 @@ def main():
 
         # ── SECTION HEADER ────────────────────────────────────────────────────
         st.markdown(
-            '<div style="background:linear-gradient(90deg,rgba(0,71,225,0.14),transparent);'
-            'border-left:3px solid #0047e1;border-radius:0 8px 8px 0;'
-            'padding:.5rem .8rem;margin-bottom:.7rem;">'
-            '<span style="font-family:Syne,sans-serif;font-weight:700;color:#c8d8f0;'
-            'font-size:.82rem;letter-spacing:.06em;">🔍 REFINE RESULTS</span>'
+            '<div style="background:linear-gradient(90deg,rgba(0,71,225,0.10),transparent);'
+            'border-left:2px solid #0047e1;border-radius:0 6px 6px 0;'
+            'padding:.38rem .75rem;margin-bottom:.6rem;">'
+            '<span style="font-family:\'DM Mono\',monospace;font-weight:500;color:#3a6090;'
+            'font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;">FILTERS</span>'
             '</div>',
             unsafe_allow_html=True,
         )
