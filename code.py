@@ -71,46 +71,40 @@ _HEADERS = {
 
 CUSTOM_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-/* ── Root background — deep space navy with subtle noise texture ─────────── */
-.stApp {
-    background: #040810;
-    color: #dde8f8;
-    background-image:
-        radial-gradient(ellipse 80% 50% at 60% -10%, rgba(0,71,225,0.07) 0%, transparent 65%),
-        radial-gradient(ellipse 50% 40% at 0% 60%, rgba(0,180,255,0.04) 0%, transparent 60%);
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+html, body, [class*="css"] {
+    font-family: 'Space Grotesk', sans-serif;
 }
 
-/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+/* ── Root background ───────────────────────────────────────────────────────── */
+.stApp {
+    background: #050c1a;
+    color: #c8d8f0;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #152540; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #0047e1; }
-
-/* ── Global transitions (exclude Plotly to avoid lag) ─────────────────────── */
-*:not(.plotly-graph-div):not(.plotly-graph-div *) {
-    transition: background 0.15s ease, border-color 0.18s ease,
-                box-shadow 0.2s ease, opacity 0.15s ease, transform 0.15s ease;
-}
+::-webkit-scrollbar-thumb { background: #0f1e34; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #0066ff; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SIDEBAR
+   SIDEBAR — fully matched dark navy
 ══════════════════════════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #050b1a 0%, #040810 100%) !important;
-    border-right: 1px solid rgba(0,71,225,0.12) !important;
-    box-shadow: 2px 0 32px rgba(0,0,0,0.5) !important;
+    background: #060d1c !important;
+    border-right: 1px solid rgba(0,100,255,0.1) !important;
+    box-shadow: 2px 0 28px rgba(0,0,0,0.6) !important;
 }
-[data-testid="stSidebar"] * { color: #a0b8d8 !important; }
+[data-testid="stSidebar"] * { color: #8aa8cc !important; }
 [data-testid="stSidebar"] hr {
-    border-color: rgba(0,71,225,0.12) !important;
-    margin: .6rem 0 !important;
+    border-color: rgba(255,255,255,0.06) !important;
+    margin: .5rem 0 !important;
 }
 
-/* ── Sidebar always-expanded ─────────────────────────────────────────────── */
+/* ── Sidebar always-expanded ────────────────────────────────────────────── */
 [data-testid="stSidebarCollapseButton"] { display: none !important; }
 [data-testid="stSidebar"][aria-expanded="false"],
 [data-testid="stSidebar"] {
@@ -125,8 +119,8 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 div[data-testid="collapsedControl"] {
     display: flex !important; visibility: visible !important;
     opacity: 1 !important; pointer-events: auto !important;
-    background: #0047e1 !important; border-radius: 0 10px 10px 0 !important;
-    border: 1px solid #0060ff !important; border-left: none !important;
+    background: #0055dd !important; border-radius: 0 10px 10px 0 !important;
+    border: 1px solid #0070ff !important; border-left: none !important;
     width: 2rem !important; z-index: 99999 !important;
 }
 [data-testid="stSidebarCollapsedControl"] button,
@@ -134,155 +128,232 @@ div[data-testid="collapsedControl"] button { color:#fff!important; background:tr
 [data-testid="stSidebarCollapsedControl"] svg,
 div[data-testid="collapsedControl"] svg { fill:#fff!important; stroke:#fff!important; }
 
-/* ── Sidebar radio buttons ───────────────────────────────────────────────── */
+/* ── Sidebar radio ──────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] [data-testid="stRadio"] label {
     font-size: .78rem !important;
     padding: .28rem .5rem !important;
     border-radius: 5px !important;
     cursor: pointer !important;
+    font-family: 'Space Grotesk', sans-serif !important;
 }
 [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
-    background: rgba(0,71,225,0.1) !important;
+    background: rgba(0,100,255,0.08) !important;
 }
 
-/* ── Sidebar buttons ─────────────────────────────────────────────────────── */
+/* ── Sidebar buttons ────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] .stButton button {
-    background: linear-gradient(135deg, #0038b8, #006dd4) !important;
+    background: linear-gradient(135deg, #003dbf, #006dd4) !important;
     color: #fff !important; border: none !important; border-radius: 8px !important;
-    font-family: 'Syne', sans-serif !important; font-weight: 700 !important;
+    font-family: 'Space Grotesk', sans-serif !important; font-weight: 700 !important;
     font-size: .83rem !important; letter-spacing: .05em !important;
     padding: .55rem 1rem !important;
-    box-shadow: 0 2px 14px rgba(0,71,225,0.22), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+    box-shadow: 0 2px 14px rgba(0,80,255,0.2) !important;
+    transition: all 0.15s !important;
 }
 [data-testid="stSidebar"] .stButton button:hover {
-    background: linear-gradient(135deg, #0044d4, #0090e0) !important;
-    box-shadow: 0 4px 22px rgba(0,71,225,0.38), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    background: linear-gradient(135deg, #0048e0, #0090e0) !important;
+    box-shadow: 0 4px 22px rgba(0,80,255,0.36) !important;
     transform: translateY(-1px) !important;
 }
 [data-testid="stSidebar"] .stButton button:active { transform: translateY(0) !important; }
 
-/* ── Sidebar run button ───────────────────────────────────────────────────── */
+/* ── Sidebar run button ─────────────────────────────────────────────────── */
 [data-testid="stSidebar"] .stButton:last-of-type button {
     font-size: .9rem !important;
     padding: .65rem 1rem !important;
     letter-spacing: .07em !important;
-    background: linear-gradient(135deg, #0044d4 0%, #0078c8 50%, #0090e0 100%) !important;
-    box-shadow: 0 3px 20px rgba(0,71,225,0.35), 0 0 0 1px rgba(0,144,224,0.2) !important;
+    background: linear-gradient(135deg, #0048e0 0%, #0078c8 50%, #0090e0 100%) !important;
+    box-shadow: 0 3px 20px rgba(0,80,255,0.32), 0 0 0 1px rgba(0,144,224,0.18) !important;
 }
 
-/* ── Sidebar multiselect ─────────────────────────────────────────────────── */
+/* ── Sidebar multiselect ────────────────────────────────────────────────── */
 [data-testid="stSidebar"] [data-baseweb="select"] { background: transparent !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] > div:first-child {
-    background: #070e1c !important; border: 1px solid #162540 !important;
-    border-radius: 7px !important; min-height: 32px !important;
+    background: #07101e !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    min-height: 34px !important;
+    box-shadow: none !important;
 }
 [data-testid="stSidebar"] [data-baseweb="select"] > div:first-child:focus-within {
-    border-color: rgba(0,71,225,0.6) !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.15) !important;
+    border-color: rgba(0,100,255,0.5) !important;
+    box-shadow: 0 0 0 2px rgba(0,100,255,0.12) !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] span { color: #1e3356 !important; }
+[data-testid="stSidebar"] [data-baseweb="select"] span { color: #152840 !important; }
 [data-testid="stSidebar"] [data-baseweb="tag"] {
-    background: rgba(0,71,225,0.12) !important; border: 1px solid rgba(0,71,225,0.3) !important;
+    background: rgba(0,100,255,0.12) !important;
+    border: 1px solid rgba(0,100,255,0.28) !important;
     border-radius: 5px !important;
 }
-[data-testid="stSidebar"] [data-baseweb="tag"] span { color: #5090e0 !important; }
+[data-testid="stSidebar"] [data-baseweb="tag"] span { color: #5ca0ff !important; }
 [data-testid="stSidebar"] [data-baseweb="tag"] [role="presentation"] svg { fill: #1e3356 !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] input {
-    background: transparent !important; color: #b0c8e8 !important;
-    caret-color: #0047e1 !important;
+    background: transparent !important; color: #a0c0e8 !important;
+    caret-color: #0066ff !important;
+    font-family: 'Space Grotesk', sans-serif !important;
 }
 
-/* ── Dropdown menus ──────────────────────────────────────────────────────── */
-[data-baseweb="popover"], [data-baseweb="menu"],
-[role="listbox"], ul[data-baseweb="menu"] {
-    background: #07101f !important; border: 1px solid #162540 !important;
-    border-radius: 10px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,71,225,0.1) !important;
-    backdrop-filter: blur(20px) !important;
-}
-[data-baseweb="menu"] li, [role="option"], [data-baseweb="menu"] [role="option"] {
-    background: transparent !important; color: #8aaccc !important;
-    font-size: .8rem !important;
-}
-[data-baseweb="menu"] li:hover, [role="option"]:hover,
-[data-baseweb="menu"] [role="option"]:hover {
-    background: rgba(0,71,225,0.1) !important; color: #d0e4ff !important;
-}
-[data-baseweb="menu"] [aria-selected="true"],
-[role="option"][aria-selected="true"] {
-    background: rgba(0,71,225,0.14) !important; color: #60a4ff !important;
-}
-[data-baseweb="popover"] input, [data-baseweb="menu"] input {
-    background: #050c18 !important; border: 1px solid #162540 !important;
-    color: #b0c8e8 !important; border-radius: 6px !important;
-}
-
-/* ── Sidebar text inputs ─────────────────────────────────────────────────── */
+/* ── Sidebar text / number inputs ───────────────────────────────────────── */
 [data-testid="stSidebar"] .stTextInput input,
 [data-testid="stSidebar"] input[type="number"],
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
-    background: #070e1c !important; border: 1px solid #162540 !important;
-    border-radius: 7px !important; color: #b0c8e8 !important;
-    font-size: .8rem !important;
+    background: #07101e !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    color: #a0c0e8 !important;
+    font-size: .82rem !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    box-shadow: none !important;
 }
 [data-testid="stSidebar"] .stTextInput input:focus,
 [data-testid="stSidebar"] input[type="number"]:focus,
 [data-testid="stSidebar"] [data-testid="stDateInput"] input:focus {
-    border-color: rgba(0,71,225,0.5) !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.12) !important;
-}
-/* Slider track */
-[data-testid="stSidebar"] [data-testid="stSlider"] [role="slider"] {
-    background: #0047e1 !important;
-    box-shadow: 0 0 8px rgba(0,71,225,0.5) !important;
+    border-color: rgba(0,100,255,0.5) !important;
+    box-shadow: 0 0 0 2px rgba(0,100,255,0.12) !important;
 }
 
-/* ── Main content inputs ─────────────────────────────────────────────────── */
-.stMultiSelect [data-baseweb="select"] { background: #070e1c !important; border-color: #122035 !important; }
-.stSelectbox [data-baseweb="select"] > div { background: #070e1c !important; border-color: #122035 !important; }
-.stTextInput input {
-    background: #070e1c !important; border: 1px solid #122035 !important;
-    border-radius: 8px !important; color: #b0c8e8 !important;
+/* ── Sidebar slider ─────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] [data-testid="stSlider"] > div > div {
+    background: rgba(255,255,255,0.06) !important;
 }
-.stTextInput input:focus { border-color: rgba(0,71,225,0.5) !important; }
+[data-testid="stSidebar"] [data-testid="stSlider"] [role="slider"] {
+    background: #0066ff !important;
+    box-shadow: 0 0 8px rgba(0,100,255,0.5) !important;
+    border: 2px solid #0090e0 !important;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
-   TABS — pill-style floating
+   DROPDOWN MENUS — dark navy, unified with sidebar
+══════════════════════════════════════════════════════════════════════════ */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[role="listbox"],
+ul[data-baseweb="menu"] {
+    background: #070f1e !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,100,255,0.08) !important;
+    backdrop-filter: blur(20px) !important;
+}
+[data-baseweb="menu"] li,
+[role="option"],
+[data-baseweb="menu"] [role="option"] {
+    background: transparent !important;
+    color: #7a9cc0 !important;
+    font-size: .82rem !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+}
+[data-baseweb="menu"] li:hover,
+[role="option"]:hover,
+[data-baseweb="menu"] [role="option"]:hover {
+    background: rgba(0,100,255,0.09) !important;
+    color: #c8ddf5 !important;
+}
+[data-baseweb="menu"] [aria-selected="true"],
+[role="option"][aria-selected="true"] {
+    background: rgba(0,100,255,0.14) !important;
+    color: #60a4ff !important;
+}
+[data-baseweb="popover"] input,
+[data-baseweb="menu"] input {
+    background: #050c1a !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    color: #a0c0e8 !important;
+    border-radius: 6px !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+}
+
+/* ── Main area multiselect / selectbox ──────────────────────────────────── */
+.stMultiSelect [data-baseweb="select"] > div:first-child,
+.stSelectbox [data-baseweb="select"] > div:first-child {
+    background: #07101e !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+}
+.stMultiSelect [data-baseweb="select"] > div:first-child:focus-within,
+.stSelectbox [data-baseweb="select"] > div:first-child:focus-within {
+    border-color: rgba(0,100,255,0.5) !important;
+    box-shadow: 0 0 0 2px rgba(0,100,255,0.12) !important;
+}
+.stMultiSelect [data-baseweb="tag"] {
+    background: rgba(0,100,255,0.12) !important;
+    border: 1px solid rgba(0,100,255,0.28) !important;
+    border-radius: 5px !important;
+}
+.stMultiSelect [data-baseweb="tag"] span { color: #5ca0ff !important; }
+
+.stTextInput input {
+    background: #07101e !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    color: #a0c0e8 !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+}
+.stTextInput input:focus {
+    border-color: rgba(0,100,255,0.5) !important;
+    box-shadow: 0 0 0 2px rgba(0,100,255,0.12) !important;
+}
+
+/* Date input calendar ─────────────────────────────────────────────────── */
+[data-baseweb="calendar"] {
+    background: #070f1e !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+}
+[data-baseweb="calendar"] * { color: #8aa8cc !important; }
+[data-baseweb="calendar"] [aria-selected="true"] {
+    background: #0066ff !important;
+    color: #fff !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TABS — pill-style
 ══════════════════════════════════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
-    background: rgba(7,14,28,0.7) !important;
+    background: rgba(6,13,28,0.7) !important;
     border-radius: 12px !important;
     padding: 4px !important; gap: 2px !important;
-    border: 1px solid rgba(0,71,225,0.1) !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(0,100,255,0.1) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
     backdrop-filter: blur(12px) !important;
 }
 .stTabs [data-baseweb="tab"] {
-    background: transparent !important; color: #2e4a6a !important;
-    border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
-    font-weight: 600 !important; font-size: .76rem !important;
-    letter-spacing: .04em !important; padding: .4rem .95rem !important;
+    background: transparent !important;
+    color: #2a4060 !important;
+    border-radius: 8px !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: .76rem !important;
+    letter-spacing: .04em !important;
+    padding: .4rem .95rem !important;
+    transition: all 0.15s !important;
 }
 .stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
-    background: rgba(0,71,225,0.08) !important; color: #8ab0d8 !important;
+    background: rgba(0,100,255,0.08) !important;
+    color: #7aa8d0 !important;
 }
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #0038b8, #006dd4) !important;
+    background: linear-gradient(135deg, #003abf, #006dd4) !important;
     color: #fff !important;
-    box-shadow: 0 2px 12px rgba(0,71,225,0.35), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    box-shadow: 0 2px 12px rgba(0,80,255,0.32) !important;
 }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 1.2rem !important; }
 
-/* ── Download buttons ────────────────────────────────────────────────────── */
+/* ── Download buttons ───────────────────────────────────────────────────── */
 .stDownloadButton button {
     background: linear-gradient(135deg, #001f07, #003812) !important;
-    color: #00e676 !important; border: 1px solid rgba(0,158,64,0.4) !important;
-    border-radius: 8px !important; font-family: 'Syne', sans-serif !important;
-    font-weight: 700 !important; letter-spacing: .04em !important;
-    box-shadow: 0 2px 12px rgba(0,150,70,0.15), inset 0 1px 0 rgba(0,230,118,0.05) !important;
+    color: #00e676 !important;
+    border: 1px solid rgba(0,158,64,0.35) !important;
+    border-radius: 8px !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: .04em !important;
+    box-shadow: 0 2px 12px rgba(0,150,70,0.12) !important;
+    transition: all 0.15s !important;
 }
 .stDownloadButton button:hover {
     background: linear-gradient(135deg, #002a0a, #004d14) !important;
-    box-shadow: 0 4px 20px rgba(0,150,70,0.28) !important;
+    box-shadow: 0 4px 20px rgba(0,150,70,0.26) !important;
     transform: translateY(-1px) !important;
 }
 
@@ -290,85 +361,83 @@ div[data-testid="collapsedControl"] svg { fill:#fff!important; stroke:#fff!impor
    BANNER
 ══════════════════════════════════════════════════════════════════════════ */
 .gl-banner {
-    background: linear-gradient(135deg, #050c1c 0%, #081838 45%, #050c1c 100%);
-    border: 1px solid rgba(0,71,225,0.15);
+    background: linear-gradient(135deg, #050c1c 0%, #07193a 45%, #050c1c 100%);
+    border: 1px solid rgba(0,100,255,0.14);
     border-radius: 16px;
     padding: 1.8rem 2.2rem; margin-bottom: 1.4rem;
     position: relative; overflow: hidden;
-    box-shadow: 0 4px 48px rgba(0,71,225,0.08), 0 0 0 1px rgba(0,180,255,0.04);
+    box-shadow: 0 4px 48px rgba(0,80,255,0.07);
 }
 .gl-banner::before {
     content: ''; position: absolute; top: -80px; right: -40px;
     width: 360px; height: 360px;
-    background: radial-gradient(circle, rgba(0,71,225,0.15) 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(0,100,255,0.13) 0%, transparent 65%);
     border-radius: 50%;
 }
 .gl-banner::after {
     content: ''; position: absolute; bottom: -50px; left: 20%;
     width: 280px; height: 280px;
-    background: radial-gradient(circle, rgba(0,180,255,0.08) 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(0,170,255,0.07) 0%, transparent 65%);
     border-radius: 50%;
 }
 .banner-eyebrow {
-    font-family: 'DM Mono', monospace; font-size: .62rem;
-    letter-spacing: .22em; color: #00b4ff;
+    font-family: 'JetBrains Mono', monospace; font-size: .62rem;
+    letter-spacing: .22em; color: #00aaff;
     text-transform: uppercase; margin-bottom: .45rem;
     display: flex; align-items: center; gap: .5rem;
 }
 .banner-eyebrow::before {
     content: ''; display: inline-block; width: 5px; height: 5px;
-    background: #00b4ff; border-radius: 50%;
+    background: #00aaff; border-radius: 50%;
     animation: pulse-dot 2s ease-in-out infinite;
-    box-shadow: 0 0 6px rgba(0,180,255,0.6);
+    box-shadow: 0 0 6px rgba(0,170,255,0.6);
 }
 @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 6px rgba(0,180,255,0.6); }
-    50% { opacity: 0.4; transform: scale(0.65); box-shadow: 0 0 2px rgba(0,180,255,0.2); }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.65); }
 }
 .banner-title {
-    font-family: 'Syne', sans-serif; font-size: 1.85rem;
-    font-weight: 800; color: #f0f6ff; line-height: 1.1; margin-bottom: .3rem;
+    font-family: 'Space Grotesk', sans-serif; font-size: 1.85rem;
+    font-weight: 700; color: #f0f6ff; line-height: 1.1; margin-bottom: .3rem;
     letter-spacing: -0.01em;
 }
-.banner-title span { color: #00b4ff; }
-.banner-sub { font-size: .8rem; color: #3a5878; font-weight: 300; line-height: 1.7; }
+.banner-title span { color: #00aaff; }
+.banner-sub { font-size: .8rem; color: #2e4a6a; font-weight: 400; line-height: 1.7; }
 .banner-ts {
-    font-family: 'DM Mono', monospace; font-size: .6rem;
-    color: #162840; margin-top: .7rem; letter-spacing: .06em;
+    font-family: 'JetBrains Mono', monospace; font-size: .6rem;
+    color: #152840; margin-top: .7rem; letter-spacing: .06em;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
    SECTION HEADINGS
 ══════════════════════════════════════════════════════════════════════════ */
 .sec-head {
-    font-family: 'DM Mono', monospace; font-size: .65rem; font-weight: 500;
-    color: #3a5a80; letter-spacing: .16em; text-transform: uppercase;
-    border-left: 2px solid #0047e1; padding-left: .7rem;
+    font-family: 'JetBrains Mono', monospace; font-size: .64rem; font-weight: 500;
+    color: #2e4a6a; letter-spacing: .18em; text-transform: uppercase;
+    border-left: 2px solid #0066ff; padding-left: .7rem;
     margin: 1.6rem 0 .9rem 0;
-    position: relative;
     display: flex; align-items: center; gap: .5rem;
 }
 .sec-head::after {
     content: ''; flex: 1; height: 1px;
-    background: linear-gradient(90deg, rgba(0,71,225,0.2), transparent);
+    background: linear-gradient(90deg, rgba(0,100,255,0.18), transparent);
 }
 
-/* ── Pills ───────────────────────────────────────────────────────────────── */
+/* ── Pills ──────────────────────────────────────────────────────────────── */
 .pill-row { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.2rem; }
 .pill {
-    background: rgba(7,14,28,0.6); border: 1px solid #0f1e32; border-radius: 20px;
-    padding: .3rem .85rem; font-size: .74rem; color: #3a5878;
+    background: rgba(6,13,28,0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px;
+    padding: .3rem .85rem; font-size: .74rem; color: #2e4a6a;
     display: flex; align-items: center; gap: .35rem;
-    backdrop-filter: blur(8px);
 }
-.pill b { color: #d8e8f8; }
-.pill-dot { width: 5px; height: 5px; border-radius: 50%; background: #0047e1; flex-shrink: 0; }
+.pill b { color: #c8d8f0; }
+.pill-dot { width: 5px; height: 5px; border-radius: 50%; background: #0066ff; flex-shrink: 0; }
 .pill:hover {
-    border-color: rgba(0,71,225,0.35) !important; background: rgba(0,71,225,0.08) !important;
-    color: #90b8e0 !important; cursor: default;
+    border-color: rgba(0,100,255,0.3) !important; background: rgba(0,100,255,0.07) !important;
+    color: #7aa8d0 !important;
 }
 
-/* ── Global misc ─────────────────────────────────────────────────────────── */
+/* ── Global misc ────────────────────────────────────────────────────────── */
 hr { border-color: #0a1525 !important; }
 #MainMenu, footer, header { visibility: hidden; }
 
@@ -376,32 +445,43 @@ hr { border-color: #0a1525 !important; }
    KPI CARDS
 ══════════════════════════════════════════════════════════════════════════ */
 .kpi-card {
-    background: rgba(7,14,28,0.7) !important;
-    border: 1px solid rgba(0,71,225,0.12) !important;
+    background: linear-gradient(145deg, rgba(7,14,28,0.85), rgba(5,10,20,0.9)) !important;
+    border: 1px solid rgba(0,100,255,0.1) !important;
     border-radius: 12px !important;
-    backdrop-filter: blur(12px) !important;
     transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease !important;
 }
 .kpi-card:hover {
     transform: translateY(-3px) !important;
-    border-color: rgba(0,71,225,0.4) !important;
-    box-shadow: 0 12px 40px rgba(0,71,225,0.18), 0 0 0 1px rgba(0,71,225,0.1) !important;
+    border-color: rgba(0,100,255,0.36) !important;
+    box-shadow: 0 12px 40px rgba(0,80,255,0.16) !important;
 }
 
-/* ── Table ───────────────────────────────────────────────────────────────── */
+/* ── Table ──────────────────────────────────────────────────────────────── */
 .dc-table tr:hover td {
-    background: rgba(0,71,225,0.06) !important;
+    background: rgba(0,100,255,0.05) !important;
     transition: background 0.12s ease !important;
 }
 
-/* ── Hover & feature cards ───────────────────────────────────────────────── */
+/* ── Article cards ──────────────────────────────────────────────────────── */
+.article-card-wrap {
+    transition: border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
+}
+.article-card-wrap:hover {
+    border-color: rgba(0,100,255,0.38) !important;
+    box-shadow: 0 6px 32px rgba(0,80,255,0.1) !important;
+    transform: translateY(-1px) !important;
+}
+.score-badge { transition: filter 0.15s ease, transform 0.15s ease !important; }
+.score-badge:hover { filter: brightness(1.3) !important; transform: scale(1.06) !important; }
+
+/* ── Hover cards ────────────────────────────────────────────────────────── */
 .hover-card {
     transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease !important;
 }
 .hover-card:hover {
     transform: translateY(-2px) !important;
-    border-color: rgba(0,71,225,0.35) !important;
-    box-shadow: 0 8px 32px rgba(0,71,225,0.15) !important;
+    border-color: rgba(0,100,255,0.32) !important;
+    box-shadow: 0 8px 32px rgba(0,80,255,0.13) !important;
 }
 .feature-card {
     transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease !important;
@@ -409,56 +489,46 @@ hr { border-color: #0a1525 !important; }
 }
 .feature-card:hover {
     transform: translateY(-4px) !important;
-    border-color: rgba(0,71,225,0.4) !important;
-    box-shadow: 0 14px 44px rgba(0,71,225,0.18) !important;
+    border-color: rgba(0,100,255,0.38) !important;
+    box-shadow: 0 14px 44px rgba(0,80,255,0.16) !important;
 }
 .saved-scan-card { transition: border-color 0.18s ease, box-shadow 0.2s ease !important; }
 .saved-scan-card:hover {
-    border-color: rgba(168,85,247,0.4) !important;
-    box-shadow: 0 4px 24px rgba(168,85,247,0.14) !important;
+    border-color: rgba(168,85,247,0.38) !important;
+    box-shadow: 0 4px 24px rgba(168,85,247,0.12) !important;
 }
-.article-card-wrap {
-    transition: border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
-}
-.article-card-wrap:hover {
-    border-color: rgba(0,71,225,0.4) !important;
-    box-shadow: 0 6px 32px rgba(0,71,225,0.12) !important;
-    transform: translateY(-1px) !important;
-}
-.score-badge { transition: filter 0.15s ease, transform 0.15s ease !important; }
-.score-badge:hover { filter: brightness(1.3) !important; transform: scale(1.06) !important; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   PLOTLY CHART WRAPPER
+   PLOTLY CHARTS
 ══════════════════════════════════════════════════════════════════════════ */
 [data-testid="stPlotlyChart"] {
     border-radius: 12px !important;
-    border: 1px solid rgba(0,71,225,0.1) !important;
+    border: 1px solid rgba(0,100,255,0.09) !important;
     overflow: visible !important;
     transition: border-color 0.22s ease, box-shadow 0.25s ease !important;
     background: rgba(7,12,24,0.5) !important;
-    backdrop-filter: blur(8px) !important;
 }
 [data-testid="stPlotlyChart"]:hover {
-    border-color: rgba(0,71,225,0.22) !important;
-    box-shadow: 0 4px 40px rgba(0,71,225,0.1) !important;
+    border-color: rgba(0,100,255,0.2) !important;
+    box-shadow: 0 4px 40px rgba(0,80,255,0.09) !important;
 }
 
-/* ── Progress bar ────────────────────────────────────────────────────────── */
+/* ── Progress bar ───────────────────────────────────────────────────────── */
 [data-testid="stProgressBar"] > div > div {
-    background: linear-gradient(90deg, #0047e1, #00b4ff) !important;
+    background: linear-gradient(90deg, #0055dd, #00aaff) !important;
     border-radius: 4px !important;
-    box-shadow: 0 0 8px rgba(0,71,225,0.4) !important;
+    box-shadow: 0 0 8px rgba(0,100,255,0.4) !important;
 }
 
-/* ── Info / warning / error alerts ──────────────────────────────────────── */
+/* ── Alerts ─────────────────────────────────────────────────────────────── */
 [data-testid="stAlert"] {
-    background: rgba(7,14,28,0.7) !important; border-radius: 10px !important;
-    border: 1px solid rgba(0,71,225,0.15) !important;
-    backdrop-filter: blur(10px) !important;
+    background: rgba(7,14,28,0.7) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(0,100,255,0.14) !important;
 }
 </style>
 """
+
 
 MONTHS = {
     "jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
@@ -466,8 +536,8 @@ MONTHS = {
 }
 
 TOPIC_COLORS = {
-    "Hyperscale":   "#0047e1",
-    "Colocation":   "#00b4ff",
+    "Hyperscale":   "#0066ff",
+    "Colocation":   "#00aaff",
     "AI / GPU":     "#ff2d6b",
     "Power":        "#ffaa00",
     "Investment":   "#a855f7",
@@ -479,8 +549,8 @@ TOPIC_COLORS = {
 }
 
 REGION_COLORS = {
-    "North America":  "#0047e1",
-    "Europe":         "#00b4ff",
+    "North America":  "#0066ff",
+    "Europe":         "#00aaff",
     "Asia Pacific":   "#ff2d6b",
     "Middle East":    "#ffaa00",
     "Latin America":  "#a855f7",
@@ -489,8 +559,8 @@ REGION_COLORS = {
 }
 
 SOURCE_META = {
-    "DataCenterDynamics": {"color": "#0047e1", "short": "DCD"},
-    "DataCenter Knowledge": {"color": "#00b4ff", "short": "DCK"},
+    "DataCenterDynamics": {"color": "#0066ff", "short": "DCD"},
+    "DataCenter Knowledge": {"color": "#00aaff", "short": "DCK"},
     "DataCenterFrontier":  {"color": "#00e5c8", "short": "DCF"},
     "Google News":         {"color": "#ffaa00", "short": "GNS"},
     "PR Newswire":         {"color": "#a855f7", "short": "PRN"},
@@ -2794,12 +2864,12 @@ def build_excel(df):
     return buf.read()
 
 
-_BG = "#040810"
-_PAPER = "#070e1c"
-_GRID = "#152038"
-_TEXT = "#6a80a8"
-_TITLE = "#b8c8e0"
-_FONT = "Inter, sans-serif"
+_BG = "#050c1a"
+_PAPER = "#070f1e"
+_GRID = "#0f1e34"
+_TEXT = "#4a6890"
+_TITLE = "#c8d8f0"
+_FONT = "Space Grotesk, sans-serif"
 
 
 def _dark(fig, height=320):
@@ -2825,7 +2895,7 @@ def _dark(fig, height=320):
         showlegend=False,
         hoverlabel=dict(
             bgcolor="#0b1928",
-            bordercolor="#0047e1",
+            bordercolor="#0066ff",
             font=dict(color="#ccdaf5", size=13, family="Inter, sans-serif"),
             align="left",
             namelength=-1,
@@ -2848,15 +2918,15 @@ def chart_topic_bar(df):
             opacity=0.88,
         ),
         text=tc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        textfont=dict(color=_TITLE, size=11, family='JetBrains Mono, monospace'),
         hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
-        hoverlabel=dict(bgcolor="#0d1e38", bordercolor="#0047e1",
+        hoverlabel=dict(bgcolor="#0d1e38", bordercolor="#0066ff",
                         font=dict(color="#ccdaf5", size=13),
                         align="left", namelength=-1),
     ))
     _dark(fig, 320)
     fig.update_layout(
-        title=dict(text="Articles by Topic", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text="Articles by Topic", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
         xaxis=dict(showgrid=True, gridcolor="#0f1e36"),
         bargap=0.28,
     )
@@ -2872,12 +2942,12 @@ def chart_region_bar(df):
         x=rc["Count"], y=rc["Region"], orientation="h",
         marker=dict(color=colors, line=dict(width=0), opacity=0.88),
         text=rc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        textfont=dict(color=_TITLE, size=11, family='JetBrains Mono, monospace'),
         hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
     ))
     _dark(fig, 300)
     fig.update_layout(
-        title=dict(text="Articles by Region", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text="Articles by Region", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
         bargap=0.28,
     )
     return fig
@@ -2896,12 +2966,12 @@ def chart_country_bar(df, top_n=20):
         x=cc["Count"], y=cc["Country"], orientation="h",
         marker=dict(color=c_colors, line=dict(width=0)),
         text=cc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+        textfont=dict(color=_TITLE, size=10, family='JetBrains Mono, monospace'),
         hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
     ))
     _dark(fig, max(340, top_n * 24))
     fig.update_layout(
-        title=dict(text=f"Top {top_n} Countries", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text=f"Top {top_n} Countries", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
         bargap=0.22,
     )
     return fig
@@ -2918,15 +2988,15 @@ def chart_timeline(df):
     fig.add_trace(go.Scatter(
         x=daily["Date"], y=daily["Articles"],
         mode="lines+markers",
-        line=dict(color="#00b4ff", width=2.5, shape="spline", smoothing=0.8),
-        marker=dict(color="#0047e1", size=6, line=dict(color="#00b4ff", width=1.5),
+        line=dict(color="#00aaff", width=2.5, shape="spline", smoothing=0.8),
+        marker=dict(color="#0066ff", size=6, line=dict(color="#00aaff", width=1.5),
                     symbol="circle"),
-        fill="tozeroy", fillcolor="rgba(0,71,225,0.09)",
+        fill="tozeroy", fillcolor="rgba(0,100,255,0.09)",
         hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
     ))
     _dark(fig, 260)
     fig.update_layout(
-        title=dict(text="Publication Volume Over Time", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text="Publication Volume Over Time", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
         yaxis_title="Articles",
         xaxis=dict(showgrid=False),
     )
@@ -2937,7 +3007,7 @@ def chart_sentiment(df):
     sc = df["Sentiment"].value_counts().reset_index()
     sc.columns = ["Sentiment", "Count"]
     sent_colors = {
-        "Opened / Live": "#00e676", "Approved": "#00b4ff",
+        "Opened / Live": "#00e676", "Approved": "#00aaff",
         "Proposed": "#ffaa00", "Under Construction": "#00e5c8",
         "Challenged": "#ff2d6b", "News": "#2e4470",
     }
@@ -2946,12 +3016,12 @@ def chart_sentiment(df):
         x=sc["Sentiment"], y=sc["Count"],
         marker=dict(color=colors, line=dict(width=0), opacity=0.88),
         text=sc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        textfont=dict(color=_TITLE, size=11, family='JetBrains Mono, monospace'),
         hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
     ))
     _dark(fig, 290)
     fig.update_layout(
-        title=dict(text="Article Sentiment / Status", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text="Article Sentiment / Status", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
         bargap=0.3,
     )
     return fig
@@ -2977,7 +3047,7 @@ def chart_donut(df):
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10),
                     orientation="v", x=1.02, y=0.5),
         hoverlabel=dict(
-            bgcolor="#0d1e38", bordercolor="#0047e1",
+            bgcolor="#0d1e38", bordercolor="#0066ff",
             font=dict(color="#ccdaf5", size=13, family="Inter, sans-serif"),
             align="left", namelength=-1,
         ),
@@ -2986,7 +3056,7 @@ def chart_donut(df):
             x=0.5, y=0.5, showarrow=False,
             font=dict(size=15, color=_TITLE, family=_FONT),
         )],
-        title=dict(text="Topic Share", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text="Topic Share", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
     )
     return fig
 
@@ -3000,12 +3070,12 @@ def chart_source_bar(df):
         x=sc["Count"], y=sc["Source"], orientation="h",
         marker=dict(color=colors, line=dict(width=0), opacity=0.88),
         text=sc["Count"], textposition="outside",
-        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        textfont=dict(color=_TITLE, size=11, family='JetBrains Mono, monospace'),
         hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
     ))
     _dark(fig, 290)
     fig.update_layout(
-        title=dict(text="Articles by Source", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        title=dict(text="Articles by Source", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
         bargap=0.28,
     )
     return fig
@@ -3028,13 +3098,13 @@ def chart_world_map(df):
     _M_GRID  = "#152038"   # subtle border matching app grid colour
 
     # Heat scale: deep navy (zero) → electric cyan → cobalt blue → neon gold (max)
-    # Matches the app's accent palette (#0047e1 blue, #00b4ff cyan, #ffaa00 amber)
+    # Matches the app's accent palette (#0066ff blue, #00aaff cyan, #ffaa00 amber)
     _COLORSCALE = [
         [0.000, "#07111f"],   # zero  — ocean/bg level (invisible baseline)
         [0.05,  "#0a2040"],   # trace — barely there
         [0.15,  "#0d3a70"],   # low   — deep cobalt
-        [0.30,  "#0047e1"],   # low-mid — brand blue
-        [0.50,  "#00b4ff"],   # mid   — electric cyan
+        [0.30,  "#0066ff"],   # low-mid — brand blue
+        [0.50,  "#00aaff"],   # mid   — electric cyan
         [0.70,  "#00e5c8"],   # high  — teal-mint
         [0.85,  "#ffaa00"],   # very high — amber
         [1.000, "#ff6400"],   # max   — vivid orange-gold peak
@@ -3055,10 +3125,10 @@ def chart_world_map(df):
             bgcolor="#0b1628",
             bordercolor="#152038",
             borderwidth=1,
-            tickfont=dict(color="#6a80a8", size=10, family="DM Mono, monospace"),
+            tickfont=dict(color="#6a80a8", size=10, family='JetBrains Mono, monospace'),
             title=dict(
                 text="Articles",
-                font=dict(color="#b8c8e0", size=11, family="Syne, sans-serif"),
+                font=dict(color="#b8c8e0", size=11, family='Space Grotesk, sans-serif'),
             ),
             len=0.6,
             thickness=14,
@@ -3067,7 +3137,7 @@ def chart_world_map(df):
         ),
         hovertemplate=(
             "<b style='color:#fff;font-size:13px;'>%{text}</b><br>"
-            "<span style='color:#00b4ff;'>Articles: %{z}</span>"
+            "<span style='color:#00aaff;'>Articles: %{z}</span>"
             "<extra></extra>"
         ),
         showscale=True,
@@ -3100,13 +3170,13 @@ def chart_world_map(df):
         margin=dict(l=0, r=60, t=44, b=0),
         title=dict(
             text="<b>Global Data Center Activity</b>",
-            font=dict(color="#b8c8e0", size=14, family="Syne, sans-serif"),
+            font=dict(color="#b8c8e0", size=14, family='Space Grotesk, sans-serif'),
             x=0.01, y=0.98,
         ),
         geo=dict(bgcolor=_M_BG),
         hoverlabel=dict(
             bgcolor="#0b1628",
-            bordercolor="#0047e1",
+            bordercolor="#0066ff",
             font=dict(color="#ccdaf5", size=13, family="Inter, sans-serif"),
             align="left",
             namelength=-1,
@@ -3117,9 +3187,9 @@ def chart_world_map(df):
 
 def dark_table(df_in, max_rows=300):
     th = (
-        "background:#0f1e36;color:#b8c8e0;font-family:monospace;"
+        "background:#0f1e36;color:#b8c8e0;font-family:JetBrains Mono,monospace;"
         "font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;"
-        "padding:.55rem .85rem;border-bottom:2px solid #0047e1;"
+        "padding:.55rem .85rem;border-bottom:2px solid #0066ff;"
         "white-space:nowrap;text-align:left;"
     )
     td = (
@@ -3137,19 +3207,19 @@ def dark_table(df_in, max_rows=300):
                 cells += (
                     f'<td style="{td}background:{bg};">'
                     f'<a href="{v}" target="_blank" '
-                    f'style="color:#0047e1;text-decoration:none;font-size:.75rem;">'
+                    f'style="color:#0066ff;text-decoration:none;font-size:.75rem;">'
                     f'Open \u2192</a></td>'
                 )
             elif col == "Capacity" and v:
                 cells += (
                     f'<td style="{td}background:{bg};">'
-                    f'<span style="color:#ffaa00;font-family:monospace;font-size:.76rem;">'
+                    f'<span style="color:#ffaa00;font-family:JetBrains Mono,monospace;font-size:.76rem;">'
                     f'\u26a1 {v}</span></td>'
                 )
             elif col == "Deal Size" and v:
                 cells += (
                     f'<td style="{td}background:{bg};">'
-                    f'<span style="color:#00e676;font-family:monospace;font-size:.76rem;">'
+                    f'<span style="color:#00e676;font-family:JetBrains Mono,monospace;font-size:.76rem;">'
                     f'{v}</span></td>'
                 )
             elif col == "Topic":
@@ -3157,7 +3227,7 @@ def dark_table(df_in, max_rows=300):
                 cells += (
                     f'<td style="{td}background:{bg};">'
                     f'<span style="background:{tc}22;color:{tc};border:1px solid {tc}44;'
-                    f'border-radius:4px;padding:2px 7px;font-size:.68rem;font-family:monospace;">'
+                    f'border-radius:4px;padding:2px 7px;font-size:.68rem;font-family:JetBrains Mono,monospace;">'
                     f'{v}</span></td>'
                 )
             elif col == "Region":
@@ -3165,19 +3235,19 @@ def dark_table(df_in, max_rows=300):
                 cells += (
                     f'<td style="{td}background:{bg};">'
                     f'<span style="background:{rc2}22;color:{rc2};border:1px solid {rc2}44;'
-                    f'border-radius:4px;padding:2px 7px;font-size:.68rem;font-family:monospace;">'
+                    f'border-radius:4px;padding:2px 7px;font-size:.68rem;font-family:JetBrains Mono,monospace;">'
                     f'{v}</span></td>'
                 )
             elif col == "Sentiment":
                 sent_c = {
-                    "Opened / Live":"#00e676","Approved":"#00b4ff","Proposed":"#ffaa00",
+                    "Opened / Live":"#00e676","Approved":"#00aaff","Proposed":"#ffaa00",
                     "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
                 }.get(v, "#2e4470")
                 cells += (
                     f'<td style="{td}background:{bg};">'
                     f'<span style="background:{sent_c}18;color:{sent_c};'
                     f'border:1px solid {sent_c}44;border-radius:4px;'
-                    f'padding:2px 7px;font-size:.68rem;font-family:monospace;">'
+                    f'padding:2px 7px;font-size:.68rem;font-family:JetBrains Mono,monospace;">'
                     f'{v}</span></td>'
                 )
             elif col == "Source":
@@ -3188,7 +3258,7 @@ def dark_table(df_in, max_rows=300):
                     f'<td style="{td}background:{bg};">'
                     f'<span style="background:{sc2_color}22;color:{sc2_color};'
                     f'border:1px solid {sc2_color}44;border-radius:4px;'
-                    f'padding:2px 6px;font-size:.65rem;font-family:monospace;">'
+                    f'padding:2px 6px;font-size:.65rem;font-family:JetBrains Mono,monospace;">'
                     f'{sc2_short}</span></td>'
                 )
             elif col in ("Headline", "Companies"):
@@ -3215,19 +3285,19 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
     cap_html = (
         f'<span style="background:rgba(255,170,0,0.12);color:#ffaa00;'
         f'border:1px solid rgba(255,170,0,0.3);border-radius:4px;'
-        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;" '
+        f'padding:2px 6px;font-family:JetBrains Mono,monospace;font-size:.62rem;white-space:nowrap;" '
         f'title="Capacity announced">'
         f'\u26a1 {capacity}</span>'
     ) if capacity else ""
     deal_html = (
         f'<span style="background:rgba(0,230,118,0.1);color:#00e676;'
         f'border:1px solid rgba(0,230,118,0.25);border-radius:4px;'
-        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;" '
+        f'padding:2px 6px;font-family:JetBrains Mono,monospace;font-size:.62rem;white-space:nowrap;" '
         f'title="Deal value">'
         f'{deal}</span>'
     ) if deal else ""
     sent_c = {
-        "Opened / Live":"#00e676","Approved":"#00b4ff","Proposed":"#ffaa00",
+        "Opened / Live":"#00e676","Approved":"#00aaff","Proposed":"#ffaa00",
         "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
     }.get(sentiment, "#2e4470")
     arrow = "\u2197"
@@ -3238,13 +3308,13 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
         sc_color = (
             "#ff6400" if ai_score >= 40
             else "#ffaa00" if ai_score >= 25
-            else "#00b4ff" if ai_score >= 15
+            else "#00aaff" if ai_score >= 15
             else "#3a5480"
         )
         score_badge_html = (
             f'<span class="score-badge" style="background:{sc_color}22;color:{sc_color};'
             f'border:1px solid {sc_color}44;border-radius:4px;'
-            f'padding:2px 7px;font-family:monospace;font-size:.62rem;font-weight:bold;" '
+            f'padding:2px 7px;font-family:JetBrains Mono,monospace;font-size:.62rem;font-weight:bold;" '
             f'title="AI Signal Score — higher = more market significant">&#9733; {ai_score}</span>'
         )
 
@@ -3268,21 +3338,21 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
         f'font-size:.86rem;font-weight:500;line-height:1.5;" '
         f'title="Open article in new tab">{headline}</a>'
         f'<div style="margin-top:.35rem;display:flex;gap:.4rem;flex-wrap:wrap;">'
-        f'<span style="font-family:monospace;font-size:.62rem;color:#2a3e60;" title="Publication date">\U0001f4c5 {date}</span>'
-        f'<span style="font-family:monospace;font-size:.62rem;color:#4a6490;" title="Country detected">\U0001f30d {country}</span>'
+        f'<span style="font-family:JetBrains Mono,monospace;font-size:.62rem;color:#2a3e60;" title="Publication date">\U0001f4c5 {date}</span>'
+        f'<span style="font-family:JetBrains Mono,monospace;font-size:.62rem;color:#4a6490;" title="Country detected">\U0001f30d {country}</span>'
         f'</div></div>'
         f'<div style="display:flex;flex-direction:column;align-items:flex-end;'
         f'gap:.28rem;flex-shrink:0;white-space:nowrap;">'
         f'<span style="background:{sc_meta["color"]}22;color:{sc_meta["color"]};'
         f'border:1px solid {sc_meta["color"]}44;border-radius:4px;'
-        f'padding:2px 6px;font-family:monospace;font-size:.62rem;" title="Source: {source}">{sc_meta["short"]}</span>'
+        f'padding:2px 6px;font-family:JetBrains Mono,monospace;font-size:.62rem;" title="Source: {source}">{sc_meta["short"]}</span>'
         f'<span style="background:{tc}22;color:{tc};border:1px solid {tc}44;'
-        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;" title="Topic: {topic}">{topic}</span>'
+        f'border-radius:4px;padding:2px 6px;font-family:JetBrains Mono,monospace;font-size:.62rem;" title="Topic: {topic}">{topic}</span>'
         f'<span style="background:{sent_c}18;color:{sent_c};border:1px solid {sent_c}44;'
-        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;" title="Project status">{sentiment}</span>'
+        f'border-radius:4px;padding:2px 6px;font-family:JetBrains Mono,monospace;font-size:.62rem;" title="Project status">{sentiment}</span>'
         f'{cap_html}{deal_html}{score_badge_html}'
         f'<a href="{url}" target="_blank" '
-        f'style="font-family:monospace;font-size:.65rem;color:#0047e1;text-decoration:none;" title="Open full article">'
+        f'style="font-family:JetBrains Mono,monospace;font-size:.65rem;color:#0066ff;text-decoration:none;" title="Open full article">'
         f'{arrow} open</a>'
         f'</div></div>'
     )
@@ -3290,8 +3360,8 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
 
 def kpi(label, value, accent="blue", delta=""):
     accent_map = {
-        "blue":  ("#0047e1", "#00b4ff"),
-        "cyan":  ("#00b4ff", "#00e5c8"),
+        "blue":  ("#0066ff", "#00aaff"),
+        "cyan":  ("#00aaff", "#00e5c8"),
         "green": ("#00e676", "#00c853"),
         "amber": ("#ffaa00", "#ff6400"),
         "purple":("#a855f7", "#7c3aed"),
@@ -3300,16 +3370,16 @@ def kpi(label, value, accent="blue", delta=""):
     c1, c2 = accent_map.get(accent, accent_map["blue"])
     delta_html = f'<div style="font-size:.68rem;color:#2a4060;margin-top:.2rem;">{delta}</div>' if delta else ""
     return (
-        f'<div class="kpi-card" style="flex:1;min-width:150px;background:linear-gradient(145deg,rgba(7,14,28,0.85),rgba(5,10,20,0.9));border:1px solid rgba(0,71,225,0.12);'
+        f'<div class="kpi-card" style="flex:1;min-width:150px;background:linear-gradient(145deg,rgba(7,14,28,0.85),rgba(5,10,20,0.9));border:1px solid rgba(0,100,255,0.12);'
         f'border-radius:12px;padding:1.1rem 1.3rem;position:relative;overflow:hidden;" '
         f'title="{label}">'
         f'<div style="position:absolute;top:0;left:0;right:0;height:2px;'
         f'background:linear-gradient(90deg,{c1},{c2});opacity:0.9;"></div>'
         f'<div style="position:absolute;top:-20px;right:-10px;width:70px;height:70px;'
         f'background:radial-gradient(circle,{c1}18,transparent 70%);border-radius:50%;"></div>'
-        f'<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
+        f'<div style="font-family:JetBrains Mono,monospace;font-size:.6rem;letter-spacing:.14em;'
         f'text-transform:uppercase;color:#2a4068;margin-bottom:.35rem;">{label}</div>'
-        f'<div style="font-family:Syne,sans-serif;font-size:1.8rem;font-weight:800;'
+        f'<div style="font-family:Space Grotesk,sans-serif;font-size:1.8rem;font-weight:800;'
         f'color:#f0f6ff;line-height:1;">{value}</div>'
         f'{delta_html}</div>'
     )
@@ -3437,17 +3507,17 @@ def main():
                 'top:12px',
                 'left:12px',
                 'z-index:2147483647',
-                'background:linear-gradient(135deg,#0047e1,#00b4ff)',
+                'background:linear-gradient(135deg,#0066ff,#00aaff)',
                 'color:#fff',
                 'border:none',
                 'border-radius:8px',
                 'padding:7px 14px',
-                'font-family:Syne,sans-serif',
+                'font-family:Space Grotesk,sans-serif',
                 'font-weight:700',
                 'font-size:0.82rem',
                 'letter-spacing:0.04em',
                 'cursor:pointer',
-                'box-shadow:0 4px 16px rgba(0,71,225,0.55)',
+                'box-shadow:0 4px 16px rgba(0,100,255,0.55)',
                 'display:none',
                 'align-items:center',
                 'gap:6px',
@@ -3555,12 +3625,12 @@ def main():
     with st.sidebar:
         st.markdown(
             '<div style="padding:.9rem 0 .4rem;">'
-            '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
+            '<div style="font-family:Space Grotesk,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
             'letter-spacing:.02em;margin-bottom:.06rem;">Global Data Center</div>'
-            '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#00b4ff;'
+            '<div style="font-family:Space Grotesk,sans-serif;font-size:.82rem;font-weight:700;color:#00aaff;'
             'letter-spacing:.02em;margin-bottom:.28rem;">Intelligence Platform</div>'
-            '<div style="font-family:monospace;font-size:.58rem;letter-spacing:.08em;color:#2a3e60;">'
-            'Built By <span style="color:#0047e1;font-weight:600;">Sharugh</span></div>'
+            '<div style="font-family:JetBrains Mono,monospace;font-size:.58rem;letter-spacing:.08em;color:#2a3e60;">'
+            'Built By <span style="color:#0066ff;font-weight:600;">Sharugh</span></div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -3697,10 +3767,10 @@ def main():
 
         # ── SECTION HEADER ────────────────────────────────────────────────────
         st.markdown(
-            '<div style="background:linear-gradient(90deg,rgba(0,71,225,0.10),transparent);'
-            'border-left:2px solid #0047e1;border-radius:0 6px 6px 0;'
+            '<div style="background:linear-gradient(90deg,rgba(0,100,255,0.10),transparent);'
+            'border-left:2px solid #0066ff;border-radius:0 6px 6px 0;'
             'padding:.38rem .75rem;margin-bottom:.6rem;">'
-            '<span style="font-family:\'DM Mono\',monospace;font-weight:500;color:#3a6090;'
+            '<span style="font-family:JetBrains Mono,monospace;font-weight:500;color:#3a6090;'
             'font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;">FILTERS</span>'
             '</div>',
             unsafe_allow_html=True,
@@ -3709,7 +3779,7 @@ def main():
         # ── GROUP 1 · SEARCH ──────────────────────────────────────────────────
         st.markdown(
             '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
-            'text-transform:uppercase;font-family:monospace;margin:.7rem 0 .35rem .05rem;">'
+            'text-transform:uppercase;font-family:JetBrains Mono,monospace;margin:.7rem 0 .35rem .05rem;">'
             '▸ SEARCH</div>',
             unsafe_allow_html=True,
         )
@@ -3741,7 +3811,7 @@ def main():
         # ── GROUP 2 · GEOGRAPHY ───────────────────────────────────────────────
         st.markdown(
             '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
-            'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
+            'text-transform:uppercase;font-family:JetBrains Mono,monospace;margin:.9rem 0 .35rem .05rem;">'
             '▸ GEOGRAPHY</div>',
             unsafe_allow_html=True,
         )
@@ -3812,7 +3882,7 @@ def main():
         # ── GROUP 3 · CONTENT ─────────────────────────────────────────────────
         st.markdown(
             '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
-            'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
+            'text-transform:uppercase;font-family:JetBrains Mono,monospace;margin:.9rem 0 .35rem .05rem;">'
             '▸ CONTENT</div>',
             unsafe_allow_html=True,
         )
@@ -3904,9 +3974,9 @@ def main():
         st.markdown(
             '<div style="background:linear-gradient(135deg,#07111f 0%,#0b1d3a 60%,#07111f 100%);'
             'border:1px solid #132040;border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1.4rem;">'
-            '<div style="font-family:\'DM Mono\',monospace;font-size:.62rem;letter-spacing:.18em;'
-            'color:#00b4ff;text-transform:uppercase;margin-bottom:.5rem;">About This Platform</div>'
-            '<div style="font-family:Syne,sans-serif;font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.6rem;">'
+            '<div style="font-family:JetBrains Mono,monospace;font-size:.62rem;letter-spacing:.18em;'
+            'color:#00aaff;text-transform:uppercase;margin-bottom:.5rem;">About This Platform</div>'
+            '<div style="font-family:Space Grotesk,sans-serif;font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.6rem;">'
             'What is Global Data Center Intelligence?</div>'
             '<div style="font-size:.82rem;color:#6a80a8;line-height:1.7;margin-bottom:.9rem;">'
             'This platform is a <b style="color:#b8c8e0">real-time intelligence tool</b> built for Wood Mac analysts, '
@@ -3916,13 +3986,13 @@ def main():
             '</div>'
             '<div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.9rem;">'
             '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
-            '<span style="font-size:.75rem;color:#00b4ff;font-family:Syne,sans-serif;font-weight:700;">Who is it for?</span>'
+            '<span style="font-size:.75rem;color:#00aaff;font-family:Space Grotesk,sans-serif;font-weight:700;">Who is it for?</span>'
             '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
             'Wood Mac researchers, energy analysts, and market intelligence teams monitoring hyperscale, '
             'AI infrastructure, power, and investment activity across 45+ countries.</div>'
             '</div>'
             '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
-            '<span style="font-size:.75rem;color:#00e5c8;font-family:Syne,sans-serif;font-weight:700;">What does it do?</span>'
+            '<span style="font-size:.75rem;color:#00e5c8;font-family:Space Grotesk,sans-serif;font-weight:700;">What does it do?</span>'
             '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
             'Scrapes DCD Construction Channel &amp; DCD General News on demand · '
             'Filters by news type, region, country, company, topic, sentiment &amp; keyword · '
@@ -3930,7 +4000,7 @@ def main():
             'Scores articles by market significance.</div>'
             '</div>'
             '<div style="background:#0b1e38;border:1px solid #152038;border-radius:8px;padding:.5rem .9rem;">'
-            '<span style="font-size:.75rem;color:#ffaa00;font-family:Syne,sans-serif;font-weight:700;">How to use it</span>'
+            '<span style="font-size:.75rem;color:#ffaa00;font-family:Space Grotesk,sans-serif;font-weight:700;">How to use it</span>'
             '<div style="font-size:.75rem;color:#3a5480;margin-top:.2rem;line-height:1.5;">'
             '1. Choose <b style="color:#b8c8e0">News Type</b> (Construction, General News, or both) and date range.<br>'
             '2. Set scrape depth and click <b style="color:#b8c8e0">Run Global Scan</b> to pull live articles.<br>'
@@ -3973,7 +4043,7 @@ def main():
                 f'<div class="feature-card" style="flex:1;min-width:200px;background:#0b1628;border:1px solid #152038;'
                 f'border-radius:10px;padding:1rem 1.15rem;">'
                 f'<div style="font-size:1.4rem;margin-bottom:.4rem;">{icon}</div>'
-                f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                f'<div style="font-family:Space Grotesk,sans-serif;font-weight:700;color:#b8c8e0;'
                 f'font-size:.9rem;margin-bottom:.3rem;">{title}</div>'
                 f'<div style="font-size:.78rem;color:#3a5480;line-height:1.5;">{desc}</div>'
                 f'</div>'
@@ -4282,12 +4352,12 @@ def main():
                 orientation="h",
                 marker=dict(color=co_colors, line=dict(width=0)),
                 text=co_df_sorted["Articles"], textposition="outside",
-                textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                textfont=dict(color=_TITLE, size=10, family='JetBrains Mono, monospace'),
                 hovertemplate="<b>%{y}</b><br>📰 %{x} mentions<extra></extra>",
             ))
             _dark(fig_co, max(300, n * 22))
             fig_co.update_layout(
-                title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
                 bargap=0.22,
             )
             st.plotly_chart(fig_co, use_container_width=True, config={"displayModeBar": False})
@@ -4298,7 +4368,7 @@ def main():
             st.markdown(
                 f'<div style="font-family:Inter,sans-serif;font-size:.82rem;color:#3a5480;margin-bottom:.7rem;">'
                 f'<b style="color:#fff">{len(co_articles)}</b> articles mentioning '
-                f'<b style="color:#00b4ff">{sel_co}</b></div>',
+                f'<b style="color:#00aaff">{sel_co}</b></div>',
                 unsafe_allow_html=True,
             )
             for _, row in co_articles.iterrows():
@@ -4374,12 +4444,12 @@ def main():
                     marker=dict(color=sc_colors, line=dict(width=0)),
                     text=sc_sorted["Articles"],
                     textposition="outside",
-                    textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                    textfont=dict(color=_TITLE, size=10, family='JetBrains Mono, monospace'),
                     hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
                 ))
                 _dark(fig_st, max(320, n_sc * 22))
                 fig_st.update_layout(
-                    title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                    title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
                     bargap=0.22,
                 )
                 st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False})
@@ -4448,12 +4518,12 @@ def main():
                             x=tp_df["Topic"], y=tp_df["Count"],
                             marker=dict(color=tp_colors, line=dict(width=0)),
                             text=tp_df["Count"], textposition="outside",
-                            textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                            textfont=dict(color=_TITLE, size=10, family='JetBrains Mono, monospace'),
                             hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
                         ))
                         _dark(fig_tp, 220)
                         fig_tp.update_layout(
-                            title=dict(text=f"Topics — {sel_state}", font=dict(color=_TITLE, size=11, family="Syne, sans-serif"), x=0.01),
+                            title=dict(text=f"Topics — {sel_state}", font=dict(color=_TITLE, size=11, family='Space Grotesk, sans-serif'), x=0.01),
                             xaxis=dict(tickfont=dict(size=9)),
                             bargap=0.3,
                         )
@@ -4521,7 +4591,7 @@ def main():
                     'rule-based extraction — no API key required. Generates a structured market '
                     'intelligence briefing covering key themes, major players, capacity pipeline, '
                     'regulatory developments, company activity, and forward-looking signals.<br>'
-                    '<span style="color:#00b4ff;">Download as Word (.docx) or PDF for a polished, '
+                    '<span style="color:#00aaff;">Download as Word (.docx) or PDF for a polished, '
                     'formatted report.</span></div>',
                     unsafe_allow_html=True,
                 )
@@ -4551,14 +4621,14 @@ def main():
                         def _md_inline(t):
                             """Convert inline **bold** and `code` to HTML."""
                             t = re.sub(r"\*\*(.+?)\*\*", r'<strong style="color:#ccdaf5;">\1</strong>', t)
-                            t = re.sub(r"`(.+?)`",         r'<code style="color:#00b4ff;background:rgba(0,71,225,0.12);padding:1px 4px;border-radius:3px;">\1</code>', t)
+                            t = re.sub(r"`(.+?)`",         r'<code style="color:#00aaff;background:rgba(0,100,255,0.12);padding:1px 4px;border-radius:3px;">\1</code>', t)
                             return t
 
                         html = (
-                            '<div style="background:#0b1628;border:1px solid #0047e1;'
+                            '<div style="background:#0b1628;border:1px solid #0066ff;'
                             'border-radius:12px;padding:1.6rem 2rem;margin-top:.8rem;">'
-                            f'<div style="font-family:\'DM Mono\',monospace;font-size:.64rem;'
-                            f'letter-spacing:.14em;color:#0047e1;text-transform:uppercase;'
+                            f'<div style="font-family:JetBrains Mono,monospace;font-size:.64rem;'
+                            f'letter-spacing:.14em;color:#0066ff;text-transform:uppercase;'
                             f'margin-bottom:1.2rem;">🧠 Market Intelligence Briefing'
                             + (f'  ·  {ctx_label}' if ctx_label else '') +
                             '</div>'
@@ -4571,11 +4641,11 @@ def main():
                             if line.startswith("## "):
                                 title = _md_inline(line[3:])
                                 html += (
-                                    f'<div style="font-family:\'Syne\',sans-serif;font-size:.82rem;'
+                                    f'<div style="font-family:Space Grotesk,sans-serif;font-size:.82rem;'
                                     f'font-weight:700;color:#b8c8e0;letter-spacing:.07em;'
-                                    f'text-transform:uppercase;border-left:3px solid #0047e1;'
+                                    f'text-transform:uppercase;border-left:3px solid #0066ff;'
                                     f'padding-left:.7rem;margin:1.8rem 0 .8rem;">{title}</div>'
-                                    f'<div style="height:1px;background:linear-gradient(90deg,#0047e1,transparent);'
+                                    f'<div style="height:1px;background:linear-gradient(90deg,#0066ff,transparent);'
                                     f'margin-bottom:.9rem;"></div>'
                                 )
 
@@ -4585,7 +4655,7 @@ def main():
                                 html += (
                                     f'<div style="display:flex;gap:.6rem;margin-bottom:.55rem;'
                                     f'line-height:1.6;font-size:.84rem;color:#8aa0c8;">'
-                                    f'<span style="color:#0047e1;flex-shrink:0;margin-top:.05rem;">◆</span>'
+                                    f'<span style="color:#0066ff;flex-shrink:0;margin-top:.05rem;">◆</span>'
                                     f'<span>{content}</span></div>'
                                 )
 
@@ -4762,8 +4832,8 @@ def main():
                 + kpi(f"{label_a}", len(df_a), "blue")
                 + kpi(f"{label_b}", len(df_b), "cyan")
                 + f'<div class="kpi-card" style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;border-radius:12px;padding:1.1rem 1.3rem;">'
-                  f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">Volume Delta</div>'
-                  f'<div style="font-family:Syne,sans-serif;font-size:1.9rem;font-weight:800;color:{delta_color};line-height:1;">{delta_sign} {abs(delta_arts)}</div>'
+                  f'<div style="font-family:JetBrains Mono,monospace;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">Volume Delta</div>'
+                  f'<div style="font-family:Space Grotesk,sans-serif;font-size:1.9rem;font-weight:800;color:{delta_color};line-height:1;">{delta_sign} {abs(delta_arts)}</div>'
                   f'</div>'
                 + '</div>'
             )
@@ -4772,7 +4842,7 @@ def main():
             # ── Article volume over time (side by side sparklines) ────────────
             st.markdown('<div class="sec-head">Article Volume Over Time</div>', unsafe_allow_html=True)
             fig_tl = go.Figure()
-            for sub_df, lbl, col in [(df_a, label_a, "#0047e1"), (df_b, label_b, "#ffaa00")]:
+            for sub_df, lbl, col in [(df_a, label_a, "#0066ff"), (df_b, label_b, "#ffaa00")]:
                 if not sub_df.empty:
                     daily = sub_df.groupby(sub_df["dt"].dt.date).size().reset_index()
                     daily.columns = ["Date", "Articles"]
@@ -4808,7 +4878,7 @@ def main():
             fig_trend.add_trace(go.Bar(
                 name=label_a,
                 x=topics_all, y=a_vals,
-                marker_color="#0047e1",
+                marker_color="#0066ff",
                 text=a_vals, textposition="outside",
                 textfont=dict(color=_TITLE, size=10),
             ))
@@ -4835,7 +4905,7 @@ def main():
             fig_sent.add_trace(go.Bar(
                 name=label_a, x=sents_all,
                 y=[int(df_a["Sentiment"].value_counts().get(s, 0)) for s in sents_all],
-                marker_color="#0047e1",
+                marker_color="#0066ff",
             ))
             fig_sent.add_trace(go.Bar(
                 name=label_b, x=sents_all,
@@ -4856,7 +4926,7 @@ def main():
                 ra_vals = [int(df_a["Region"].value_counts().get(r, 0)) for r in regions_all]
                 rb_vals = [int(df_b["Region"].value_counts().get(r, 0)) for r in regions_all]
                 fig_reg_trend = go.Figure()
-                fig_reg_trend.add_trace(go.Bar(name=label_a, x=regions_all, y=ra_vals, marker_color="#0047e1"))
+                fig_reg_trend.add_trace(go.Bar(name=label_a, x=regions_all, y=ra_vals, marker_color="#0066ff"))
                 fig_reg_trend.add_trace(go.Bar(name=label_b, x=regions_all, y=rb_vals, marker_color="#ffaa00"))
                 _dark(fig_reg_trend, 300)
                 fig_reg_trend.update_layout(
@@ -4871,7 +4941,7 @@ def main():
             col_a_feed, col_b_feed = st.columns(2)
             with col_a_feed:
                 st.markdown(
-                    f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#0047e1;'
+                    f'<div style="font-family:Space Grotesk,sans-serif;font-weight:700;color:#0066ff;'
                     f'font-size:.85rem;margin-bottom:.5rem;">● {label_a} ({len(df_a)} articles)</div>',
                     unsafe_allow_html=True,
                 )
@@ -4883,7 +4953,7 @@ def main():
                     ), unsafe_allow_html=True)
             with col_b_feed:
                 st.markdown(
-                    f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#ffaa00;'
+                    f'<div style="font-family:Space Grotesk,sans-serif;font-weight:700;color:#ffaa00;'
                     f'font-size:.85rem;margin-bottom:.5rem;">● {label_b} ({len(df_b)} articles)</div>',
                     unsafe_allow_html=True,
                 )
@@ -4934,8 +5004,8 @@ def main():
                     x=pivot_wide.columns.tolist(),
                     y=pivot_wide.index.tolist(),
                     colorscale=[
-                        [0.0, "#07111f"], [0.1, "#0a2040"], [0.3, "#0047e1"],
-                        [0.6, "#00b4ff"], [0.8, "#ffaa00"], [1.0, "#ff6400"],
+                        [0.0, "#07111f"], [0.1, "#0a2040"], [0.3, "#0066ff"],
+                        [0.6, "#00aaff"], [0.8, "#ffaa00"], [1.0, "#ff6400"],
                     ],
                     hovertemplate="<b>%{y}</b> · %{x}<br>%{z:,.0f} MW<extra></extra>",
                     colorbar=dict(
@@ -5206,19 +5276,19 @@ def main():
                                  labels=["0-10", "10-20", "20-30", "30-40", "40-50", "50+"])
             score_dist = score_bins.value_counts().sort_index().reset_index()
             score_dist.columns = ["Score Range", "Articles"]
-            score_colors = ["#2e4470", "#0047e1", "#00b4ff", "#00e5c8", "#ffaa00", "#ff6400"]
+            score_colors = ["#2e4470", "#0066ff", "#00aaff", "#00e5c8", "#ffaa00", "#ff6400"]
             fig_score = go.Figure(go.Bar(
                 x=score_dist["Score Range"].astype(str),
                 y=score_dist["Articles"],
                 marker_color=score_colors[:len(score_dist)],
                 marker_line_width=0,
                 text=score_dist["Articles"], textposition="outside",
-                textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                textfont=dict(color=_TITLE, size=10, family='JetBrains Mono, monospace'),
                 hovertemplate="<b>Score %{x}</b><br>📰 %{y} articles<extra></extra>",
             ))
             _dark(fig_score, 270)
             fig_score.update_layout(
-                title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13, family='Space Grotesk, sans-serif'), x=0.01),
                 bargap=0.3,
             )
             st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
@@ -5267,7 +5337,7 @@ def main():
                 '<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
                 'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
                 '<div style="font-size:1.5rem;margin-bottom:.4rem;">\U0001f4ca</div>'
-                '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                '<div style="font-family:Space Grotesk,sans-serif;font-weight:700;color:#b8c8e0;'
                 'font-size:.95rem;margin-bottom:.3rem;">Excel Report (.xlsx)</div>'
                 '<div style="font-size:.78rem;color:#2a3e60;line-height:1.5;">'
                 '5 sheets: All Articles \u00b7 By Country \u00b7 By Region \u00b7 By Topic \u00b7 By Company<br>'
@@ -5287,7 +5357,7 @@ def main():
                 '<div style="background:#0b1628;border:1px solid #152038;border-radius:10px;'
                 'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
                 '<div style="font-size:1.5rem;margin-bottom:.4rem;">\U0001f4c4</div>'
-                '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                '<div style="font-family:Space Grotesk,sans-serif;font-weight:700;color:#b8c8e0;'
                 'font-size:.95rem;margin-bottom:.3rem;">CSV Export</div>'
                 '<div style="font-size:.78rem;color:#2a3e60;line-height:1.5;">'
                 'Flat CSV of the filtered view.<br>'
@@ -5314,7 +5384,7 @@ def main():
     st.markdown(
         '<div style="margin-top:3rem;padding:1.2rem 0 .6rem;border-top:1px solid #101b2e;'
         'text-align:center;">'
-        '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
+        '<div style="font-family:JetBrains Mono,monospace;font-size:.6rem;letter-spacing:.14em;'
         'color:#1a2e50;text-transform:uppercase;">'
         'Global Data Center Intelligence &nbsp;\u00b7&nbsp; Wood Mac'
         '</div></div>',
