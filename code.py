@@ -3688,10 +3688,8 @@ def main():
             'border-left:3px solid #0047e1;border-radius:0 6px 6px 0;'
             'padding:.45rem .75rem;margin-bottom:.6rem;">'
             '<span style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
-            'font-size:.8rem;letter-spacing:.05em;">🔍 REFINE RESULTS</span>'
-            + ('<br><span style="font-size:.65rem;color:#1a3a60;font-family:monospace;">'
-               'Run scan first to filter live data</span>' if not _data_loaded else '')
-            + '</div>',
+            'font-size:.8rem;letter-spacing:.05em;">Filter</span>'
+            '</div>',
             unsafe_allow_html=True,
         )
 
