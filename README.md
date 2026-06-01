@@ -1,156 +1,86 @@
-# 🌐 Global Data Center Construction Intelligence
-
-A real-time Streamlit intelligence platform that scrapes, enriches, and visualises global data center industry news — covering construction projects, site selections, approvals, expansions, investments, and power infrastructure across 45+ countries.
-
+🌐 Global Data Center Intelligence Platform
+A Streamlit-based market intelligence dashboard that scrapes, enriches, and analyses data center news in real time — built for the Wood Mackenzie team to track global DC activity across deals, capacity, construction, and investment.
 ---
-
-## Features
-
-### 🕸️ Smart Scraping Engine
-- **Primary source:** DataCenterDynamics (DCD) — scraped via DCD's own Construction Channel (`?term=the-data-center-construction-channel`), the highest-density feed of DC construction news on the web
-- **Dynamic region targeting:** When you select regions in the sidebar, the scraper appends DCD's own region taxonomy terms (`?term=europe`, `?term=asia-pacific`, etc.) so only regionally relevant articles are fetched — faster and more accurate than post-hoc filtering
-- **Project-stage coverage:** Automatically scrapes DCD's tagged pages for `approved`, `site-selection`, `disclosed-projects`, `project-announcement`, `expansion`, and `extension` — so the full project lifecycle is covered
-- **Google News supplement:** 30 targeted queries covering construction, approvals, hyperscalers, operators, power, investment, and all global regions — runs in parallel after DCD scrape completes
-- **Cloudflare bypass:** Uses `cloudscraper` when available, falls back to `requests` with browser-like headers
-
-### 🌍 Global Coverage
-- 45+ countries across all continents with auto-detection using 500+ geographic keywords, city names, and state/province names
-- Regions: North America · Europe · Asia Pacific · Middle East · Africa · Latin America
-- Country → Region → State/Province drill-down hierarchy in both filters and tabs
-
-### 🧠 Auto-Enrichment (every article)
-| Field | What it detects |
-|---|---|
-| **Country** | 45+ countries via keyword + city matching |
-| **Region** | Auto-mapped from country |
-| **Topic** | Hyperscale · Colocation · AI/GPU · Power · Investment · Permits · Construction · Sustainability |
-| **Sentiment** | Opened/Live · Approved · Proposed · Under Construction · Challenged · News |
-| **Capacity** | MW / GW figures extracted from headline |
-| **Deal Size** | $bn / $m figures extracted from headline |
-| **Companies** | Up to 4 named companies matched against 80+ known DC operators/vendors |
-
-### 🔁 Deduplication
-- URL-based exact dedup first
-- Fuzzy headline matching (88% similarity threshold via `difflib.SequenceMatcher`)
-- When duplicates found across sources, DCD version is always kept (priority 1)
-
+What it does
+The app pulls live articles from Data Center Dynamics, classifies each one by topic, sentiment, region, and company, then surfaces the results across a set of analytical views. Everything runs in the browser — no database, no backend service required.
 ---
-
-## Tabs
-
-| Tab | Description |
-|---|---|
-| 📰 **Feed** | Chronological article cards with headline, date, source, topic badge, sentiment, capacity, deal size, and direct link |
-| 🗺️ **World Map** | Red-heat choropleth map — countries glow brighter red the more articles they have |
-| 📊 **Analytics** | Topic breakdown · Top countries · Publication volume over time · Topic share donut · Capacity mentions table · Source bar |
-| 🏢 **By Company** | Top 30 companies by mention count (bar chart) + drill-down to read all articles mentioning a selected company |
-| 📍 **By State** | State/province article volume bar chart + drill-down: select any state to see its topic breakdown mini-chart and all matching articles |
-| 🧠 **Market Intel** | Built-in TF-IDF NLP briefing — no API key needed. Covers themes, capacity pipeline, regulatory activity, company signals, and forward-looking indicators. Export as `.txt`, `.docx`, or `.pdf` |
-| ⬇️ **Export** | Excel (5 sheets: Articles · By Country · By Region · By Topic · By Company) + CSV |
-
+Features
+Live scraper — fetches the latest articles from DCD's news and construction channels with Cloudflare bypass via `cloudscraper`.
+Auto-enrichment — each article is automatically tagged with:
+Topic (Hyperscale, AI/GPU, Investment, Power, Colocation, Construction, Sustainability, etc.)
+Sentiment (Bullish, Bearish, Neutral, News)
+Region and ISO/RTO zone
+Capacity (MW) and Deal Size extracted from headline text
+Company names matched against a known operator/hyperscaler list
+AI Scoring engine — proprietary scoring model that ranks articles by signal strength across recency, capacity, deal size, company tier, topic weight, and high-value keywords. Articles are tiered into High (30+), Medium (15–29), and Low (<15) signal bands.
+11 analysis tabs:
+Tab	Description
+📰 Feed	Chronological article cards with all enrichment tags
+🗺️ World Map	Choropleth map of article volume by country
+📊 Analytics	KPIs, topic breakdown, sentiment distribution, top companies
+🏢 By Company	Per-operator deep dive with article timelines
+📍 By State	US state-level breakdown with ISO/RTO mapping
+🧠 Market Intel	Auto-generated Wood Mackenzie-style prose briefing
+📈 Trend Compare	Multi-topic trend lines over time
+🔥 Capacity Heatmap	MW capacity heatmap by country and topic
+💰 Deal Flow	Deal size tracker and financial signal analysis
+🤖 AI Scoring	Full scored article table with distribution chart
+⬇️ Export	Download filtered data as Excel (.xlsx) or CSV
+Export options:
+Excel report with 5 sheets (All Articles, By Country, By Region, By Topic, By Company), colour-coded badges, auto-filter, frozen headers
+CSV flat export for use in Python, PowerBI, or Tableau
+PDF and Word (.docx) report generation
+Sidebar filters — filter live data by date range, region, country, topic, sentiment, company, keyword, and capacity range.
 ---
-
-## Sidebar Filters
-
-Filters apply **after** the scan — no re-scrape needed:
-
-- **Date range** — Latest (all), 7d, 14d, 30d, 90d, or custom from/to dates
-- **🌐 Region** — multiselect; also dynamically narrows the DCD scrape on next run
-- **🌍 Country** — filtered by selected regions
-- **📍 State / Province** — filtered by selected countries; draws from per-country state lists
-- **🏢 Company** — search across 80+ known DC companies + any detected in results
-- **🏷️ Topic** — Hyperscale, Colocation, AI/GPU, Power, Investment, Permits, Construction, Sustainability
-- **📊 Project Status** — Opened/Live, Approved, Proposed, Under Construction, Challenged, News
-- **🔤 Keyword** — free-text search across headlines
-- **⚡ Min Capacity (MW)** — filter to only articles with a MW/GW figure above a threshold
-
+Tech stack
+Streamlit — UI framework
+cloudscraper + BeautifulSoup — scraping and HTML parsing
+pandas — data manipulation
+Plotly — interactive charts and maps
+openpyxl — Excel report generation
+reportlab — PDF export
+python-docx — Word document export
 ---
-
-## Installation
-
+Getting started
+1. Clone the repo
 ```bash
-pip install streamlit cloudscraper beautifulsoup4 feedparser pandas \
-            plotly openpyxl python-docx reportlab
+git clone https://github.com/your-username/global-dc-intelligence.git
+cd global-dc-intelligence
 ```
-
-> `cloudscraper` and `python-docx` and `reportlab` are optional — the app degrades gracefully if they are absent.
-
-### `requirements.txt`
+2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+3. Run the app
+```bash
+streamlit run app.py
+```
+The app opens at `http://localhost:8501`.
+---
+Requirements
 ```
 streamlit
-cloudscraper
-beautifulsoup4
-feedparser
 pandas
 plotly
 openpyxl
-python-docx
+beautifulsoup4
+cloudscraper
+requests
 reportlab
+python-docx
 ```
-
 ---
-
-## Deploying to Streamlit Cloud
-
-1. Push `code.py` (rename if needed) and `requirements.txt` to a GitHub repository
-2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**
-3. Select your repo, branch, and set **Main file path** to `code.py`
-4. Click **Deploy** — no secrets or environment variables required
-
+Deployment
+The app is deployed on Streamlit Community Cloud. To deploy your own instance:
+Push the repo to GitHub
+Go to share.streamlit.io and connect the repo
+Set the main file path to `app.py`
+Deploy
+No environment variables or secrets are required — the scraper uses public endpoints only.
 ---
-
-## How the Scraper Works
-
-```
-Run Global Scan
-    │
-    ├── DCD Construction Channel (primary)
-    │     ├── ?term=the-data-center-construction-channel
-    │     ├── + ?term=<region> for each selected region (e.g. europe)
-    │     ├── + ?term=approved  (project stage pages)
-    │     ├── + ?term=site-selection
-    │     ├── + ?term=disclosed-projects
-    │     ├── + ?term=project-announcement
-    │     ├── + ?term=expansion
-    │     └── + ?term=extension
-    │     Each paginated up to max_pages (default 10 × ~28 articles/page)
-    │
-    ├── Google News RSS (30 targeted queries, parallel)
-    │     ├── Construction / groundbreaking / phase / expansion
-    │     ├── Approvals / permits / site selection / disclosed
-    │     ├── Hyperscalers (Microsoft, Google, Amazon, Meta, Oracle…)
-    │     ├── Operators (Equinix, Digital Realty, CyrusOne, QTS…)
-    │     ├── Power (nuclear, SMR, PPA, grid connection, MW/GW)
-    │     ├── Investment (acquisition, REIT, IPO, financing)
-    │     └── Regions (Europe, APAC, Middle East, LatAm, Africa)
-    │
-    └── Merge → DC relevance filter → Date cutoff filter
-              → Enrich (country/topic/sentiment/capacity/deal/companies)
-              → Fuzzy deduplicate
-              → Display
-```
-
+Notes
+The scraper targets public DCD news pages. Run times vary depending on the date range and number of pages fetched.
+The Market Intel tab generates a prose briefing using the enriched article data — useful for quick team updates or client-facing summaries.
+All filtering is done client-side on the fetched dataset; re-running the scan refreshes the data.
 ---
-
-## Data Sources
-
-| Source | Type | Notes |
-|---|---|---|
-| [DataCenterDynamics](https://www.datacenterdynamics.com) | HTML scrape | Primary — Construction Channel + stage tags |
-| [Google News RSS](https://news.google.com) | RSS/feedparser | 30 targeted DC queries, runs in parallel |
-
----
-
-## Notes
-
-- No API keys required for any functionality
-- The app stores all data in Streamlit session state — refreshing the page clears results
-- Scrape depth is fixed at 10 pages per DCD term (≈280 articles per term, ≈2,240 total from DCD alone before dedup)
-- Google News typically adds 300–600 additional unique articles depending on query overlap
-- The Market Intel briefing uses pure Python TF-IDF + rule-based extraction — no LLM, no external API
-
----
-
-## License
-
-MIT
+Global Data Center Intelligence · Wood Mac
