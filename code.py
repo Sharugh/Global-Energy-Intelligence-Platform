@@ -4,9 +4,9 @@ import io
 import time
 import math
 import textwrap
-from collections import Counter
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
+from collections import Counter
 
 # ── Platform metadata ─────────────────────────────────────────────────────────
 # _PLAT_VER   : internal build version string
@@ -58,6 +58,7 @@ except ImportError:
     _USE_CS = False
 
 from bs4 import BeautifulSoup
+import os as _os
 
 _HEADERS = {
     "User-Agent": (
@@ -1220,6 +1221,931 @@ KNOWN_COMPANIES = [
 ]
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RENEWABLES POWER MARKETS — Constants, Keywords, Sources
+# ═══════════════════════════════════════════════════════════════════════════════
+
+RE_TOPIC_COLORS = {
+    "Solar":           "#ffaa00",
+    "Wind":            "#00b4ff",
+    "Energy Storage":  "#00e5c8",
+    "Offshore Wind":   "#0088cc",
+    "Hydrogen":        "#a855f7",
+    "Other Renewables":"#00e676",
+}
+
+RE_DEAL_TYPE_COLORS = {
+    "PPA":               "#00e676",
+    "MOU":               "#00b4ff",
+    "AOR / Offtake":     "#a855f7",
+    "Tender / Auction":  "#ffaa00",
+    "Investment / IPO":  "#0047e1",
+    "M&A / Deals":       "#ff6400",
+    "Construction":      "#00e5c8",
+    "Commissioning":     "#43ea80",
+    "Policy / Reg":      "#ff2d6b",
+    "Grid / Connect":    "#9c27b0",
+    "General":           "#2e4470",
+}
+
+RE_TOPIC_KEYWORDS = {
+    "Solar": [
+        "solar","photovoltaic","pv ","pv park","solar farm","solar park","solar plant",
+        "solar project","solar array","solar panel","bifacial","utility-scale solar",
+        "rooftop solar","floating solar","agrivoltaic","cpv","concentrated solar",
+        "solar developer","solar installer","solar capacity","solar gw","solar mw",
+        "solaredge","enphase","first solar","sunpower","jinko","longi","canadian solar",
+    ],
+    "Offshore Wind": [
+        "offshore wind","floating wind","offshore turbine","monopile","jacket foundation",
+        "offshore wind farm","offshore wind park","wtiv","offshore substation",
+        "offshore lease","floating offshore","offshore cfd","seabed lease",
+        "wind turbine installation vessel","offshore wind developer",
+        "orsted","equinor wind","vattenfall wind","rwe offshore","bp wind",
+    ],
+    "Wind": [
+        "wind farm","wind park","wind project","wind turbine","onshore wind",
+        "wind energy","wind power","wind blade","nacelle","wind developer",
+        "wind repowering","land wind","wind capacity","wind gw","wind mw",
+        "vestas","siemens gamesa","ge wind","nordex","enercon","goldwind",
+    ],
+    "Energy Storage": [
+        "battery storage","bess","energy storage","grid-scale battery",
+        "lithium-ion storage","flow battery","vanadium battery","battery system",
+        "storage project","battery energy storage","grid battery",
+        "long duration storage","flywheel","compressed air","pumped hydro",
+        "pumped storage","gravity storage","battery gw","battery mw",
+        "tesla megapack","fluence","nec energy","wartsila storage","wärtsilä",
+    ],
+    "Hydrogen": [
+        "hydrogen","electrolysis","electrolyser","electrolyzer","green hydrogen",
+        "blue hydrogen","pink hydrogen","grey hydrogen","fuel cell",
+        "ammonia","hydrogen pipeline","hydrogen hub","ptx","power-to-gas",
+        "hydrogen project","hydrogen offtake","hydrogen ppa","hydrogen storage",
+        "electrolytic hydrogen","renewable hydrogen","h2 project","h2 plant",
+        "itm power","nel hydrogen","plug power","bloom energy","air products hydrogen",
+    ],
+    "Other Renewables": [
+        "geothermal","hydropower","hydroelectric","hydro dam","run-of-river",
+        "tidal","wave energy","marine energy","bioenergy","biomass","biogas",
+        "landfill gas","waste-to-energy","csp","concentrated solar power",
+        "solar thermal","ocean energy","enhanced geothermal","egs",
+    ],
+}
+
+RE_DEAL_TYPE_KEYWORDS = {
+    "PPA": [
+        "ppa","power purchase agreement","offtake agreement","long-term contract",
+        "virtual ppa","vppa","corporate ppa","sleeved ppa","private wire",
+        "power offtake","energy supply agreement","electricity supply contract",
+        "15-year","20-year","25-year","30-year","offtake deal","supply agreement",
+    ],
+    "MOU": [
+        "mou","memorandum of understanding","framework agreement","heads of terms",
+        "letter of intent","loi","development agreement","cooperation agreement",
+        "non-binding agreement","joint development","strategic partnership",
+        "collaboration agreement","teaming agreement",
+    ],
+    "AOR / Offtake": [
+        "aor","agreement on record","anchor offtake","capacity agreement",
+        "tolling agreement","capacity reservation","offtake signed","offtake secured",
+        "virtual offtake","capacity booking",
+    ],
+    "Tender / Auction": [
+        "tender","auction","bid","cfds","contract for difference","request for proposal",
+        "rfp","solicitation","capacity tender","cfd round","awarded contract",
+        "contract award","competitive tender","round results","round award",
+        "capacity market","capacity auction","procurement round",
+    ],
+    "Investment / IPO": [
+        "investment","funding","financing","equity","debt","bond","green bond",
+        "sustainability bond","loan","credit facility","project finance",
+        "financial close","equity raise","debt raise","infrastructure fund",
+        "ipo","initial public offering","listing","stock exchange","spac",
+        "raises","secured financing","secured funding","series a","series b",
+    ],
+    "M&A / Deals": [
+        "acquisition","acquired","merger","takeover","stake","bought","purchased",
+        "divested","sold ","portfolio sale","asset sale","m&a","deal signed",
+        "joint venture","jv ","partnership deal","buys ","sells ",
+    ],
+    "Construction": [
+        "broke ground","groundbreaking","construction begins","under construction",
+        "build","installation begins","turbine installation","panel installation",
+        "civil works","epc contract","epc award","notice to proceed","ntp",
+    ],
+    "Commissioning": [
+        "commissioned","commissioning","energized","energised","goes live",
+        "began operations","first power","first generation","inaugurated","opened",
+        "commercial operation","cod","coo","reaches cod","online","goes online",
+        "starts generation","begins generation","ribbon cutting",
+    ],
+    "Policy / Reg": [
+        "regulation","policy","legislation","standard","target","mandate","decree",
+        "executive order","parliament","senate","vote","approved","enacted","signed",
+        "feed-in tariff","fit ","rps","renewable portfolio","irp","net metering",
+        "clean energy standard","subsidy","tax credit","itc ","ptc ","ira ",
+        "planning consent","permit","eia ","grid code","capacity market rules",
+    ],
+    "Grid / Connect": [
+        "grid connection","interconnection","network connection","transmission access",
+        "substation","connection offer","interconnection agreement","grid study",
+        "hvdc","hvac","cable","transmission line","grid upgrade","grid expansion",
+    ],
+}
+
+# ─── RE Feed registry ──────────────────────────────────────────────────────────
+# Multi-source RSS/Atom engine.  For each of the 6 sectors we maintain:
+#   - specialist publication feeds  (high signal, narrow scope)
+#   - Google News query feeds        (broad, always fresh, no paywalls)
+#   - cross-sector feeds             (tagged to all relevant sectors)
+#
+# Google News RSS format: https://news.google.com/rss/search?q=QUERY&hl=en&gl=US&ceid=US:en
+# Completely free, no API key, no rate limits on reasonable usage.
+# Specialist feeds: direct RSS from each publication — fastest, highest quality.
+
+_GN = "https://news.google.com/rss/search?hl=en&gl=US&ceid=US:en&q="
+
+RE_FEED_REGISTRY = {
+    # ── Solar ──────────────────────────────────────────────────────────────────
+    "Solar": [
+        # Specialist
+        {"url": "https://www.pv-magazine.com/feed/",                       "source": "PV Magazine",        "weight": 10},
+        {"url": "https://www.pv-tech.org/feed/",                           "source": "PV Tech",            "weight": 10},
+        {"url": "https://www.solarpowerworldonline.com/feed/",             "source": "Solar Power World",  "weight":  8},
+        {"url": "https://www.pveurope.eu/taxonomy/term/1/feed",            "source": "PV Europe",          "weight":  7},
+        {"url": "https://pv-magazine-usa.com/feed/",                       "source": "PV Magazine USA",    "weight":  8},
+        # Google News targeted queries
+        {"url": _GN + "solar+PPA+power+purchase+agreement",               "source": "GNews/Solar-PPA",    "weight":  9},
+        {"url": _GN + "solar+farm+tender+auction+MW+GW",                  "source": "GNews/Solar-Tender", "weight":  9},
+        {"url": _GN + "solar+project+investment+financing+fund",          "source": "GNews/Solar-Inv",    "weight":  9},
+        {"url": _GN + "solar+MOU+memorandum+agreement",                   "source": "GNews/Solar-MOU",    "weight":  8},
+        {"url": _GN + "solar+commissioned+groundbreaking+construction",   "source": "GNews/Solar-Dev",    "weight":  8},
+        {"url": _GN + "floating+solar+agrivoltaic+rooftop+solar",         "source": "GNews/Solar-Tech",   "weight":  7},
+    ],
+    # ── Wind ──────────────────────────────────────────────────────────────────
+    "Wind": [
+        {"url": "https://www.windpowermonthly.com/rss",                    "source": "Wind Power Monthly", "weight": 10},
+        {"url": "https://windenergynews.com/feed/",                        "source": "Wind Energy News",   "weight":  9},
+        {"url": "https://www.windpowerengineering.com/feed/",              "source": "Windpower Eng.",     "weight":  8},
+        {"url": _GN + "onshore+wind+farm+tender+auction+MW+GW",           "source": "GNews/Wind-Tender",  "weight":  9},
+        {"url": _GN + "wind+energy+PPA+power+purchase+agreement",         "source": "GNews/Wind-PPA",     "weight":  9},
+        {"url": _GN + "wind+project+investment+financing+turbine",        "source": "GNews/Wind-Inv",     "weight":  9},
+        {"url": _GN + "wind+farm+commissioned+groundbreaking",            "source": "GNews/Wind-Dev",     "weight":  8},
+        {"url": _GN + "wind+repowering+capacity+expansion",               "source": "GNews/Wind-Repow",   "weight":  7},
+    ],
+    # ── Energy Storage ────────────────────────────────────────────────────────
+    "Energy Storage": [
+        {"url": "https://www.energy-storage.news/feed/",                   "source": "Energy Storage News","weight": 10},
+        {"url": "https://www.storagedaily.com/rss/",                       "source": "Storage Daily",      "weight":  8},
+        {"url": _GN + "battery+energy+storage+BESS+MW+GWh",              "source": "GNews/BESS",         "weight":  9},
+        {"url": _GN + "battery+storage+PPA+offtake+tender",              "source": "GNews/BESS-PPA",     "weight":  9},
+        {"url": _GN + "battery+storage+investment+financing+fund",        "source": "GNews/BESS-Inv",     "weight":  9},
+        {"url": _GN + "grid+battery+commissioned+BESS+project",          "source": "GNews/BESS-Dev",     "weight":  8},
+        {"url": _GN + "long+duration+storage+flow+battery+pumped+hydro", "source": "GNews/LDES",         "weight":  8},
+        {"url": _GN + "Tesla+Megapack+Fluence+energy+storage+project",   "source": "GNews/BESS-OEM",     "weight":  7},
+    ],
+    # ── Offshore Wind ─────────────────────────────────────────────────────────
+    "Offshore Wind": [
+        {"url": "https://www.offshorewind.biz/feed/",                      "source": "Offshore Wind Biz",  "weight": 10},
+        {"url": "https://www.4coffshore.com/rss/windfarms-rss.xml",        "source": "4C Offshore",        "weight":  9},
+        {"url": _GN + "offshore+wind+farm+tender+auction+CfD",            "source": "GNews/OSW-Tender",   "weight": 10},
+        {"url": _GN + "offshore+wind+PPA+power+purchase+agreement",       "source": "GNews/OSW-PPA",      "weight":  9},
+        {"url": _GN + "offshore+wind+investment+financing+fund",          "source": "GNews/OSW-Inv",      "weight":  9},
+        {"url": _GN + "offshore+wind+commissioned+first+power",           "source": "GNews/OSW-Dev",      "weight":  8},
+        {"url": _GN + "floating+offshore+wind+project+MOU",               "source": "GNews/FOW",          "weight":  8},
+        {"url": _GN + "offshore+wind+lease+seabed+monopile",              "source": "GNews/OSW-Tech",     "weight":  7},
+    ],
+    # ── Hydrogen ──────────────────────────────────────────────────────────────
+    "Hydrogen": [
+        {"url": "https://www.hydrogeninsight.com/rss",                     "source": "Hydrogen Insight",   "weight": 10},
+        {"url": "https://www.h2-view.com/feed/",                           "source": "H2 View",            "weight": 10},
+        {"url": "https://fuelcellsworks.com/feed/",                        "source": "Fuel Cells Works",   "weight":  8},
+        {"url": "https://www.hydrogenfuelnews.com/feed/",                  "source": "Hydrogen Fuel News", "weight":  8},
+        {"url": _GN + "green+hydrogen+electrolyzer+electrolyser+PPA",     "source": "GNews/H2-PPA",       "weight":  9},
+        {"url": _GN + "green+hydrogen+project+investment+financing",      "source": "GNews/H2-Inv",       "weight":  9},
+        {"url": _GN + "hydrogen+MOU+memorandum+agreement+partnership",    "source": "GNews/H2-MOU",       "weight":  9},
+        {"url": _GN + "hydrogen+offtake+supply+agreement+tonnes",         "source": "GNews/H2-Offtake",   "weight":  9},
+        {"url": _GN + "green+hydrogen+plant+commissioned+groundbreaking", "source": "GNews/H2-Dev",       "weight":  8},
+        {"url": _GN + "ammonia+green+hydrogen+export+terminal",           "source": "GNews/H2-Ammonia",   "weight":  7},
+    ],
+    # ── Other Renewables ──────────────────────────────────────────────────────
+    "Other Renewables": [
+        {"url": "https://www.rechargenews.com/rss",                        "source": "Recharge News",      "weight":  9},
+        {"url": "https://www.enerdata.net/rss.xml",                        "source": "Enerdata",           "weight":  8},
+        {"url": _GN + "geothermal+power+project+investment+tender",       "source": "GNews/Geo",          "weight":  9},
+        {"url": _GN + "hydropower+hydro+dam+project+tender+financing",    "source": "GNews/Hydro",        "weight":  9},
+        {"url": _GN + "tidal+wave+marine+energy+project",                 "source": "GNews/Marine",       "weight":  8},
+        {"url": _GN + "biomass+bioenergy+biogas+renewable+project",       "source": "GNews/Bio",          "weight":  8},
+        {"url": _GN + "concentrated+solar+CSP+solar+thermal+project",     "source": "GNews/CSP",          "weight":  7},
+    ],
+}
+
+# Cross-sector feeds — appear in ALL sectors; tagged during ingest
+RE_CROSS_FEEDS = [
+    {"url": "https://cleantechnica.com/feed/",                             "source": "CleanTechnica",      "weight": 9},
+    {"url": "https://electrek.co/feed/",                                   "source": "Electrek",           "weight": 9},
+    {"url": "https://www.canarymedia.com/feed.xml",                        "source": "Canary Media",       "weight": 9},
+    {"url": "https://ieefa.org/feed/",                                     "source": "IEEFA",              "weight": 8},
+    {"url": "https://www.carbonbrief.org/feed",                            "source": "Carbon Brief",       "weight": 8},
+    {"url": "https://www.greenbiz.com/feeds/all",                          "source": "GreenBiz",           "weight": 7},
+    {"url": _GN + "renewable+energy+PPA+MOU+tender+investment+deal",      "source": "GNews/RE-Deals",     "weight": 9},
+    {"url": _GN + "clean+energy+acquisition+merger+IPO+financing",        "source": "GNews/RE-Finance",   "weight": 9},
+    {"url": _GN + "renewable+energy+policy+regulation+target+legislation","source": "GNews/RE-Policy",    "weight": 8},
+    {"url": _GN + "wind+solar+storage+hydrogen+commissioned+tender",      "source": "GNews/RE-All",       "weight": 9},
+]
+
+# All unique sources for the KPI banner
+RE_SOURCES = (
+    [{"name": f["source"]} for feeds in RE_FEED_REGISTRY.values() for f in feeds]
+    + [{"name": f["source"]} for f in RE_CROSS_FEEDS]
+)
+
+RE_SOURCE_META = {
+    "PV Magazine":       {"color": "#ff6400", "short": "PVM"},
+    "PV Tech":           {"color": "#ffaa00", "short": "PVT"},
+    "PV Magazine USA":   {"color": "#ff7700", "short": "PVU"},
+    "Solar Power World": {"color": "#ffcc00", "short": "SPW"},
+    "Wind Power Monthly":{"color": "#00b4ff", "short": "WPM"},
+    "Wind Energy News":  {"color": "#0090cc", "short": "WEN"},
+    "Windpower Eng.":    {"color": "#0070aa", "short": "WPE"},
+    "Energy Storage News":{"color":"#00e5c8", "short": "ESN"},
+    "Storage Daily":     {"color": "#00bbaa", "short": "STD"},
+    "Offshore Wind Biz": {"color": "#0088cc", "short": "OWB"},
+    "4C Offshore":       {"color": "#005599", "short": "4CO"},
+    "Hydrogen Insight":  {"color": "#a855f7", "short": "HYI"},
+    "H2 View":           {"color": "#9333ea", "short": "H2V"},
+    "Fuel Cells Works":  {"color": "#7c3aed", "short": "FCW"},
+    "Hydrogen Fuel News":{"color": "#6d28d9", "short": "HFN"},
+    "Recharge News":     {"color": "#00e676", "short": "RCH"},
+    "Enerdata":          {"color": "#00cc66", "short": "END"},
+    "CleanTechnica":     {"color": "#22c55e", "short": "CTC"},
+    "Electrek":          {"color": "#16a34a", "short": "ELK"},
+    "Canary Media":      {"color": "#f59e0b", "short": "CNR"},
+    "IEEFA":             {"color": "#0047e1", "short": "IEF"},
+    "Carbon Brief":      {"color": "#ef4444", "short": "CBR"},
+    "GreenBiz":          {"color": "#15803d", "short": "GBZ"},
+}
+# All GNews sources get a default teal
+for _k in list(RE_SOURCE_META.keys()):
+    pass
+_RE_GNEWS_COLOR = {"color": "#00bcd4", "short": "GNW"}
+
+
+# ─── RE Deal-type detection ────────────────────────────────────────────────────
+def detect_re_deal_type(text):
+    t = text.lower()
+    # Priority order: specific deal types first
+    for dtype in ["PPA","MOU","AOR / Offtake","Tender / Auction","Investment / IPO",
+                  "M&A / Deals","Commissioning","Construction","Policy / Reg","Grid / Connect"]:
+        kws = RE_DEAL_TYPE_KEYWORDS.get(dtype, [])
+        if any(k in t for k in kws):
+            return dtype
+    return "General"
+
+def detect_re_topic(text):
+    t = text.lower()
+    # Check most-specific sectors first (Offshore Wind before Wind)
+    for topic in ["Offshore Wind", "Energy Storage", "Hydrogen",
+                  "Solar", "Wind", "Other Renewables"]:
+        kws = RE_TOPIC_KEYWORDS.get(topic, [])
+        if any(k.lower() in t for k in kws):
+            return topic
+    return "Other Renewables"
+
+def detect_re_capacity(text):
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|kW|MWh|GWh|gigawatt|megawatt|kilowatt)\b", text, re.I)
+    if m:
+        val = m.group(1).replace(",", "")
+        unit = m.group(2)
+        unit_map = {"gigawatt": "GW","megawatt": "MW","kilowatt": "kW"}
+        unit = unit_map.get(unit.lower(), unit.upper())
+        return val + " " + unit
+    return ""
+
+def detect_re_project_status(text):
+    t = text.lower()
+    for status, keywords in [
+        ("Commissioned",      ["commissioned","energized","energised","goes live","first power","commercial operation","cod","inaugurated","begins generation"]),
+        ("Financed",          ["financial close","reached financial close","fc achieved","fully funded","financing agreed","financing closed"]),
+        ("Under Construction",["broke ground","groundbreaking","under construction","construction begins","installation begins","ntp issued"]),
+        ("Approved",          ["approved","consent granted","planning approved","permit granted","green light","go-ahead","eia approved"]),
+        ("Tendered",          ["tender","auction","bid","rfp","solicitation","cfd round","procurement round"]),
+        ("Contracted",        ["ppa signed","ppa agreed","ppa awarded","offtake signed","contract signed","mou signed","agreement signed","deal signed"]),
+        ("Proposed",          ["proposed","plans","eyes","could build","may build","announced plans","seeks","targeting","plans to build"]),
+        ("Challenged",        ["cancelled","rejected","denied","moratorium","blocked","withdrawn","lawsuit","challenged","opposition"]),
+    ]:
+        if any(w in t for w in keywords):
+            return status
+    return "News"
+
+def is_re_relevant(text):
+    t = text.lower()
+    return any(p in t for p in [
+        "solar","wind","renewable","green energy","clean energy","energy storage",
+        "bess","battery storage","hydrogen","electrolyser","electrolyzer",
+        "ppa","power purchase agreement","offshore wind","onshore wind",
+        "photovoltaic","solar farm","wind farm","geothermal","hydropower",
+        "hydroelectric","biomass energy","cfd","capacity auction","energy tender",
+        "green hydrogen","fuel cell","ammonia","electrolysis","turbine",
+        "solar developer","wind developer","renewables","clean power",
+        "decarbonisation","decarbonization","energy transition",
+        "gigawatt","gw solar","gw wind","mw solar","mw wind","mwh battery",
+        "gwh storage","offshore lease","hvdc","interconnector",
+    ])
+
+# ─── Multi-source RSS engine ───────────────────────────────────────────────────
+
+import xml.etree.ElementTree as _ET
+from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+import urllib.parse as _urlparse
+
+_RSS_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+}
+_ATOM_NS = "http://www.w3.org/2005/Atom"
+
+
+def _fetch_feed(feed_meta, timeout=12):
+    """
+    Fetch a single RSS/Atom feed. Returns (feed_meta, raw_text) or (feed_meta, None).
+    Tries cloudscraper first (bypasses Cloudflare), then plain requests.
+    """
+    url = feed_meta["url"]
+    try:
+        if _USE_CS:
+            r = _CS.get(url, timeout=timeout)
+        else:
+            import requests as _req
+            r = _req.get(url, headers=_RSS_HEADERS, timeout=timeout)
+        if r.status_code == 200 and len(r.text) > 200:
+            return feed_meta, r.text
+    except Exception:
+        pass
+    # Fallback: plain requests if cloudscraper failed
+    try:
+        import requests as _req2
+        r2 = _req2.get(url, headers=_RSS_HEADERS, timeout=timeout)
+        if r2.status_code == 200 and len(r2.text) > 200:
+            return feed_meta, r2.text
+    except Exception:
+        pass
+    return feed_meta, None
+
+
+def _parse_feed_xml(xml_text, feed_meta, sector_tag, cutoff):
+    """
+    Parse RSS 2.0 or Atom 1.0 XML.
+    Returns list of article dicts.
+    """
+    articles = []
+    try:
+        root = _ET.fromstring(xml_text.encode("utf-8", errors="replace"))
+    except Exception:
+        try:
+            import re as _re2
+            clean = _re2.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', xml_text)
+            root = _ET.fromstring(clean.encode("utf-8", errors="replace"))
+        except Exception:
+            return articles
+
+    # Detect RSS vs Atom
+    is_atom = root.tag == f"{{{_ATOM_NS}}}feed" or "atom" in root.tag.lower()
+
+    if is_atom:
+        items = root.findall(f"{{{_ATOM_NS}}}entry")
+        for item in items:
+            def _at(tag):
+                el = item.find(f"{{{_ATOM_NS}}}{tag}")
+                return el.text.strip() if el is not None and el.text else ""
+            title = _at("title")
+            # Atom link is an element with href attr
+            link_el = item.find(f"{{{_ATOM_NS}}}link[@rel='alternate']") or item.find(f"{{{_ATOM_NS}}}link")
+            url = link_el.get("href", "") if link_el is not None else ""
+            pub = _at("published") or _at("updated")
+            date_obj = parse_date_str(pub) if pub else None
+            if not title or not url:
+                continue
+            if cutoff and date_obj and date_obj < cutoff:
+                continue
+            articles.append(_mk_re_art(title, url, date_obj, feed_meta, sector_tag))
+    else:
+        # RSS 2.0 / RSS 1.0
+        items = root.findall(".//item")
+        for item in items:
+            def _rss(tag, ns=""):
+                el = item.find(f"{ns}{tag}")
+                return el.text.strip() if el is not None and el.text else ""
+            title = _rss("title")
+            url   = _rss("link") or _rss("guid")
+            # <link> is sometimes text after the tag in RSS
+            if not url:
+                link_el = item.find("link")
+                if link_el is not None:
+                    url = (link_el.text or "").strip()
+                    if not url:
+                        url = str(link_el.tail or "").strip()
+            pub = _rss("pubDate") or _rss("published") or _rss("dc:date") or _rss("date")
+            # Try dc:date namespace
+            if not pub:
+                dc_el = item.find("{http://purl.org/dc/elements/1.1/}date")
+                if dc_el is not None and dc_el.text:
+                    pub = dc_el.text.strip()
+            date_obj = parse_date_str(pub) if pub else None
+            if not title or not url:
+                continue
+            if cutoff and date_obj and date_obj < cutoff:
+                continue
+            articles.append(_mk_re_art(title, url, date_obj, feed_meta, sector_tag))
+    return articles
+
+
+def _mk_re_art(headline, url, date_obj, feed_meta, sector_tag):
+    """Build a raw article dict from parsed feed data."""
+    # Clean Google News redirect URLs → extract real URL
+    real_url = url
+    if "news.google.com" in url:
+        try:
+            parsed = _urlparse.urlparse(url)
+            qs = _urlparse.parse_qs(parsed.query)
+            if "url" in qs:
+                real_url = qs["url"][0]
+        except Exception:
+            pass
+    # Clean headline — strip HTML entities
+    hl = re.sub(r"<[^>]+>", "", headline)
+    hl = hl.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'")
+    hl = re.sub(r"\s+", " ", hl).strip()
+    return {
+        "headline":  hl,
+        "url":       real_url.strip(),
+        "date_obj":  date_obj,
+        "source":    feed_meta.get("source", "Unknown"),
+        "_sector":   sector_tag,
+        "_weight":   feed_meta.get("weight", 5),
+        "_priority": feed_meta.get("weight", 5),
+    }
+
+
+def run_re_scrapers(max_html_pages, cutoff, progress_cb, re_sectors=None):
+    """
+    Multi-source parallel RSS engine.
+    - Fetches specialist publication feeds + Google News query feeds concurrently
+    - Covers all 6 sectors with sector-specific + cross-sector feeds
+    - re_sectors: list of selected sectors (filters which feeds to hit)
+    - max_html_pages: repurposed as a depth signal (1=light, 3+=deep)
+    - cutoff: datetime — articles older than this are dropped
+    """
+    # Build list of (feed_meta, sector_tag) to fetch
+    active_sectors = re_sectors if re_sectors else list(RE_FEED_REGISTRY.keys())
+    feed_jobs = []
+
+    # Sector-specific feeds — only include selected sectors
+    for sector in active_sectors:
+        for feed in RE_FEED_REGISTRY.get(sector, []):
+            feed_jobs.append((feed, sector))
+
+    # Cross-sector feeds — always include, tag by keyword during enrichment
+    for feed in RE_CROSS_FEEDS:
+        feed_jobs.append((feed, None))  # None = detect sector from headline
+
+    total_feeds = len(feed_jobs)
+    progress_cb(0.0, f"🌿 Fetching {total_feeds} RSS feeds across {len(active_sectors)} sectors…")
+
+    raw       = []
+    seen_urls = set()
+    completed = 0
+
+    def _process_job(job):
+        feed_meta, sector_tag = job
+        meta, xml_text = _fetch_feed(feed_meta, timeout=12)
+        if not xml_text:
+            return []
+        arts = _parse_feed_xml(xml_text, meta, sector_tag, cutoff)
+        return arts
+
+    # Parallel fetch — ThreadPoolExecutor, 12 workers
+    max_workers = min(12, total_feeds)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(_process_job, job): job for job in feed_jobs}
+        for future in _as_completed(futures):
+            completed += 1
+            frac = completed / total_feeds
+            feed_meta = futures[future][0]
+            try:
+                arts = future.result()
+                for a in arts:
+                    norm = a["url"].rstrip("/")
+                    # Skip empty or nav URLs
+                    if not norm or len(norm) < 15:
+                        continue
+                    if norm not in seen_urls:
+                        seen_urls.add(norm)
+                        raw.append(a)
+            except Exception:
+                pass
+            progress_cb(
+                frac * 0.9,
+                f"📡 {feed_meta.get('source','feed')} → {len(raw)} articles so far…",
+            )
+
+    progress_cb(0.92, f"🔍 Filtering {len(raw)} articles for relevance…")
+
+    # Relevance + dedup pass
+    raw = [a for a in raw if a["headline"] and is_re_relevant(a["headline"])]
+
+    # For cross-sector articles (sector_tag=None), detect from headline
+    for a in raw:
+        if not a.get("_sector"):
+            a["_sector"] = detect_re_topic(a["headline"])
+
+    # Apply sector filter if set (cross-sector articles may belong to multiple)
+    if re_sectors:
+        def _match(art):
+            detected = detect_re_topic(art["headline"])
+            tagged   = art.get("_sector")
+            return detected in re_sectors or tagged in re_sectors
+        raw = [a for a in raw if _match(a)]
+
+    # Sort: dated articles first (newest → oldest), undated at end
+    raw.sort(key=lambda a: a.get("date_obj") or datetime.min, reverse=True)
+
+    progress_cb(1.0, f"✅ {len(raw)} articles from {len(set(a['source'] for a in raw))} sources")
+    return raw
+
+
+def enrich_re(raw_item):
+    """Enrich a raw RE article dict → structured display dict."""
+    hl      = raw_item["headline"]
+    d       = raw_item.get("date_obj")
+    country = detect_country(hl)
+    region  = COUNTRY_TO_REGION.get(country, "Global")
+    return {
+        "Headline":  hl,
+        "Date":      d.strftime("%Y-%m-%d") if d else "Unknown",
+        "Source":    raw_item.get("source", "Unknown"),
+        "URL":       raw_item.get("url", ""),
+        "Country":   country,
+        "Region":    region,
+        "Sector":    raw_item.get("_sector") or detect_re_topic(hl),
+        "Deal Type": detect_re_deal_type(hl),
+        "Status":    detect_re_project_status(hl),
+        "Capacity":  detect_re_capacity(hl),
+        "Deal Size": detect_deal_size(hl),
+        "Companies": detect_companies(hl),
+        "_date_obj": d,
+    }
+
+
+
+RE_TOPIC_KEYWORDS = {
+    "Solar": [
+        "solar","photovoltaic","pv ","solar farm","solar park","solar plant",
+        "solar project","solar array","solar panel","bifacial","utility-scale solar",
+        "rooftop solar","floating solar","agrivoltaic","cpv","concentrated solar",
+        "solar irradiance","solar developer","solar installer",
+    ],
+    "Offshore Wind": [
+        "offshore wind","floating wind","offshore turbine","monopile","jacket foundation",
+        "offshore wind farm","offshore wind park","wind turbine installation vessel",
+        "wtiv","offshore substation","offshore lease","floating offshore",
+    ],
+    "Wind": [
+        "wind farm","wind park","wind project","wind turbine","onshore wind",
+        "wind energy","wind power","anemometer","wind blade","nacelle",
+        "wind developer","wind repowering","land wind","wind capacity",
+    ],
+    "Energy Storage": [
+        "battery storage","bess","energy storage","grid-scale battery",
+        "lithium-ion storage","flow battery","vanadium battery","battery system",
+        "storage project","ess ","battery energy storage","grid battery",
+        "long duration storage","flywheel","compressed air energy storage",
+        "pumped hydro","pumped storage","gravity storage",
+    ],
+    "Hydrogen": [
+        "hydrogen","electrolysis","electrolyser","electrolyzer","green hydrogen",
+        "blue hydrogen","pink hydrogen","grey hydrogen","h2 ","fuel cell",
+        "ammonia","hydrogen pipeline","hydrogen hub","ptx","power-to-gas",
+        "hydrogen project","hydrogen offtake","hydrogen ppa","hydrogen storage",
+    ],
+    "Other Renewables": [
+        "geothermal","hydro","hydropower","hydroelectric","tidal","wave energy",
+        "marine energy","bioenergy","biomass","biogas","landfill gas",
+        "waste-to-energy","csp","concentrated solar power","solar thermal",
+        "ocean energy","run-of-river",
+    ],
+}
+
+RE_DEAL_TYPE_KEYWORDS = {
+    "Tender / Auction": [
+        "tender","auction","bid","cfds","request for proposal","rfp","solicitation",
+        "competitive tender","award tender","capacity tender","round ","cfd round",
+        "awarded contract","contract award",
+    ],
+    "PPA": [
+        "ppa","power purchase agreement","offtake agreement","long-term contract",
+        "virtual ppa","vppa","corporate ppa","sleeved ppa","private wire",
+        "power offtake","energy supply agreement","electricity supply contract",
+        "long-term power","15-year contract","20-year contract","25-year contract",
+    ],
+    "MOU": [
+        "mou","memorandum of understanding","framework agreement","heads of terms",
+        "loi","letter of intent","development agreement","cooperation agreement",
+        "non-binding agreement","joint development","strategic partnership",
+    ],
+    "AOR / Offtake": [
+        "aor","agreement on record","offtake","anchor offtake","capacity agreement",
+        "tolling agreement","capacity reservation","hydrogen offtake","storage offtake",
+        "virtual offtake",
+    ],
+    "Investment": [
+        "investment","funding","financing","equity","debt","bond","green bond",
+        "sustainability bond","loan","credit facility","project finance","raise",
+        "financial close","fc ","reached financial close","equity raise","debt raise",
+        "infrastructure fund","joint venture","acquisition","stake","acquired",
+        "merger","takeover","ipo","listing",
+    ],
+    "Commissioning": [
+        "commissioned","commissioning","energized","energised","goes live","online",
+        "began operations","first power","first generation","inaugurated","opened",
+        "ribbon cutting","commercial operation","cod","coo","cod achieved",
+    ],
+    "Construction": [
+        "broke ground","groundbreaking","construction begins","under construction",
+        "build","installation","erection","foundation","civil works","epc",
+        "procurement","turbine installation","panel installation",
+    ],
+    "Grid / Interconnect": [
+        "grid connection","interconnection","grid code","network connection",
+        "transmission access","substation","capacity booking","connection offer",
+        "offered capacity","queue","interconnection agreement","shallow study",
+        "deep study","grid study",
+    ],
+    "M&A": [
+        "acquisition","acquired","merger","takeover","stake","bought","purchased",
+        "divested","sold ","portfolio sale","asset sale","m&a",
+    ],
+    "Policy": [
+        "regulation","policy","legislation","standard","target","mandate","decree",
+        "executive order","parliament","senate","vote","approved","enacted","signed",
+    ],
+}
+
+# ─── Renewable energy news sources ────────────────────────────────────────────
+RE_SOURCES = [
+    {"name": "Renewables Now",  "url": "https://renewablesnow.com/", "type": "html"},
+]
+
+# ─── RE Source meta ────────────────────────────────────────────────────────────
+RE_SOURCE_META = {
+    "Renewables Now":  {"color": "#00e676", "short": "RNW"},
+    "Unknown":         {"color": "#2e4470", "short": "UNK"},
+}
+
+# ─── RE URL constants — the 6 confirmed RenewablesNow section URLs ────────────
+
+# ─── RE Deal-type detection ────────────────────────────────────────────────────
+def detect_re_deal_type(text):
+    t = text.lower()
+    for dtype, kws in RE_DEAL_TYPE_KEYWORDS.items():
+        if any(k in t for k in kws):
+            return dtype
+    return "General"
+
+def detect_re_topic(text):
+    t = text.lower()
+    # Check most-specific sectors first to avoid "wind" matching "offshore wind"
+    for topic in ["Offshore Wind", "Energy Storage", "Hydrogen",
+                  "Solar", "Wind", "Other Renewables"]:
+        kws = RE_TOPIC_KEYWORDS.get(topic, [])
+        if any(k.lower() in t for k in kws):
+            return topic
+    return "Other Renewables"
+
+def detect_re_capacity(text):
+    """Extract GW/MW/kW capacity from renewable energy article headline."""
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|kW|gigawatt|megawatt|kilowatt)\b", text, re.I)
+    if m:
+        val = m.group(1).replace(",", "")
+        unit = m.group(2).upper()
+        if unit in ("KILOWATT", "KW"):
+            unit = "kW"
+        return val + " " + unit
+    return ""
+
+def detect_re_project_status(text):
+    t = text.lower()
+    if any(w in t for w in ["commissioned","energized","energised","goes live","online",
+                              "began operations","first power","commercial operation","cod",
+                              "inaugurated","opened"]):
+        return "Commissioned"
+    if any(w in t for w in ["financial close","reached financial close","fc achieved",
+                              "fully funded","financing agreed"]):
+        return "Financed"
+    if any(w in t for w in ["broke ground","groundbreaking","under construction",
+                              "construction begins","installation begins"]):
+        return "Under Construction"
+    if any(w in t for w in ["approved","consent granted","planning approved",
+                              "permit granted","green light","go-ahead","eia approved"]):
+        return "Approved"
+    if any(w in t for w in ["tender","auction","bid","rfp","solicitation","cfd round"]):
+        return "Tendered"
+    if any(w in t for w in ["ppa signed","ppa agreed","ppa awarded","offtake signed",
+                              "contract signed","mou signed","agreement signed"]):
+        return "Contracted"
+    if any(w in t for w in ["proposed","plans","eyes","could build","may build",
+                              "announced plans","seeks","targeting"]):
+        return "Proposed"
+    if any(w in t for w in ["cancelled","rejected","denied","moratorium","blocked",
+                              "withdrawn","lawsuit","challenged","opposition"]):
+        return "Challenged"
+    return "News"
+
+def is_re_relevant(text):
+    """Quick relevance check for renewable energy news."""
+    t = text.lower()
+    primary_re = [
+        "solar","wind","renewable","green energy","clean energy","energy storage",
+        "bess","battery storage","hydrogen","electrolyser","electrolyzer",
+        "nuclear","smr","small modular reactor","ppa","power purchase agreement",
+        "offshore wind","onshore wind","photovoltaic","pv park","solar farm",
+        "wind farm","geothermal","hydropower","hydroelectric","biomass energy",
+        "cfd","contract for difference","capacity auction","energy tender",
+        "green hydrogen","fuel cell","ammonia","electrolysis","turbine",
+        "solar developer","wind developer","renewables developer",
+        "clean power","low carbon power","decarbonisation","decarbonization",
+        "net zero power","energy transition","power transition",
+        "recharge news","pv-tech","pv magazine","wind power","solar power",
+        "gigawatt solar","gigawatt wind","mw solar","mw wind",
+        "offshore lease","transmission line","hvdc","interconnector",
+        "grid expansion","capacity market","renewable target",
+    ]
+    return any(p in t for p in primary_re)
+
+# ─── PV-Tech article scraper ───────────────────────────────────────────────────
+# _parse_pvtech_articles and _scrape_pvtech removed — PV Tech no longer used.
+
+
+
+def _parse_generic_news_page(soup, source_name, base_url):
+    """Generic parser for news listing pages (works for many CMS patterns)."""
+    articles = []
+    seen = set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("/"):
+            full_url = base_url.rstrip("/") + href
+        elif href.startswith("http"):
+            full_url = href
+        else:
+            continue
+        if not re.search(r"/news/|/article/|/story/|/energy/|/sector/|/analysis/|/\d{4}/", href):
+            continue
+        norm = full_url.rstrip("/")
+        if norm in seen or len(norm) < 30:
+            continue
+        seen.add(norm)
+        h_tag = a.find(["h1","h2","h3","h4","h5"])
+        hl = h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)
+        hl = re.sub(r"\s+", " ", hl).strip()
+        if not hl or len(hl) < 15:
+            continue
+        date_obj = None
+        node = a.parent
+        for _ in range(8):
+            if node is None:
+                break
+            tt = node.find("time")
+            if tt:
+                date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
+                if date_obj:
+                    break
+            node = node.parent
+        articles.append({
+            "headline": hl, "url": full_url,
+            "date_obj": date_obj, "source": source_name, "_priority": 2,
+        })
+    return articles
+
+def _scrape_generic_re(base_url, source_name, max_pages, cutoff, progress_cb,
+                       base_frac=0.0, frac_share=1.0,
+                       extra_url_patterns=None):
+    """
+    Generic multi-page scraper used for every RE source except PV Tech.
+    Handles ?page=N and /page/N pagination styles automatically.
+    extra_url_patterns: additional regex to accept beyond the default set.
+    """
+    arts  = []
+    seen  = set()
+    _patterns = [
+        r"/news/|/article/|/story/|/energy/|/sector/|/analysis/",
+        r"/wind/|/solar/|/storage/|/hydrogen/|/nuclear/|/hydro/|/offshore/",
+        r"/\d{4}/\d{2}/|/\d{4}/",
+        r"/renewables/|/power/|/market/|/project/|/deal/|/ppa/|/tender/",
+    ]
+    if extra_url_patterns:
+        _patterns.extend(extra_url_patterns)
+    combined_re = re.compile("|".join(_patterns))
+
+    for page in range(1, max_pages + 1):
+        frac = base_frac + (page / max_pages) * frac_share
+        progress_cb(min(frac, 1.0), f"{source_name} · Page {page}/{max_pages}")
+
+        # Try ?page=N first, then /page/N
+        if page == 1:
+            url = base_url
+        elif "?" in base_url:
+            url = f"{base_url}&page={page}"
+        else:
+            # Try both patterns — use whichever works
+            url = f"{base_url}?page={page}"
+
+        soup = fetch_html(url)
+        if not soup:
+            # fallback: /page/N style
+            if page > 1:
+                url2 = base_url.rstrip("/") + f"/page/{page}/"
+                soup = fetch_html(url2)
+            if not soup:
+                break
+
+        new_on_page = 0
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if href.startswith("/"):
+                full_url = base_url.rstrip("/").rsplit("/", maxsplit=10)[0] + href
+                # Safer: use scheme+netloc from base_url
+                from urllib.parse import urljoin
+                full_url = urljoin(base_url, href)
+            elif href.startswith("http"):
+                full_url = href
+            else:
+                continue
+
+            if not combined_re.search(href):
+                continue
+
+            norm = full_url.rstrip("/")
+            if norm in seen or len(norm) < 30:
+                continue
+            seen.add(norm)
+
+            h_tag = a.find(["h1","h2","h3","h4","h5"])
+            hl = h_tag.get_text(" ", strip=True) if h_tag else a.get_text(" ", strip=True)
+            hl = re.sub(r"\s+", " ", hl).strip()
+            if not hl or len(hl) < 15:
+                continue
+
+            # Date hunt — walk up DOM
+            date_obj = None
+            node = a.parent
+            for _ in range(10):
+                if node is None:
+                    break
+                tt = node.find("time")
+                if tt:
+                    date_obj = parse_date_str(tt.get("datetime","") or tt.get_text(strip=True))
+                    if date_obj:
+                        break
+                # Also scan text nodes for date patterns
+                txt = node.get_text(" ", strip=True)
+                m = re.search(r"\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b", txt, re.I)
+                if m:
+                    date_obj = parse_date_str(m.group(0))
+                    if date_obj:
+                        break
+                m2 = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", txt)
+                if m2:
+                    date_obj = parse_date_str(m2.group(1))
+                    if date_obj:
+                        break
+                node = node.parent
+
+            if date_obj and date_obj < cutoff:
+                continue
+
+            arts.append({
+                "headline": hl, "url": full_url,
+                "date_obj": date_obj, "source": source_name, "_priority": 2,
+            })
+            new_on_page += 1
+
+        if new_on_page == 0:
+            break
+        time.sleep(0.3)
+
+    return arts
+
+
+
+
 # ─── DCD URL constants ─────────────────────────────────────────────────────
 DCD_BASE             = "https://www.datacenterdynamics.com"
 # Construction channel: DCD's own filtered term-based URL (proven to work)
@@ -2013,6 +2939,15 @@ _STOPWORDS = {
     "datacenter","centers","new","says","said","says","say","also","more","than",
 }
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PER-ARTICLE SUMMARISER  — removed (BART / HF NLP tier deleted per spec)
+#  The Market Intel tab uses generate_local_summary / generate_re_summary only.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+
+
 def _tfidf_scores(headlines):
     """Lightweight TF-IDF over headline tokens → sentence score dict."""
     tokenize = lambda h: [w.lower() for w in re.findall(r"[a-zA-Z]{3,}", h)
@@ -2453,7 +3388,8 @@ def _set_cell_bg(cell, hex_color):
     tcPr.append(shd)
 
 
-def build_briefing_docx(summary_text, sel_desc, date_range, df):
+def build_briefing_docx(summary_text, sel_desc, date_range, df,
+                        title="GLOBAL DATA CENTER INTELLIGENCE BRIEFING"):
     """Return bytes of a polished Word briefing document."""
     if not _DOCX_OK:
         return None
@@ -2474,7 +3410,7 @@ def build_briefing_docx(summary_text, sel_desc, date_range, df):
     # ── Cover block ──────────────────────────────────────────────────────────
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = p.add_run("GLOBAL DATA CENTER INTELLIGENCE BRIEFING")
+    run = p.add_run(title)
     run.bold = True
     run.font.size = Pt(22)
     run.font.color.rgb = RGBColor(0x00, 0x47, 0xE1)
@@ -2498,7 +3434,7 @@ def build_briefing_docx(summary_text, sel_desc, date_range, df):
     stats = [
         ("Total Articles", str(len(df))),
         ("Top Region",     df["Region"].value_counts().index[0] if not df.empty else "—"),
-        ("Top Topic",      df["Topic"].value_counts().index[0]  if not df.empty else "—"),
+        ("Top Topic",      df["Topic"].value_counts().index[0]  if not df.empty and "Topic" in df.columns else (df["Sector"].value_counts().index[0] if not df.empty and "Sector" in df.columns else "—")),
         ("With Capacity",  str(len(df[df["Capacity"] != ""]))),
         ("With Deal Size", str(len(df[df["Deal Size"] != ""]))),
     ]
@@ -2601,7 +3537,8 @@ def build_briefing_docx(summary_text, sel_desc, date_range, df):
 #  PDF EXPORT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def build_briefing_pdf(summary_text, sel_desc, date_range, df):
+def build_briefing_pdf(summary_text, sel_desc, date_range, df,
+                       title="GLOBAL DATA CENTER INTELLIGENCE BRIEFING"):
     """Return bytes of a styled PDF briefing document."""
     if not _PDF_OK:
         return None
@@ -2650,7 +3587,7 @@ def build_briefing_pdf(summary_text, sel_desc, date_range, df):
     story = []
 
     # ── Header ────────────────────────────────────────────────────────────────
-    story.append(Paragraph("GLOBAL DATA CENTER INTELLIGENCE BRIEFING", s_title))
+    story.append(Paragraph(title, s_title))
     story.append(Paragraph(
         f"<b>Selection:</b> {sel_desc}   |   <b>Period:</b> {date_range}<br/>"
         f"Generated: {_ist_str}   |   "
@@ -2663,7 +3600,7 @@ def build_briefing_pdf(summary_text, sel_desc, date_range, df):
     stats_vals   = [
         str(len(df)),
         df["Region"].value_counts().index[0] if not df.empty else "—",
-        df["Topic"].value_counts().index[0]  if not df.empty else "—",
+        df["Topic"].value_counts().index[0]  if not df.empty and "Topic" in df.columns else (df["Sector"].value_counts().index[0] if not df.empty and "Sector" in df.columns else "—"),
         str(len(df[df["Capacity"] != ""])),
         str(len(df[df["Deal Size"] != ""])),
     ]
@@ -3302,14 +4239,638 @@ def kpi(label, value, accent="blue", delta=""):
     )
 
 
+
+# ─── RE-specific chart helpers ─────────────────────────────────────────────────
+def chart_re_sector_bar(df):
+    tc = df["Sector"].value_counts().reset_index()
+    tc.columns = ["Sector", "Count"]
+    tc = tc.sort_values("Count")
+    colors = [RE_TOPIC_COLORS.get(t, "#2e4470") for t in tc["Sector"]]
+    fig = go.Figure(go.Bar(
+        x=tc["Count"], y=tc["Sector"], orientation="h",
+        marker=dict(color=colors, line=dict(width=0), opacity=0.88),
+        text=tc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
+    ))
+    _dark(fig, 340)
+    fig.update_layout(
+        title=dict(text="Articles by Sector", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        xaxis=dict(showgrid=True, gridcolor="#0f1e36"),
+        bargap=0.28,
+    )
+    return fig
+
+def chart_re_deal_type_bar(df):
+    tc = df["Deal Type"].value_counts().reset_index()
+    tc.columns = ["Deal Type", "Count"]
+    tc = tc.sort_values("Count")
+    colors = [RE_DEAL_TYPE_COLORS.get(t, "#2e4470") for t in tc["Deal Type"]]
+    fig = go.Figure(go.Bar(
+        x=tc["Count"], y=tc["Deal Type"], orientation="h",
+        marker=dict(color=colors, line=dict(width=0), opacity=0.88),
+        text=tc["Count"], textposition="outside",
+        textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
+        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
+    ))
+    _dark(fig, 320)
+    fig.update_layout(
+        title=dict(text="Articles by Deal Type", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        bargap=0.28,
+    )
+    return fig
+
+def chart_re_status_pie(df):
+    sc = df["Status"].value_counts().reset_index()
+    sc.columns = ["Status", "Count"]
+    status_colors = {
+        "Commissioned":"#00e676","Financed":"#00b4ff","Under Construction":"#00e5c8",
+        "Approved":"#a855f7","Tendered":"#ffaa00","Contracted":"#0047e1",
+        "Proposed":"#ff6400","Challenged":"#ff2d6b","News":"#2e4470",
+    }
+    colors = [status_colors.get(s, "#2e4470") for s in sc["Status"]]
+    fig = go.Figure(go.Pie(
+        labels=sc["Status"], values=sc["Count"],
+        marker=dict(colors=colors, line=dict(color=_BG, width=2)),
+        textinfo="label+percent",
+        textfont=dict(size=10, family="DM Mono, monospace", color=_TITLE),
+        hole=0.52,
+        hovertemplate="<b>%{label}</b><br>%{value} articles · %{percent}<extra></extra>",
+    ))
+    _dark(fig, 300)
+    fig.update_layout(
+        title=dict(text="Project Status Distribution", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+        showlegend=True,
+        legend=dict(font=dict(color=_TEXT, size=10), bgcolor="rgba(0,0,0,0)"),
+    )
+    return fig
+
+def re_article_card(headline, date, url, source, country, sector, deal_type,
+                    capacity="", deal_size="", status="News", ai_score=None):
+    """Render a styled article card for Renewables Power Markets feed."""
+    sc_meta = RE_SOURCE_META.get(source, {"color": "#2e4470", "short": source[:3].upper()})
+    tc = RE_TOPIC_COLORS.get(sector, "#2e4470")
+    dt_c = RE_DEAL_TYPE_COLORS.get(deal_type, "#2e4470")
+    cap_html = (
+        f'<span style="background:rgba(255,170,0,0.12);color:#ffaa00;'
+        f'border:1px solid rgba(255,170,0,0.25);border-radius:4px;'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;" '
+        f'title="Capacity">⚡ {capacity}</span>'
+    ) if capacity else ""
+    deal_html = (
+        f'<span style="background:rgba(0,230,118,0.1);color:#00e676;'
+        f'border:1px solid rgba(0,230,118,0.25);border-radius:4px;'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;white-space:nowrap;" '
+        f'title="Deal value">{deal_size}</span>'
+    ) if deal_size else ""
+    status_colors = {
+        "Commissioned":"#00e676","Financed":"#00b4ff","Under Construction":"#00e5c8",
+        "Approved":"#a855f7","Tendered":"#ffaa00","Contracted":"#0047e1",
+        "Proposed":"#ff6400","Challenged":"#ff2d6b","News":"#2e4470",
+    }
+    st_c = status_colors.get(status, "#2e4470")
+    score_badge_html = ""
+    if ai_score is not None:
+        sc_c = "#ff6400" if ai_score>=40 else "#ffaa00" if ai_score>=25 else "#00b4ff" if ai_score>=15 else "#3a5480"
+        score_badge_html = (
+            f'<span style="background:{sc_c}22;color:{sc_c};border:1px solid {sc_c}44;'
+            f'border-radius:4px;padding:2px 7px;font-family:monospace;font-size:.62rem;font-weight:bold;">★ {ai_score}</span>'
+        )
+    is_high = ai_score is not None and ai_score >= 30
+    border_c = "#22aa55" if is_high else "#152038"
+    top_strip = (
+        '<div style="position:absolute;top:0;left:0;right:0;height:2px;'
+        'background:linear-gradient(90deg,#00e676,#00b4ff);border-radius:2px 2px 0 0;"></div>'
+        if is_high else ""
+    )
+    return (
+        f'<div class="article-card-wrap" style="background:#0b1820;border:1px solid {border_c};border-radius:10px;'
+        f'padding:.85rem 1.1rem;display:flex;justify-content:space-between;'
+        f'align-items:flex-start;gap:.9rem;margin-bottom:.45rem;position:relative;">'
+        f'{top_strip}'
+        f'<div style="flex:1;min-width:0;">'
+        f'<a href="{url}" target="_blank" '
+        f'style="color:#ccdaf5;text-decoration:none;font-family:Inter,sans-serif;'
+        f'font-size:.86rem;font-weight:500;line-height:1.5;">{headline}</a>'
+        f'<div style="margin-top:.35rem;display:flex;gap:.4rem;flex-wrap:wrap;">'
+        f'<span style="font-family:monospace;font-size:.62rem;color:#2a3e60;">📅 {date}</span>'
+        f'<span style="font-family:monospace;font-size:.62rem;color:#4a6490;">🌍 {country}</span>'
+        f'</div></div>'
+        f'<div style="display:flex;flex-direction:column;align-items:flex-end;'
+        f'gap:.28rem;flex-shrink:0;white-space:nowrap;">'
+        f'<span style="background:{sc_meta["color"]}22;color:{sc_meta["color"]};'
+        f'border:1px solid {sc_meta["color"]}44;border-radius:4px;'
+        f'padding:2px 6px;font-family:monospace;font-size:.62rem;">{sc_meta["short"]}</span>'
+        f'<span style="background:{tc}22;color:{tc};border:1px solid {tc}44;'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{sector}</span>'
+        f'<span style="background:{dt_c}22;color:{dt_c};border:1px solid {dt_c}44;'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{deal_type}</span>'
+        f'<span style="background:{st_c}18;color:{st_c};border:1px solid {st_c}44;'
+        f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{status}</span>'
+        f'{cap_html}{deal_html}{score_badge_html}'
+        f'<a href="{url}" target="_blank" '
+        f'style="font-family:monospace;font-size:.65rem;color:#00b4ff;text-decoration:none;">↗ open</a>'
+        f'</div></div>'
+    )
+
+def generate_re_summary(df, sel_desc, date_range):
+    """
+    Wood Mackenzie-grade renewables market intelligence briefing.
+    Produces deeply analytical, prose-rich sections with quantified signals,
+    sector deep-dives, deal flow analysis, and forward-looking commentary —
+    modelled on top-tier clean energy research houses (BloombergNEF, Wood Mac, BNEF).
+    """
+    headlines = df["Headline"].tolist()
+    scores    = _tfidf_scores(headlines)
+    df2 = df.copy()
+    df2["_score"] = scores
+
+    total = len(df2)
+    if total == 0:
+        return "No articles in the selected view. Adjust filters and regenerate."
+
+    # ── Core aggregations ─────────────────────────────────────────────────────
+    top_sectors    = df2["Sector"].value_counts()
+    top_deal_types = df2["Deal Type"].value_counts()
+    top_statuses   = df2["Status"].value_counts()
+    top_countries  = df2["Country"].value_counts()
+    top_regions    = df2["Region"].value_counts()
+
+    mw_df   = df2[df2["Capacity"] != ""].copy()
+    deal_df = df2[df2["Deal Size"] != ""].copy()
+    mw_vals   = mw_df["Capacity"].tolist()
+    deal_vals = deal_df["Deal Size"].tolist()
+
+    # Company counter
+    all_co_list = []
+    for v in df2["Companies"]:
+        if v:
+            all_co_list.extend([c.strip() for c in str(v).split(",") if c.strip()])
+    co_counter = Counter(all_co_list)
+    top_cos = [co for co, _ in co_counter.most_common(20)]
+
+    # Status counts
+    commissioned = int(top_statuses.get("Commissioned", 0))
+    financed     = int(top_statuses.get("Financed", 0))
+    under_c      = int(top_statuses.get("Under Construction", 0))
+    approved     = int(top_statuses.get("Approved", 0))
+    tendered     = int(top_statuses.get("Tendered", 0))
+    contracted   = int(top_statuses.get("Contracted", 0))
+    proposed     = int(top_statuses.get("Proposed", 0))
+    challenged   = int(top_statuses.get("Challenged", 0))
+
+    # Deal type counts
+    ppa_cnt    = int(top_deal_types.get("PPA", 0))
+    tender_cnt = int(top_deal_types.get("Tender / Auction", 0))
+    mou_cnt    = int(top_deal_types.get("MOU", 0))
+    aor_cnt    = int(top_deal_types.get("AOR / Offtake", 0))
+    inv_cnt    = int(top_deal_types.get("Investment / IPO", 0))
+    ma_cnt     = int(top_deal_types.get("M&A / Deals", 0))
+
+    def pct(n): return f"{round(n/total*100)}%" if total else "0%"
+    def hl(sub, n=3):
+        if sub.empty: return []
+        return sub.nlargest(n, "_score")["Headline"].tolist()
+
+    # Aggregate announced capacity
+    cap_total_mw = 0
+    for cap in mw_vals:
+        m = re.search(r"([\d,.]+)\s*(GW|MW)", str(cap), re.I)
+        if m:
+            v = float(m.group(1).replace(",", ""))
+            cap_total_mw += v * 1000 if m.group(2).upper() == "GW" else v
+
+    dominant_sector  = top_sectors.index[0]  if not top_sectors.empty  else "Solar"
+    dominant_country = top_countries.index[0] if not top_countries.empty else "—"
+    dominant_region  = top_regions.index[0]   if not top_regions.empty  else "Global"
+    dominant_deal    = top_deal_types.index[0] if not top_deal_types.empty else "General"
+
+    # Pipeline momentum signal
+    active_pipeline = proposed + tendered + contracted
+    momentum_signal = (
+        "strongly positive — new project announcements and tenders significantly outpace "
+        "commissioning, indicating an accelerating build-out cycle"
+        if active_pipeline > (commissioned + financed) * 1.5
+        else "balanced — deal origination and project commissioning are broadly in step, "
+        "reflecting a market in orderly expansion"
+        if abs(active_pipeline - commissioned) <= 5
+        else "delivery-constrained — commissioning activity is lagging behind the pipeline of "
+        "announced and tendered projects, pointing to execution and grid-connection bottlenecks"
+    )
+
+    # ── SECTION 1: EXECUTIVE SUMMARY ─────────────────────────────────────────
+    exec_lines = [
+        f"This intelligence briefing synthesises {total} renewables market articles "
+        f"published between {date_range}, filtered to: {sel_desc}. "
+        f"The analysis draws on headlines sourced from specialist renewable energy publications, "
+        f"RSS feeds, and news aggregators, auto-enriched with sector classification, deal-type "
+        f"detection, project status signals, capacity extraction, and named-entity recognition "
+        f"across {df2['Country'].nunique()} countries and {df2['Region'].nunique()} regions.",
+
+        f"\nSector concentration is led by **{dominant_sector}** at {pct(int(top_sectors.iloc[0]))} "
+        f"of total coverage"
+        + (f", followed by {' and '.join(str(t) for t in top_sectors.index[1:3])}" if len(top_sectors) > 1 else "")
+        + f". Geographic activity is centred on {dominant_region}, with {dominant_country} "
+        f"representing the single most active market. Deal flow is dominated by "
+        f"**{dominant_deal}** transactions, reflecting the current stage of the procurement cycle.",
+
+        f"\nThe project pipeline presents a {momentum_signal}. "
+        f"Status breakdown: {commissioned} commissioned/energised, {financed} reached financial close, "
+        f"{under_c} under construction, {contracted} contracted (PPA/offtake signed), "
+        f"{tendered} tendered or at auction, {proposed} proposed or announced, "
+        f"and {challenged} contested or challenged. "
+        + (f"Identified capacity across announced and tendered projects totals approximately "
+           f"**{cap_total_mw:,.0f} MW** across {len(mw_df)} discrete capacity-cited articles. "
+           if cap_total_mw > 0 else "")
+        + (f"Disclosed transaction values span {len(deal_df)} deal-citing articles including: "
+           f"{'; '.join(deal_vals[:6])}."
+           if deal_vals else ""),
+    ]
+    exec_summary = "\n\n".join(p.strip() for p in exec_lines if p.strip())
+
+    # ── SECTION 2: SECTOR DYNAMICS ───────────────────────────────────────────
+    sector_lines = []
+    for sector, cnt in top_sectors.items():
+        sub = df2[df2["Sector"] == sector]
+        examples = hl(sub, 2)
+
+        # Sub-metrics for each sector
+        sec_commissioned = int((sub["Status"] == "Commissioned").sum())
+        sec_contracted   = int((sub["Status"] == "Contracted").sum())
+        sec_tendered     = int((sub["Status"] == "Tendered").sum())
+        sec_proposed     = int((sub["Status"] == "Proposed").sum())
+        sec_cap_arts     = sub[sub["Capacity"] != ""]["Capacity"].tolist()
+        sec_ppa          = int((sub["Deal Type"] == "PPA").sum())
+        sec_countries    = sub["Country"].value_counts().head(4).index.tolist()
+
+        pipeline_str = []
+        if sec_proposed:   pipeline_str.append(f"{sec_proposed} proposed")
+        if sec_tendered:   pipeline_str.append(f"{sec_tendered} tendered")
+        if sec_contracted: pipeline_str.append(f"{sec_contracted} contracted")
+        if sec_commissioned: pipeline_str.append(f"{sec_commissioned} commissioned")
+
+        detail = f"({pct(cnt)})"
+        if sec_countries and sec_countries != ["Global"]:
+            detail += f" · Key markets: {', '.join(sec_countries)}"
+        if pipeline_str:
+            detail += f" · Pipeline: {', '.join(pipeline_str)}"
+        if sec_ppa:
+            detail += f" · PPAs: {sec_ppa}"
+        if sec_cap_arts:
+            detail += f" · Capacity cited: {'; '.join(sec_cap_arts[:3])}"
+
+        ex_str = ""
+        if examples:
+            h1 = examples[0][:115].rsplit(" ", 1)[0] if len(examples[0]) > 115 else examples[0]
+            ex_str = f'\n  Notable: "{h1}"'
+            if len(examples) > 1:
+                h2 = examples[1][:100].rsplit(" ", 1)[0] if len(examples[1]) > 100 else examples[1]
+                ex_str += f'; "{h2}".'
+            else:
+                ex_str += "."
+
+        sector_lines.append(
+            f"• **{sector}** — {cnt} article{'s' if cnt > 1 else ''} {detail}.{ex_str}"
+        )
+
+    # ── SECTION 3: DEAL FLOW & TRANSACTION ANALYSIS ──────────────────────────
+    deal_type_lines = []
+    for dt, cnt in top_deal_types.items():
+        dt_sub = df2[df2["Deal Type"] == dt]
+        dt_countries = dt_sub["Country"].value_counts().head(3).index.tolist()
+        dt_sectors   = dt_sub["Sector"].value_counts().head(3).index.tolist()
+        dt_cap_arts  = dt_sub[dt_sub["Capacity"] != ""]["Capacity"].tolist()
+        dt_examples  = hl(dt_sub, 1)
+
+        detail_parts = [f"{pct(cnt)} of deal flow"]
+        if dt_countries and dt_countries != ["Global"]:
+            detail_parts.append(f"active in {', '.join(dt_countries)}")
+        if dt_sectors:
+            detail_parts.append(f"across {', '.join(dt_sectors)}")
+        if dt_cap_arts:
+            detail_parts.append(f"capacity: {'; '.join(dt_cap_arts[:2])}")
+
+        ex_str = ""
+        if dt_examples:
+            h = dt_examples[0][:105].rsplit(" ", 1)[0] if len(dt_examples[0]) > 105 else dt_examples[0]
+            ex_str = f'\n  Example: "{h}".'
+
+        deal_type_lines.append(
+            f"• **{dt}** — {cnt} transaction event{'s' if cnt > 1 else ''} | "
+            + " · ".join(detail_parts)
+            + f".{ex_str}"
+        )
+
+    deal_intro = (
+        f"Transaction activity across the filtered dataset totals {total} articles. "
+        f"PPAs account for {ppa_cnt} events, tenders/auctions for {tender_cnt}, "
+        f"MOUs for {mou_cnt}, offtake agreements for {aor_cnt}, "
+        f"investment/IPO events for {inv_cnt}, and M&A for {ma_cnt}. "
+    )
+    if ppa_cnt > tender_cnt and ppa_cnt > 0:
+        deal_intro += (
+            "The dominance of PPA activity signals a maturing procurement environment "
+            "where developers are prioritising revenue certainty ahead of financial close. "
+        )
+    elif tender_cnt > ppa_cnt and tender_cnt > 0:
+        deal_intro += (
+            "The elevated tender volume indicates governments and utilities are actively "
+            "expanding capacity procurement pipelines, which should drive PPA activity in subsequent quarters. "
+        )
+    if deal_vals:
+        deal_intro += (
+            f"Disclosed deal values in the current selection include: {'; '.join(deal_vals[:8])}."
+        )
+
+    # ── SECTION 4: MAJOR PROJECTS & CAPACITY ANNOUNCEMENTS ───────────────────
+    proj_bullets = []
+    deal_sub = deal_df.nlargest(min(10, len(deal_df)), "_score") if not deal_df.empty else pd.DataFrame()
+    for _, r in deal_sub.iterrows():
+        parts = [f"**{r['Headline'][:130]}**"]
+        tags  = []
+        if r.get("Deal Size"): tags.append(f"Deal: {r['Deal Size']}")
+        if r.get("Capacity"):  tags.append(f"Capacity: {r['Capacity']}")
+        if r.get("Country"):   tags.append(f"Market: {r['Country']}")
+        if r.get("Sector"):    tags.append(f"Sector: {r['Sector']}")
+        if r.get("Companies"): tags.append(f"Parties: {r['Companies']}")
+        if r.get("Status"):    tags.append(f"Status: {r['Status']}")
+        if tags: parts.append(" · ".join(tags))
+        proj_bullets.append("• " + " | ".join(parts))
+
+    cap_only = mw_df[mw_df["Deal Size"] == ""].nlargest(min(8, len(mw_df)), "_score") if not mw_df.empty else pd.DataFrame()
+    for _, r in cap_only.iterrows():
+        parts = [f"**{r['Headline'][:130]}**"]
+        tags  = [f"Capacity: {r['Capacity']}", f"Market: {r['Country']}", f"Sector: {r.get('Sector','')}"]
+        if r.get("Companies"): tags.append(f"Parties: {r['Companies']}")
+        if r.get("Status"):    tags.append(f"Status: {r['Status']}")
+        parts.append(" · ".join(t for t in tags if t.split(": ")[1]))
+        proj_bullets.append("• " + " | ".join(parts))
+
+    if not proj_bullets:
+        for _, r in df2.nlargest(10, "_score").iterrows():
+            proj_bullets.append(
+                f"• **{r['Headline'][:130]}** | Market: {r['Country']} · Sector: {r['Sector']} · Status: {r.get('Status','—')}"
+            )
+
+    # ── SECTION 5: POLICY, REGULATION & PERMITTING ───────────────────────────
+    policy_df  = df2[df2["Deal Type"] == "Policy / Reg"]
+    chall_df   = df2[df2["Status"] == "Challenged"]
+    appr_df    = df2[df2["Status"] == "Approved"]
+    tendered_df= df2[df2["Status"] == "Tendered"]
+
+    policy_intro = (
+        f"Policy and regulatory activity accounts for {len(policy_df)} articles "
+        f"({pct(len(policy_df))}) in the current selection. "
+    )
+    if len(chall_df) > 0:
+        policy_intro += (
+            f"{len(chall_df)} project{'s' if len(chall_df)>1 else ''} face contested or challenged status, "
+            f"indicating {'elevated' if len(chall_df) > 4 else 'moderate'} regulatory or community resistance. "
+        )
+    if len(appr_df) > 0:
+        policy_intro += f"{len(appr_df)} project{'s' if len(appr_df)>1 else ''} received approvals or permits in the period. "
+    if len(tendered_df) > 0:
+        policy_intro += (
+            f"{len(tendered_df)} auction or tender event{'s' if len(tendered_df)>1 else ''} detected, "
+            f"reflecting active government procurement across "
+            f"{tendered_df['Country'].value_counts().head(3).index.tolist()} markets. "
+        )
+    if policy_df.empty and chall_df.empty:
+        policy_intro += "No specific policy friction or permitting events detected in the current filter."
+
+    policy_bullets = ["• " + h for h in hl(pd.concat([policy_df, chall_df, appr_df, tendered_df]).drop_duplicates(), 8)]
+    if not policy_bullets:
+        policy_bullets = ["• No policy-specific articles in the current selection."]
+
+    # ── SECTION 6: COMPANY & DEVELOPER ACTIVITY ──────────────────────────────
+    # Categorise participants
+    developers  = {"Ørsted","RWE","BP","Shell","TotalEnergies","Equinor","Engie","EDF","Enel","Iberdrola",
+                   "Vattenfall","SSE","ScottishPower","E.ON","Innogy","Lightsource","Lightsource BP",
+                   "Acciona","AES","NextEra","Duke Energy","Dominion","Invenergy","Terra-Gen",
+                   "Enercon","Vestas","Siemens Gamesa","GE Vernova","SGRE","MHI Vestas",
+                   "BayWa","Statkraft","Neste","Northland Power","Pattern Energy","Terraform",
+                   "Greenko","ReNew Power","Adani","NTPC","CESC","Tata Power","Azure Power",
+                   "Sembcorp","Masdar","ACWA Power","Saudi Aramco","JERA","KEPCO",
+                   "Intersect Power","Longroad","Avangrid","Eversource","National Grid"}
+    offtakers   = {"Microsoft","Google","Amazon","AWS","Meta","Apple","Facebook","Walmart",
+                   "Amazon Web Services","Apple","IKEA","Tesla","GM","Ford","Volkswagen",
+                   "Starbucks","Bloomberg","Goldman Sachs","JPMorgan","BlackRock","Vanguard",
+                   "British Steel","ArcelorMittal","BASF","Air Products","Air Liquide",
+                   "Anglo American","Rio Tinto","BHP","Glencore","Lafarge","Holcim"}
+    financiers  = {"BlackRock","Macquarie","KKR","Brookfield","Copenhagen Infrastructure",
+                   "Green Investment Group","CDPQ","CPP Investments","Stonepeak","Actis",
+                   "Quinbrook","Ardian","Infravia","ICG","AMP Capital","EIB","IFC","AIIB","ADB",
+                   "World Bank","EBRD","Green Climate Fund","NatWest","HSBC","Barclays",
+                   "BNP Paribas","Société Générale","Deutsche Bank","Crédit Agricole"}
+
+    mentioned_cos = [(co, cnt) for co, cnt in co_counter.most_common(30)]
+
+    co_section_lines = []
+    if mentioned_cos:
+        devs_m   = [(co, c) for co, c in mentioned_cos if co in developers]
+        offt_m   = [(co, c) for co, c in mentioned_cos if co in offtakers]
+        fin_m    = [(co, c) for co, c in mentioned_cos if co in financiers]
+        other_m  = [(co, c) for co, c in mentioned_cos if co not in developers and co not in offtakers and co not in financiers]
+
+        # Narrative intro
+        intro_parts = []
+        if devs_m:
+            intro_parts.append(
+                f"Renewable developers/utilities with notable activity include "
+                f"{', '.join(co for co, _ in devs_m[:6])} — signalling active project pipelines "
+                f"across multiple geographies."
+            )
+        if offt_m:
+            intro_parts.append(
+                f"Corporate offtakers prominent in this period: "
+                f"{', '.join(co for co, _ in offt_m[:5])} — consistent with the accelerating "
+                f"trend of tech and industrial corporates securing long-term clean energy supply."
+            )
+        if fin_m:
+            intro_parts.append(
+                f"Financial sponsors and infrastructure capital active in the dataset: "
+                f"{', '.join(co for co, _ in fin_m[:5])}, indicating continued investor appetite "
+                f"for renewables as an asset class."
+            )
+        if intro_parts:
+            co_section_lines.append("\n".join(intro_parts))
+        co_section_lines.append("")
+
+        for co, cnt in mentioned_cos[:20]:
+            co_arts = df2[
+                df2["Companies"].str.contains(re.escape(co), na=False, case=False) |
+                df2["Headline"].str.contains(re.escape(co), na=False, case=False)
+            ]
+            sectors_seen   = co_arts["Sector"].value_counts().head(3).index.tolist()
+            statuses_seen  = co_arts["Status"].value_counts().head(2).index.tolist()
+            deal_types_seen= co_arts["Deal Type"].value_counts().head(2).index.tolist()
+            countries_seen = co_arts["Country"].value_counts().head(3).index.tolist()
+            cap_arts       = co_arts[co_arts["Capacity"] != ""]["Capacity"].tolist()
+            deal_arts      = co_arts[co_arts["Deal Size"] != ""]["Deal Size"].tolist()
+
+            detail_parts = [f"sectors: {', '.join(sectors_seen) if sectors_seen else 'General'}"]
+            if countries_seen and countries_seen != ["Global"]:
+                detail_parts.append(f"markets: {', '.join(countries_seen)}")
+            if deal_types_seen:
+                detail_parts.append(f"deal types: {', '.join(deal_types_seen)}")
+            if statuses_seen:
+                detail_parts.append(f"status signals: {', '.join(statuses_seen)}")
+            if cap_arts:
+                detail_parts.append(f"capacity cited: {'; '.join(cap_arts[:3])}")
+            if deal_arts:
+                detail_parts.append(f"deal flow: {'; '.join(deal_arts[:2])}")
+
+            co_section_lines.append(
+                f"• **{co}** — {cnt} article{'s' if cnt > 1 else ''} | "
+                + " | ".join(detail_parts)
+            )
+    else:
+        co_section_lines.append(
+            "• No named company entities detected in the current filtered view. "
+            "Consider broadening the date range, sector, or region filters to surface developer-level signals."
+        )
+
+    # ── SECTION 7: REGIONAL BREAKDOWN ────────────────────────────────────────
+    region_lines = []
+    for region, rdf in df2.groupby("Region"):
+        top_c        = rdf["Country"].value_counts().head(5).index.tolist()
+        top_sec      = rdf["Sector"].value_counts().head(3).index.tolist()
+        top_dt       = rdf["Deal Type"].value_counts().head(2).index.tolist()
+        cap_in_reg   = rdf[rdf["Capacity"] != ""]["Capacity"].tolist()
+        deals_reg    = rdf[rdf["Deal Size"] != ""]["Deal Size"].tolist()
+        prop_reg     = len(rdf[rdf["Status"] == "Proposed"])
+        comm_reg     = len(rdf[rdf["Status"] == "Commissioned"])
+        chall_reg    = len(rdf[rdf["Status"] == "Challenged"])
+        tender_reg   = len(rdf[rdf["Status"] == "Tendered"])
+        contracted_r = len(rdf[rdf["Status"] == "Contracted"])
+
+        region_lines.append(f"• **{region}** — {len(rdf)} articles ({pct(len(rdf))})")
+        region_lines.append(
+            f"  Lead markets: {', '.join(top_c)}. "
+            f"Dominant sectors: {', '.join(top_sec)}. "
+            f"Deal types: {', '.join(top_dt)}. "
+            f"Pipeline: {prop_reg} proposed, {tender_reg} tendered, {contracted_r} contracted, "
+            f"{comm_reg} commissioned, {chall_reg} challenged."
+            + (f" Capacity cited: {'; '.join(cap_in_reg[:4])}." if cap_in_reg else "")
+            + (f" Deal flow: {'; '.join(deals_reg[:3])}." if deals_reg else "")
+        )
+
+    # ── SECTION 8: MARKET OUTLOOK & FORWARD SIGNALS ──────────────────────────
+    reg_risk = (
+        "elevated" if challenged > 5
+        else "moderate" if challenged > 2
+        else "low"
+    )
+
+    outlook_bullets = [
+        f"• **Pipeline momentum:** The overall pipeline is {momentum_signal}. "
+        f"With {proposed + tendered} projects at proposal or tender stage, "
+        f"{contracted} contracted, {under_c} under construction, and {commissioned} "
+        f"recently commissioned, the market is demonstrating "
+        f"{'strong end-to-end delivery velocity' if commissioned >= 3 else 'active origination but watch delivery timelines'}.",
+
+        f"• **Deal origination:** {ppa_cnt} PPA events, {tender_cnt} auctions/tenders, "
+        f"and {mou_cnt} MOUs signal "
+        + ("robust bilateral procurement momentum alongside government-led capacity auctions."
+           if ppa_cnt > 0 and tender_cnt > 0
+           else "active but concentrated deal origination — diversification across deal structures is limited."
+           ),
+
+        f"• **Regulatory environment:** Risk is assessed as {reg_risk} — "
+        f"{challenged} contested or challenged project{'s' if challenged != 1 else ''} in the dataset. "
+        + ("Grid connection constraints, permitting delays, and community opposition represent the "
+           "primary near-term threats to project delivery in this geography and period."
+           if challenged > 3
+           else "The regulatory environment appears broadly supportive of new capacity additions."),
+
+        f"• **Developer & investor watch:** {', '.join(top_cos[:8])} are the highest-frequency "
+        f"participants in this period. Monitor for capacity announcements, PPA signings, "
+        f"M&A activity, and financial close events.",
+    ]
+
+    if cap_total_mw > 0:
+        outlook_bullets.append(
+            f"• **Capacity pipeline:** {len(mw_df)} articles reference explicit MW or GW figures. "
+            f"Aggregate announced capacity stands at approximately **{cap_total_mw:,.0f} MW** across "
+            f"disclosed projects. Actual delivered capacity will depend on permitting approvals, "
+            f"grid connection queue position, and financing milestones."
+        )
+    if deal_vals:
+        outlook_bullets.append(
+            f"• **Capital deployment:** {len(deal_df)} deal-citing articles disclose transactions "
+            f"totalling {', '.join(deal_vals[:8])}. "
+            f"Deal density and disclosed values indicate continued strong capital flow into the clean energy sector."
+        )
+    if inv_cnt > 0 or ma_cnt > 0:
+        outlook_bullets.append(
+            f"• **M&A & investment signals:** {inv_cnt} investment/IPO and {ma_cnt} M&A events "
+            f"detected. Elevated M&A and fundraising activity typically presages accelerated "
+            f"project development in the 12–18 months following close."
+        )
+
+    # ── Assemble final document ───────────────────────────────────────────────
+    doc_parts = [
+        "## 1. Executive Summary\n\n",
+        exec_summary, "\n\n",
+
+        "## 2. Sector Dynamics\n\n",
+        f"Coverage across {total} articles spans {len(top_sectors)} sector{'s' if len(top_sectors)>1 else ''}: "
+        f"{', '.join(f'{s} ({c})' for s, c in top_sectors.items())}.\n\n",
+        "\n".join(sector_lines), "\n\n",
+
+        "## 3. Deal Flow & Transaction Analysis\n\n",
+        deal_intro + "\n\n",
+        "\n".join(deal_type_lines), "\n\n",
+
+        "## 4. Major Projects, Deals & Capacity Announcements\n\n",
+        "\n".join(proj_bullets) if proj_bullets else "• No capacity or deal-cited articles in the current selection.", "\n\n",
+
+        "## 5. Policy, Regulation & Procurement\n\n",
+        policy_intro + "\n\n",
+        "\n".join(policy_bullets), "\n\n",
+
+        "## 6. Developer, Offtaker & Investor Activity\n\n",
+        "\n".join(co_section_lines), "\n\n",
+
+        "## 7. Regional Breakdown\n\n",
+        "\n".join(region_lines), "\n\n",
+
+        "## 8. Market Outlook & Forward Signals\n\n",
+        "\n".join(outlook_bullets), "\n",
+    ]
+
+    return "".join(doc_parts)
+
 def main():
     st.set_page_config(
-        page_title="Global Data Center Intelligence",
-        page_icon="\U0001f310",
+        page_title="Global Energy Intelligence Platform",
+        page_icon="⚡",
         layout="wide",
         initial_sidebar_state="expanded",
     )
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+    # ── Additional CSS for dual-platform layout ───────────────────────────────
+    st.markdown("""
+    <style>
+    .platform-tab-active {
+        background: linear-gradient(135deg, #0047e1, #00b4ff) !important;
+        color: #fff !important; border-color: transparent !important;
+        box-shadow: 0 4px 18px rgba(0,71,225,0.35) !important;
+    }
+    .platform-tab-re-active {
+        background: linear-gradient(135deg, #00aa44, #00e676) !important;
+        color: #fff !important; border-color: transparent !important;
+        box-shadow: 0 4px 18px rgba(0,200,80,0.35) !important;
+    }
+    .mode-pill {
+        display:inline-flex;align-items:center;gap:.5rem;
+        padding:.38rem 1rem;border-radius:20px;
+        font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.06em;
+        font-weight:600;cursor:pointer;transition:all .2s;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # ── Timezone detection via browser JS ────────────────────────────────────
     # Reads the browser IANA tz and writes it into query params.
@@ -3543,7 +5104,7 @@ def main():
         st.markdown(
             '<div style="padding:.9rem 0 .4rem;">'
             '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#b8c8e0;'
-            'letter-spacing:.02em;margin-bottom:.06rem;">Global Data Center</div>'
+            'letter-spacing:.02em;margin-bottom:.06rem;">Global Energy</div>'
             '<div style="font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;color:#00b4ff;'
             'letter-spacing:.02em;margin-bottom:.28rem;">Intelligence Platform</div>'
             '<div style="font-family:monospace;font-size:.58rem;letter-spacing:.08em;color:#2a3e60;">'
@@ -3553,7 +5114,42 @@ def main():
         )
         st.divider()
 
-        st.markdown("**\U0001f4c5 Date Range**")
+        # ── PLATFORM MODE SELECTOR ─────────────────────────────────────────────
+        st.markdown(
+            '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
+            'text-transform:uppercase;font-family:monospace;margin-bottom:.4rem;">'
+            '▸ INTELLIGENCE MODULE</div>',
+            unsafe_allow_html=True,
+        )
+        platform_mode = st.radio(
+            "Module",
+            ["🏢 Data Center Markets", "🌱 Renewables Power Markets"],
+            index=0,
+            label_visibility="collapsed",
+            help="Switch between Data Center Intelligence and Renewables Power Markets.",
+        )
+        st.markdown('<div style="height:.2rem;"></div>', unsafe_allow_html=True)
+
+        # Colour indicator for active module
+        if "Renewables" in platform_mode:
+            st.markdown(
+                '<div style="background:linear-gradient(90deg,rgba(0,200,80,0.12),transparent);'
+                'border-left:3px solid #00e676;border-radius:0 6px 6px 0;'
+                'padding:.38rem .75rem;font-family:DM Mono,monospace;font-size:.62rem;color:#00e676;'
+                'letter-spacing:.08em;margin-bottom:.5rem;">🌱 RENEWABLES ACTIVE</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="background:linear-gradient(90deg,rgba(0,71,225,0.12),transparent);'
+                'border-left:3px solid #0047e1;border-radius:0 6px 6px 0;'
+                'padding:.38rem .75rem;font-family:DM Mono,monospace;font-size:.62rem;color:#0047e1;'
+                'letter-spacing:.08em;margin-bottom:.5rem;">🏢 DATA CENTER ACTIVE</div>',
+                unsafe_allow_html=True,
+            )
+        st.divider()
+
+
         time_opt = st.radio(
             "", ["Latest (all)", "Past 30 days", "Past 14 days", "Past 7 days", "Custom Range"],
             index=0, label_visibility="collapsed",
@@ -3605,74 +5201,49 @@ def main():
             unsafe_allow_html=True,
         )
 
-        # ── News Type ─────────────────────────────────────────────────────────
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
-            'text-transform:uppercase;margin:.9rem 0 .2rem;">📰 News Type</div>',
-            unsafe_allow_html=True,
-        )
-        news_type_sel = st.multiselect(
-            "News Type",
-            [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL],
-            default=[NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL],
-            placeholder="Select channel(s)…",
-            label_visibility="collapsed",
-            help=(
-                "Construction → DCD Data Center Construction Channel\n"
-                "General News → DCD General News feed"
-            ),
-        )
-        # Friendly label shown under the selector
-        _nt_labels = {
-            NEWS_TYPE_CONSTRUCTION: "🏗️ Construction Channel",
-            NEWS_TYPE_GENERAL:      "📰 General News",
-        }
-        if news_type_sel:
-            st.markdown(
-                '<div style="font-size:.68rem;color:#1a2e50;margin-top:-.3rem;margin-bottom:.4rem;">'
-                + " · ".join(_nt_labels[n] for n in news_type_sel if n in _nt_labels)
-                + '</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.warning("Select at least one news channel.")
-
         use_html  = True
         use_rss   = True
         use_gn    = True
 
         st.divider()
 
-        # ── FILTER PANEL — always visible from the start ──────────────────────
-        # Filter version counter (incremented on "Clear All" to reset widget keys)
+        # ── FILTER PANEL — mode-aware (switches between DC and RE) ──────────
         if "_filter_ver" not in st.session_state:
             st.session_state["_filter_ver"] = 0
         _fv = st.session_state["_filter_ver"]
         def _fk(name): return f"{name}_v{_fv}"
 
-        def _fuzzy_resolve(typed, candidates):
-            if not typed:
-                return []
-            t = typed.strip().lower()
-            return [c for c in candidates if t in c.lower()]
+        _is_re_mode = "Renewables" in platform_mode
 
-        # Pull live data if available, else use empty fallbacks
-        _data_loaded = "df_full" in st.session_state and st.session_state.df_full is not None
-        if _data_loaded:
-            df_full = st.session_state.df_full
-            all_regions_av   = sorted(df_full["Region"].dropna().unique().tolist())
-            all_countries_av = sorted(df_full["Country"].dropna().unique().tolist())
-            all_topics_av    = sorted(df_full["Topic"].dropna().unique().tolist())
-            all_sents_av     = sorted(df_full["Sentiment"].dropna().unique().tolist())
-            _all_co_raw = []
-            for v in df_full["Companies"]:
-                if v:
-                    _all_co_raw.extend([c.strip() for c in str(v).split(",")])
+        # ── Pull live data for filter option lists ─────────────────────────────
+        _dc_loaded = "df_full"    in st.session_state and st.session_state.df_full    is not None
+        _re_loaded = "re_df_full" in st.session_state and st.session_state.re_df_full is not None
+
+        if _is_re_mode and _re_loaded:
+            _src = st.session_state.re_df_full
+            all_regions_av   = sorted(_src["Region"].dropna().unique().tolist())
+            all_countries_av = sorted(_src["Country"].dropna().unique().tolist())
+            # DC-only lists (safe defaults — never rendered in RE mode)
+            all_topics_av    = sorted(TOPIC_COLORS.keys())
+            all_sents_av     = ["Opened / Live", "Approved", "Proposed",
+                                 "Under Construction", "Challenged", "News"]
+            all_companies_av = KNOWN_COMPANIES
+            _all_iso_in_data = []
+        elif not _is_re_mode and _dc_loaded:
+            _src = st.session_state.df_full
+            all_regions_av   = sorted(_src["Region"].dropna().unique().tolist())
+            all_countries_av = sorted(_src["Country"].dropna().unique().tolist())
+            all_topics_av    = sorted(_src["Topic"].dropna().unique().tolist())
+            all_sents_av     = sorted(_src["Sentiment"].dropna().unique().tolist())
+            _all_co_raw      = []
+            for _v in _src["Companies"]:
+                if _v:
+                    _all_co_raw.extend([c.strip() for c in str(_v).split(",")])
             all_companies_av = sorted(set(c for c in _all_co_raw if c))
             _all_iso_in_data = sorted(set(
-                v for v in df_full.get("ISO / RTO", pd.Series(dtype=str)).tolist()
+                v for v in _src["ISO / RTO"].tolist()
                 if v and str(v) != "nan" and str(v).strip()
-            )) if "ISO / RTO" in df_full.columns else []
+            )) if "ISO / RTO" in _src.columns else []
         else:
             all_regions_av   = sorted(REGION_COLORS.keys())
             all_countries_av = sorted(COUNTRY_TO_REGION.keys())
@@ -3682,58 +5253,27 @@ def main():
             all_companies_av = KNOWN_COMPANIES
             _all_iso_in_data = []
 
-        # ── SECTION HEADER ────────────────────────────────────────────────────
+        # ── Colour-coded header that switches with the active module ───────────
+        _fa   = "#00e676" if _is_re_mode else "#0047e1"
+        _fbg  = "rgba(0,200,80,0.12)" if _is_re_mode else "rgba(0,71,225,0.12)"
+        _flbl = "🌱 Renewables Filters" if _is_re_mode else "🏢 Data Center Filters"
         st.markdown(
-            '<div style="background:linear-gradient(90deg,rgba(0,71,225,0.12),transparent);'
-            'border-left:3px solid #0047e1;border-radius:0 6px 6px 0;'
-            'padding:.45rem .75rem;margin-bottom:.6rem;">'
-            '<span style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
-            'font-size:.8rem;letter-spacing:.05em;">Filter</span>'
-            '</div>',
+            f'<div style="background:linear-gradient(90deg,{_fbg},transparent);'
+            f'border-left:3px solid {_fa};border-radius:0 6px 6px 0;'
+            f'padding:.45rem .75rem;margin-bottom:.6rem;">'
+            f'<span style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+            f'font-size:.8rem;letter-spacing:.05em;">{_flbl}</span>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
-        # ── GROUP 1 · SEARCH ──────────────────────────────────────────────────
+        # ── GEOGRAPHY — shared by both modes ───────────────────────────────────
         st.markdown(
             '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
             'text-transform:uppercase;font-family:monospace;margin:.7rem 0 .35rem .05rem;">'
-            '▸ SEARCH</div>',
-            unsafe_allow_html=True,
-        )
-
-        # 1a. Keyword  ← now FIRST
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-            'text-transform:uppercase;margin-bottom:.2rem;">🔤 Keyword</div>',
-            unsafe_allow_html=True,
-        )
-        keyword = st.text_input(
-            "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
-            label_visibility="collapsed", key=_fk("f_keyword"),
-        )
-
-        # 1b. Company
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-            'text-transform:uppercase;margin:.75rem 0 .2rem;">🏢 Company</div>',
-            unsafe_allow_html=True,
-        )
-        full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
-        sel_companies = st.multiselect(
-            "Company", full_co_pool, default=[],
-            placeholder="All companies — type to search",
-            label_visibility="collapsed", key=_fk("f_companies"),
-        )
-
-        # ── GROUP 2 · GEOGRAPHY ───────────────────────────────────────────────
-        st.markdown(
-            '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
-            'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
             '▸ GEOGRAPHY</div>',
             unsafe_allow_html=True,
         )
-
-        # 2a. Region
         st.markdown(
             '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
             'text-transform:uppercase;margin-bottom:.2rem;">🌐 Region</div>',
@@ -3745,7 +5285,6 @@ def main():
             key=_fk("f_regions"),
         )
 
-        # 2b. Country (cascades from region)
         all_world_countries = sorted(set(list(COUNTRY_TO_REGION.keys()) + all_countries_av))
         if sel_regions:
             world_pool = sorted([c for c in all_world_countries
@@ -3764,110 +5303,994 @@ def main():
             key=_fk("f_countries"),
         )
 
-        # 2c. State (cascades from country, only if applicable)
-        state_pool = []
-        for c in (sel_countries if sel_countries else world_pool):
-            state_pool.extend(COUNTRY_STATES.get(c, []))
-        state_pool = sorted(set(state_pool))
-
-        sel_states = []
-        if state_pool:
-            st.markdown(
-                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-                'text-transform:uppercase;margin:.75rem 0 .2rem;">📍 State / Province</div>',
+        # ══════════════════════════════════════════════════════════════════════
+        #  MODE-SPECIFIC CONTENT FILTERS
+        # ══════════════════════════════════════════════════════════════════════
+        if _is_re_mode:
+            # ── RENEWABLES FILTERS ─────────────────────────────────────────────
+            _lbl = lambda txt: st.markdown(
+                f'<div style="font-size:.72rem;color:#2a6040;letter-spacing:.06em;'
+                f'text-transform:uppercase;margin:.75rem 0 .2rem;">{txt}</div>',
                 unsafe_allow_html=True,
             )
-            sel_states = st.multiselect(
-                "State", state_pool, default=[],
-                placeholder="All states/provinces", label_visibility="collapsed",
-                key=_fk("f_states"),
+
+            # ── State / Province (RE mode) ────────────────────────────────────
+            re_state_pool = []
+            for c in (sel_countries if sel_countries else list(COUNTRY_STATES.keys())):
+                re_state_pool.extend(COUNTRY_STATES.get(c, []))
+            re_state_pool = sorted(set(re_state_pool))
+
+            re_state_sel = []
+            if re_state_pool:
+                _lbl("📍 State / Province")
+                re_state_sel = st.multiselect(
+                    "RE State", re_state_pool, default=[],
+                    placeholder="All states/provinces",
+                    label_visibility="collapsed",
+                    key=_fk("f_re_states"),
+                )
+
+            st.markdown(
+                '<div style="font-size:.65rem;color:#1a4a2e;letter-spacing:.1em;'
+                'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
+                '▸ CONTENT FILTERS</div>',
+                unsafe_allow_html=True,
             )
 
-        # 2d. ISO / RTO / Grid
-        _iso_pool = sorted(set(_all_iso_in_data + list(US_ISO_RTO.keys()) + list(GLOBAL_GRID_OPERATORS.keys())))
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-            'text-transform:uppercase;margin:.75rem 0 .2rem;">⚡ ISO / RTO / Grid</div>',
-            unsafe_allow_html=True,
-        )
-        sel_iso_rto = st.multiselect(
-            "ISO/RTO", _iso_pool, default=[],
-            placeholder="All grid operators", label_visibility="collapsed",
-            key=_fk("f_iso_rto"),
-        )
+            # ── Sector (drives which feeds are fetched) ────────────────────────
+            _lbl("🌱 Sector")
+            re_sector_sel = st.multiselect(
+                "Sector",
+                options=list(RE_TOPIC_COLORS.keys()),
+                default=[],
+                placeholder="All sectors  (Solar · Wind · Storage · OSW · H₂ · Other)",
+                label_visibility="collapsed",
+                key=_fk("f_re_sector"),
+            )
+            # Show feed count hint
+            if re_sector_sel:
+                n_feeds = sum(len(RE_FEED_REGISTRY.get(s, [])) for s in re_sector_sel) + len(RE_CROSS_FEEDS)
+                st.markdown(
+                    f'<div style="font-size:.62rem;color:#2a6040;font-family:monospace;'
+                    f'margin:.1rem 0 .4rem .05rem;">↳ {n_feeds} feeds · '
+                    + " · ".join(re_sector_sel)
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                total_feeds = sum(len(v) for v in RE_FEED_REGISTRY.values()) + len(RE_CROSS_FEEDS)
+                st.markdown(
+                    f'<div style="font-size:.62rem;color:#1a4a2e;font-family:monospace;'
+                    f'margin:.1rem 0 .4rem .05rem;">↳ All {total_feeds} feeds across 6 sectors</div>',
+                    unsafe_allow_html=True,
+                )
 
-        # ── GROUP 3 · CONTENT ─────────────────────────────────────────────────
-        st.markdown(
-            '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
-            'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
-            '▸ CONTENT</div>',
-            unsafe_allow_html=True,
-        )
+            # ── Deal Type ─────────────────────────────────────────────────────
+            _lbl("📋 Deal Type")
+            re_deal_type_sel = st.multiselect(
+                "Deal Type",
+                options=list(RE_DEAL_TYPE_COLORS.keys()),
+                default=[],
+                placeholder="PPA · MOU · Tender · Investment · M&A…",
+                label_visibility="collapsed",
+                key=_fk("f_re_deal"),
+            )
 
-        # 3a. Topic
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-            'text-transform:uppercase;margin-bottom:.2rem;">🏷️ Topic</div>',
-            unsafe_allow_html=True,
-        )
-        sel_topics = st.multiselect(
-            "Topic", all_topics_av, default=[],
-            placeholder="All topics", label_visibility="collapsed",
-            key=_fk("f_topics"),
-        )
+            # ── Project Status ────────────────────────────────────────────────
+            _lbl("📊 Project Status")
+            _re_statuses = [
+                "Commissioned", "Financed", "Under Construction",
+                "Approved", "Tendered", "Contracted",
+                "Proposed", "Challenged", "News",
+            ]
+            re_status_sel = st.multiselect(
+                "RE Status", _re_statuses, default=[],
+                placeholder="All statuses",
+                label_visibility="collapsed",
+                key=_fk("f_re_status"),
+            )
 
-        # 3b. Project Status
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-            'text-transform:uppercase;margin:.75rem 0 .2rem;">📊 Project Status</div>',
-            unsafe_allow_html=True,
-        )
-        sel_sents = st.multiselect(
-            "Status", all_sents_av, default=[],
-            placeholder="All statuses", label_visibility="collapsed",
-            key=_fk("f_sents"),
-        )
+            # ── Keyword ───────────────────────────────────────────────────────
+            _lbl("🔤 Keyword")
+            re_keyword = st.text_input(
+                "RE Keyword",
+                placeholder="e.g. 500MW, India, Ørsted, PPA...",
+                label_visibility="collapsed",
+                key=_fk("f_re_keyword"),
+            )
 
-        # 3c. Min Capacity
-        st.markdown(
-            '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-            'text-transform:uppercase;margin:.75rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
-            unsafe_allow_html=True,
-        )
-        min_mw = st.number_input(
-            "Min MW", min_value=0, value=0,
-            step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
-        )
+            st.markdown('<div style="margin-top:.7rem;"></div>', unsafe_allow_html=True)
+            if st.button("✕ Clear Renewables Filters", use_container_width=True,
+                         key="clear_re_filters_btn"):
+                st.session_state["_filter_ver"] = _fv + 1
+                st.session_state.pop("re_filters", None)
+                st.rerun()
 
-        # ── Clear All ─────────────────────────────────────────────────────────
-        st.markdown('<div style="margin-top:.6rem;"></div>', unsafe_allow_html=True)
-        if st.button("✕ Clear All Filters", use_container_width=True, key="clear_all_filters_btn"):
-            st.session_state["_filter_ver"] = _fv + 1
-            st.session_state.pop("filters", None)
-            st.rerun()
+            st.session_state["re_filters"] = {
+                "sectors":    re_sector_sel,
+                "deal_types": re_deal_type_sel,
+                "statuses":   re_status_sel,
+                "sources":    [],
+                "keyword":    re_keyword,
+                "regions":    sel_regions,
+                "countries":  sel_countries,
+                "states":     re_state_sel,
+            }
 
-        # Persist filters to session state
-        st.session_state.filters = {
-            "regions":        sel_regions,
-            "topics":         sel_topics,
-            "sources":        [],
-            "sents":          sel_sents,
-            "keyword":        keyword,
-            "min_mw":         min_mw,
-            "date_from":      None,
-            "date_to":        None,
-            "countries":      sel_countries,
-            "states":         sel_states,
-            "company_search": "",
-            "companies":      sel_companies,
-            "iso_rto":        sel_iso_rto,
-        }
+            # Null-out DC-only vars so nothing downstream crashes
+            news_type_sel = [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
+            keyword       = ""
+            sel_companies = []
+            sel_topics    = []
+            sel_sents     = []
+            sel_states    = []
+            sel_iso_rto   = []
+            min_mw        = 0
+
+        else:
+            # ── DATA CENTER FILTERS ────────────────────────────────────────────
+            # News Type selector (DCD channels — DC mode only)
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.07em;'
+                'text-transform:uppercase;margin:.4rem 0 .2rem;">📰 News Type</div>',
+                unsafe_allow_html=True,
+            )
+            news_type_sel = st.multiselect(
+                "News Type",
+                [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL],
+                default=[NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL],
+                placeholder="Select channel(s)…",
+                label_visibility="collapsed",
+                help=(
+                    "Construction → DCD Data Center Construction Channel\n"
+                    "General News → DCD General News feed"
+                ),
+            )
+            _nt_labels = {
+                NEWS_TYPE_CONSTRUCTION: "🏗️ Construction Channel",
+                NEWS_TYPE_GENERAL:      "📰 General News",
+            }
+            if news_type_sel:
+                st.markdown(
+                    '<div style="font-size:.68rem;color:#1a2e50;margin-top:-.3rem;margin-bottom:.4rem;">'
+                    + " · ".join(_nt_labels[n] for n in news_type_sel if n in _nt_labels)
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.warning("Select at least one news channel.")
+
+            # State / Province (cascades from country)
+            state_pool = []
+            for c in (sel_countries if sel_countries else world_pool):
+                state_pool.extend(COUNTRY_STATES.get(c, []))
+            state_pool = sorted(set(state_pool))
+
+            sel_states = []
+            if state_pool:
+                st.markdown(
+                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                    'text-transform:uppercase;margin:.75rem 0 .2rem;">📍 State / Province</div>',
+                    unsafe_allow_html=True,
+                )
+                sel_states = st.multiselect(
+                    "State", state_pool, default=[],
+                    placeholder="All states/provinces", label_visibility="collapsed",
+                    key=_fk("f_states"),
+                )
+
+            # ISO / RTO / Grid
+            _iso_pool = sorted(set(
+                _all_iso_in_data + list(US_ISO_RTO.keys()) + list(GLOBAL_GRID_OPERATORS.keys())
+            ))
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin:.75rem 0 .2rem;">⚡ ISO / RTO / Grid</div>',
+                unsafe_allow_html=True,
+            )
+            sel_iso_rto = st.multiselect(
+                "ISO/RTO", _iso_pool, default=[],
+                placeholder="All grid operators", label_visibility="collapsed",
+                key=_fk("f_iso_rto"),
+            )
+
+            st.markdown(
+                '<div style="font-size:.65rem;color:#2a4060;letter-spacing:.1em;'
+                'text-transform:uppercase;font-family:monospace;margin:.9rem 0 .35rem .05rem;">'
+                '▸ CONTENT</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Keyword
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin-bottom:.2rem;">🔤 Keyword</div>',
+                unsafe_allow_html=True,
+            )
+            keyword = st.text_input(
+                "Keyword", placeholder="e.g. 500MW, Texas, nuclear, AWS...",
+                label_visibility="collapsed", key=_fk("f_keyword"),
+            )
+
+            # Company
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin:.75rem 0 .2rem;">🏢 Company</div>',
+                unsafe_allow_html=True,
+            )
+            full_co_pool = sorted(set(all_companies_av + KNOWN_COMPANIES))
+            sel_companies = st.multiselect(
+                "Company", full_co_pool, default=[],
+                placeholder="All companies — type to search",
+                label_visibility="collapsed", key=_fk("f_companies"),
+            )
+
+            # Topic
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin:.75rem 0 .2rem;">🏷️ Topic</div>',
+                unsafe_allow_html=True,
+            )
+            sel_topics = st.multiselect(
+                "Topic", all_topics_av, default=[],
+                placeholder="All topics", label_visibility="collapsed",
+                key=_fk("f_topics"),
+            )
+
+            # Project Status
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin:.75rem 0 .2rem;">📊 Project Status</div>',
+                unsafe_allow_html=True,
+            )
+            sel_sents = st.multiselect(
+                "Status", all_sents_av, default=[],
+                placeholder="All statuses", label_visibility="collapsed",
+                key=_fk("f_sents"),
+            )
+
+            # Min Capacity
+            st.markdown(
+                '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                'text-transform:uppercase;margin:.75rem 0 .2rem;">⚡ Min Capacity (MW)</div>',
+                unsafe_allow_html=True,
+            )
+            min_mw = st.number_input(
+                "Min MW", min_value=0, value=0,
+                step=10, label_visibility="collapsed", key=_fk("f_min_mw"),
+            )
+
+            st.markdown('<div style="margin-top:.6rem;"></div>', unsafe_allow_html=True)
+            if st.button("✕ Clear All Filters", use_container_width=True,
+                         key="clear_all_filters_btn"):
+                st.session_state["_filter_ver"] = _fv + 1
+                st.session_state.pop("filters", None)
+                st.rerun()
+
+            # Null-out RE-only vars
+            re_sector_sel    = []
+            re_deal_type_sel = []
+            re_status_sel    = []
+            re_state_sel     = []
+            re_keyword       = ""
+            st.session_state.setdefault("re_filters", {})
+
+        # Write DC filters to session (only in DC mode)
+        if not _is_re_mode:
+            st.session_state.filters = {
+                "regions":        sel_regions,
+                "topics":         sel_topics,
+                "sources":        [],
+                "sents":          sel_sents,
+                "keyword":        keyword,
+                "min_mw":         min_mw,
+                "date_from":      None,
+                "date_to":        None,
+                "countries":      sel_countries,
+                "states":         sel_states,
+                "company_search": "",
+                "companies":      sel_companies,
+                "iso_rto":        sel_iso_rto,
+            }
 
         st.divider()
-        go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
+        if "Renewables" in platform_mode:
+            go_btn = st.button("🌱  Run Renewables Scan", use_container_width=True, type="primary")
+        else:
+            go_btn = st.button("\U0001f50d  Run Global Scan", use_container_width=True, type="primary")
 
     now_str = fmt_local()
     # _sa_sig is the platform authorship token — do not modify
+    _sa_sig = "\u00a9 Sharugh A"
+
+    # ══════════════════════════════════════════════════════════════════════════
+    #  PLATFORM BRANCH: Route to DC or Renewables based on platform_mode
+    # ══════════════════════════════════════════════════════════════════════════
+    if "Renewables" in platform_mode:
+        # ── RENEWABLES POWER MARKETS PLATFORM ────────────────────────────────
+        _re_accent = "#00e676"
+        st.markdown(
+            f'<div class="gl-banner" style="background:linear-gradient(135deg,#071a0f 0%,#0b2a18 45%,#071a0f 100%);">'
+            f'<div class="banner-eyebrow" style="color:{_re_accent};">◉ Live Renewables Feed  ·  Solar · Wind · Storage · Hydrogen · Nuclear · Gas</div>'
+            f'<div class="banner-title">Renewables <span style="color:{_re_accent};">Power Markets</span></div>'
+            f'<div class="banner-title" style="margin-top:-.15rem;">Intelligence Platform</div>'
+            f'<div class="banner-sub">Real-time news from Renewables Now · Solar · Wind · Storage · Hydrogen · Offshore Wind · Other Renewables '
+            f'· Corporate PPAs · Orders · Financing · Tenders · Regulations · Deals · IPOs</div>'
+            f'<div class="banner-ts">🕐 {now_str}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        if "re_df_full" not in st.session_state:
+            st.session_state.re_df_full = None
+
+        if not go_btn and st.session_state.re_df_full is None:
+            # ── RE About panel ────────────────────────────────────────────────
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,#071a0f 0%,#0b2a18 60%,#071a0f 100%);"'
+                'border:1px solid #0a2a18;border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1.4rem;">'
+                '<div style="font-family:\'DM Mono\',monospace;font-size:.62rem;letter-spacing:.18em;'
+                'color:#00e676;text-transform:uppercase;margin-bottom:.5rem;">About This Module</div>'
+                '<div style="font-family:Syne,sans-serif;font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.6rem;">'
+                'Renewables Power Markets Intelligence</div>'
+                '<div style="font-size:.82rem;color:#6a80a8;line-height:1.7;margin-bottom:.9rem;">'
+                'Track tenders, PPAs, MOUs, AORs, investments, and commissioning events across '
+                'Solar, Offshore Wind, Onshore Wind, Storage/BESS, Hydrogen, and other renewables globally. '
+                'Powered by Renewables Now — all 17 sections: News · Projects · Company News · Policy &amp; Tenders.'
+                '</div></div>',
+                unsafe_allow_html=True,
+            )
+            re_features = [
+                ("☀️", "Solar Markets", "Track solar tenders, PPAs, farm commissioning, and investment globally. Covers utility-scale, floating, and agrivoltaic projects."),
+                ("💨", "Wind Markets", "Offshore & onshore wind developments — turbine awards, lease rounds, construction starts, CfD results, capacity auctions."),
+                ("🔋", "Energy Storage", "Grid-scale battery storage deals, procurement tenders, offtake agreements, and commissioning events worldwide."),
+                ("⚛️", "Hydrogen & Nuclear", "Green hydrogen PPAs, electrolysis projects, SMR announcements, nuclear capacity tenders, and fuel cell offtakes."),
+                ("📋", "Deal Classification", "Every article auto-classified as Tender/Auction, PPA, MOU, AOR/Offtake, Investment, Construction, or Commissioning."),
+                ("📊", "Market Analytics", "Sector, deal type, status, regional, and country breakdowns with AI Signal Scoring for high-value deals."),
+            ]
+            row_html = ""
+            for icon, title, desc in re_features:
+                row_html += (
+                    f'<div class="feature-card" style="flex:1;min-width:200px;background:#0b1820;'
+                    f'border:1px solid #0a2a18;border-radius:10px;padding:1rem 1.15rem;">'
+                    f'<div style="font-size:1.4rem;margin-bottom:.4rem;">{icon}</div>'
+                    f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;font-size:.9rem;margin-bottom:.3rem;">{title}</div>'
+                    f'<div style="font-size:.78rem;color:#2a5040;line-height:1.5;">{desc}</div>'
+                    f'</div>'
+                )
+            st.markdown('<div style="display:flex;gap:.9rem;flex-wrap:wrap;margin-bottom:1.4rem;">' + row_html + '</div>', unsafe_allow_html=True)
+            return
+
+        if go_btn:
+            if time_opt == "Custom Range" and custom_start and custom_end:
+                re_cutoff = datetime.combine(custom_start, datetime.min.time())
+            elif sel_days is None:
+                re_cutoff = datetime.min
+            else:
+                re_cutoff = datetime.now() - timedelta(days=sel_days)
+
+            re_pbar = st.progress(0.0, text="Initialising Renewables scan...")
+
+            def re_progress_cb(frac, label=""):
+                re_pbar.progress(min(frac, 1.0), text=f"🌱 Renewables Sweep · {label}")
+
+            re_raw = run_re_scrapers(max_pages, re_cutoff, re_progress_cb,
+                                     re_sectors=re_sector_sel if re_sector_sel else None)
+            re_pbar.progress(1.0, text="Enriching articles...")
+
+            re_enriched = [enrich_re(i) for i in re_raw]
+            re_deduped  = deduplicate(re_enriched)
+            _re_df = pd.DataFrame(re_deduped).drop(columns=["_date_obj"], errors="ignore")
+            if "Date" in _re_df.columns and not _re_df.empty:
+                _re_df = _re_df.sort_values("Date", ascending=False)
+            st.session_state.re_df_full   = _re_df.reset_index(drop=True)
+            st.session_state.re_raw_count = len(re_raw)
+            st.session_state.re_scan_time = fmt_local(now_local())
+            re_pbar.empty()
+
+            if st.session_state.re_df_full.empty:
+                st.warning("No renewables articles found. Try expanding the date range.")
+                st.stop()
+            st.rerun()
+
+        re_df_full = st.session_state.re_df_full
+        if re_df_full is None or re_df_full.empty:
+            st.info("Click 'Run Renewables Scan' to fetch live renewables news.")
+            return
+
+        # ── Apply RE filters ──────────────────────────────────────────────────
+        re_flt = st.session_state.get("re_filters", {})
+        re_df  = re_df_full.copy()
+        if re_flt.get("sectors"):
+            re_df = re_df[re_df["Sector"].isin(re_flt["sectors"])]
+        if re_flt.get("deal_types"):
+            re_df = re_df[re_df["Deal Type"].isin(re_flt["deal_types"])]
+        if re_flt.get("statuses"):
+            re_df = re_df[re_df["Status"].isin(re_flt["statuses"])]
+        if re_flt.get("sources"):
+            re_df = re_df[re_df["Source"].isin(re_flt["sources"])]
+        if re_flt.get("regions"):
+            re_df = re_df[re_df["Region"].isin(re_flt["regions"])]
+        if re_flt.get("countries"):
+            sel_c = re_flt["countries"]
+            re_df = re_df[re_df["Country"].isin(sel_c)]
+        if re_flt.get("keyword"):
+            kw = re_flt["keyword"].lower()
+            re_df = re_df[re_df["Headline"].str.lower().str.contains(kw, na=False)]
+        if re_flt.get("states"):
+            state_kw = [s.lower() for s in re_flt["states"]]
+            re_df = re_df[re_df["Headline"].apply(lambda h: any(sk in str(h).lower() for sk in state_kw))]
+        re_df = re_df.reset_index(drop=True)
+
+        # ── RE KPI row ────────────────────────────────────────────────────────
+        re_scan_ts  = st.session_state.get("re_scan_time", "—")
+        re_cap_count = int((re_df["Capacity"] != "").sum()) if "Capacity" in re_df.columns else 0
+        re_deal_count= int((re_df["Deal Size"] != "").sum()) if "Deal Size" in re_df.columns else 0
+        re_top_sector= re_df["Sector"].value_counts().idxmax() if not re_df.empty else "—"
+        re_top_deal  = re_df["Deal Type"].value_counts().idxmax() if not re_df.empty else "—"
+        re_top_country=re_df["Country"].value_counts().idxmax() if not re_df.empty else "—"
+
+        # Compute RE-specific KPI values
+        _re_commissioned = int((re_df["Status"] == "Commissioned").sum()) if "Status" in re_df.columns else 0
+        _re_tendered     = int((re_df["Status"] == "Tendered").sum())     if "Status" in re_df.columns else 0
+        _re_ppa_count    = int((re_df["Deal Type"] == "PPA").sum())        if "Deal Type" in re_df.columns else 0
+        _re_solar        = int((re_df["Sector"] == "Solar").sum())         if "Sector" in re_df.columns else 0
+        _re_wind_total   = int(
+            ((re_df["Sector"] == "Wind") | (re_df["Sector"] == "Offshore Wind")).sum()
+        ) if "Sector" in re_df.columns else 0
+        _re_storage      = int((re_df["Sector"] == "Energy Storage").sum()) if "Sector" in re_df.columns else 0
+
+        # MW total across capacity-mentioned articles
+        _re_mw_total = 0
+        if "Capacity" in re_df.columns:
+            for _cap in re_df["Capacity"]:
+                _m = re.search(r"([\d,.]+)\s*(GW|MW)", str(_cap), re.I)
+                if _m:
+                    _v = float(_m.group(1).replace(",",""))
+                    _re_mw_total += _v * 1000 if _m.group(2).upper() == "GW" else _v
+        _re_mw_str = f"{_re_mw_total:,.0f} MW" if _re_mw_total > 0 else "—"
+
+        re_kpi_html = (
+            '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
+            + kpi("Sources Active", sum(len(v) for v in RE_FEED_REGISTRY.values()) + len(RE_CROSS_FEEDS), "green", "RSS · Google News · Specialist feeds")
+            + kpi("Unique Articles", len(re_df_full), "cyan", "after deduplication")
+            + kpi("Filtered View", len(re_df), "amber", "current filters applied")
+            + kpi("PPAs / Tenders", f"{_re_ppa_count} / {_re_tendered}", "blue", "deals in current view")
+            + kpi("Capacity Pipeline", _re_mw_str, "purple", "announced MW/GW in view")
+            + kpi("Commissioned", _re_commissioned, "green", "projects live / energised")
+            + '</div>'
+        )
+        st.markdown(re_kpi_html, unsafe_allow_html=True)
+
+        # Secondary sector breakdown pills
+        _sector_pills = ""
+        for _sec, _cnt in re_df["Sector"].value_counts().head(6).items() if "Sector" in re_df.columns and not re_df.empty else []:
+            _sc = RE_TOPIC_COLORS.get(_sec, "#2e4470")
+            _sector_pills += (
+                f'<div class="pill" style="border-color:{_sc}44;">'
+                f'<span class="pill-dot" style="background:{_sc};"></span>'
+                f'{_sec}: <b style="color:{_sc};">{_cnt}</b></div>'
+            )
+
+        re_pills_html = (
+            '<div class="pill-row">'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Scan: <b>{re_scan_ts}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Top Sector: <b>{re_top_sector}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Top Deal Type: <b>{re_top_deal}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Top Country: <b>{re_top_country}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#ffaa00;"></span>Solar: <b>{_re_solar}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00b4ff;"></span>Wind: <b>{_re_wind_total}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e5c8;"></span>Storage: <b>{_re_storage}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Countries: <b>{re_df["Country"].nunique()}</b></div>'
+            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Latest: <b>{re_df["Date"].max()}</b></div>'
+            + _sector_pills +
+            "</div>"
+        )
+        st.markdown(re_pills_html, unsafe_allow_html=True)
+
+        # ── RE TABS ───────────────────────────────────────────────────────────
+        re_tab1, re_tab2, re_tab3, re_tab4, re_tab4b, re_tab5, re_tab6, re_tab7 = st.tabs([
+            "📰 Feed",
+            "🗺️ World Map",
+            "📊 Analytics",
+            "🏢 By Company",
+            "📍 By State",
+            "💰 Deal Flow",
+            "🧠 AI Summarize",
+            "⬇️ Export",
+        ])
+
+        with re_tab1:
+            st.markdown('<div class="sec-head">🌱 Renewables Power Markets Feed</div>', unsafe_allow_html=True)
+            if re_df.empty:
+                st.info("No articles match current filters.")
+            else:
+                for _, row in re_df.iterrows():
+                    st.markdown(
+                        re_article_card(
+                            row["Headline"], row["Date"], row["URL"],
+                            row["Source"], row["Country"], row["Sector"],
+                            row.get("Deal Type","General"), row.get("Capacity",""),
+                            row.get("Deal Size",""), row.get("Status","News"),
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+        with re_tab2:
+            st.markdown('<div class="sec-head">🌍 Global Activity Map</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_world_map(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_1")
+            st.markdown('<div class="sec-head">Country Breakdown</div>', unsafe_allow_html=True)
+            re_cc_df = re_df[re_df["Country"] != "Global"]["Country"].value_counts().reset_index()
+            re_cc_df.columns = ["Country", "Articles"]
+            re_cc_df["Region"] = re_cc_df["Country"].map(COUNTRY_TO_REGION).fillna("Global")
+            st.markdown(dark_table(re_cc_df), unsafe_allow_html=True)
+
+        with re_tab3:
+            st.markdown('<div class="sec-head">Sector Distribution</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_re_sector_bar(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_2")
+            st.markdown('<div class="sec-head">Deal Type Distribution</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_re_deal_type_bar(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_3")
+            st.markdown('<div class="sec-head">Regional Distribution</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_region_bar(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_4")
+            st.markdown('<div class="sec-head">Top Countries</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_country_bar(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_5")
+            st.markdown('<div class="sec-head">Project Status Distribution</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_re_status_pie(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_6")
+            tl = chart_timeline(re_df)
+            if tl:
+                st.markdown('<div class="sec-head">Publication Volume Over Time</div>', unsafe_allow_html=True)
+                st.plotly_chart(tl, use_container_width=True, config={"displayModeBar": False}, key="pc_7")
+            # Capacity pipeline
+            st.markdown('<div class="sec-head">Capacity Pipeline</div>', unsafe_allow_html=True)
+            re_cap_df = re_df[re_df["Capacity"] != ""][["Headline","Capacity","Deal Size","Country","Sector","Date"]].head(30) if "Capacity" in re_df.columns else pd.DataFrame()
+            if not re_cap_df.empty:
+                st.markdown(dark_table(re_cap_df), unsafe_allow_html=True)
+            else:
+                st.info("No capacity mentions in current view.")
+
+        with re_tab4:
+            st.markdown('<div class="sec-head">Company Activity</div>', unsafe_allow_html=True)
+            re_co_rows = []
+            for _, row in re_df.iterrows():
+                if row.get("Companies"):
+                    for co in str(row["Companies"]).split(", "):
+                        co = co.strip()
+                        if co:
+                            re_co_rows.append(co)
+            if re_co_rows:
+                re_co_counts = Counter(re_co_rows)
+                re_co_df = pd.DataFrame(re_co_counts.most_common(30), columns=["Company","Articles"])
+                re_co_sorted = re_co_df.sort_values("Articles")
+                n = len(re_co_sorted)
+                co_colors = [f"rgba(0,{int(150+70*i/max(n-1,1))},{int(80+100*i/max(n-1,1))},0.88)" for i in range(n)]
+                fig_reco = go.Figure(go.Bar(
+                    x=re_co_sorted["Articles"], y=re_co_sorted["Company"], orientation="h",
+                    marker=dict(color=co_colors, line=dict(width=0)),
+                    text=re_co_sorted["Articles"], textposition="outside",
+                    textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                    hovertemplate="<b>%{y}</b><br>📰 %{x} mentions<extra></extra>",
+                ))
+                _dark(fig_reco, max(300, n*22))
+                fig_reco.update_layout(
+                    title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                    bargap=0.22,
+                )
+                st.plotly_chart(fig_reco, use_container_width=True, config={"displayModeBar": False}, key="pc_8")
+                st.markdown('<div class="sec-head">Drill Into a Company</div>', unsafe_allow_html=True)
+                sel_re_co = st.selectbox("Select company", re_co_df["Company"].tolist(), key="re_co_sel")
+                re_co_arts = re_df[re_df["Companies"].str.contains(sel_re_co, na=False, case=False)]
+                for _, row in re_co_arts.iterrows():
+                    st.markdown(
+                        re_article_card(row["Headline"],row["Date"],row["URL"],row["Source"],
+                            row["Country"],row["Sector"],row.get("Deal Type","General"),
+                            row.get("Capacity",""),row.get("Deal Size",""),row.get("Status","News")),
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.info("No company mentions detected.")
+
+        with re_tab4b:
+            st.markdown('<div class="sec-head">📍 By State / Province</div>', unsafe_allow_html=True)
+
+            def _re_detect_states_in_headline(headline):
+                hl = str(headline).lower()
+                found = []
+                for country, states in COUNTRY_STATES.items():
+                    for state in states:
+                        if re.search(r"\b" + re.escape(state.lower()) + r"\b", hl):
+                            found.append(state)
+                return found if found else ["Unspecified"]
+
+            re_state_rows = []
+            for _, row in re_df.iterrows():
+                states_found = _re_detect_states_in_headline(row["Headline"])
+                for st_name in states_found:
+                    re_state_rows.append({
+                        "State":     st_name,
+                        "Headline":  row["Headline"],
+                        "Date":      row["Date"],
+                        "URL":       row["URL"],
+                        "Source":    row["Source"],
+                        "Country":   row["Country"],
+                        "Region":    row["Region"],
+                        "Sector":    row.get("Sector", ""),
+                        "Deal Type": row.get("Deal Type", "General"),
+                        "Capacity":  row.get("Capacity", ""),
+                        "Deal Size": row.get("Deal Size", ""),
+                        "Status":    row.get("Status", "News"),
+                    })
+
+            if not re_state_rows:
+                st.info("No state/province mentions detected in the current filtered view. Try broadening your filters.")
+            else:
+                re_state_df_all = pd.DataFrame(re_state_rows)
+                re_state_counts = (
+                    re_state_df_all[re_state_df_all["State"] != "Unspecified"]["State"]
+                    .value_counts()
+                    .reset_index()
+                )
+                re_state_counts.columns = ["State", "Articles"]
+
+                if not re_state_counts.empty:
+                    sc_sorted = re_state_counts.head(30).sort_values("Articles")
+                    n_sc = len(sc_sorted)
+                    sc_colors = [
+                        f"rgba(0,{int(150 + 80 * i / max(n_sc-1,1))},{int(80 + 100 * i / max(n_sc-1,1))},0.88)"
+                        for i in range(n_sc)
+                    ]
+                    fig_re_st = go.Figure(go.Bar(
+                        x=sc_sorted["Articles"],
+                        y=sc_sorted["State"],
+                        orientation="h",
+                        marker=dict(color=sc_colors, line=dict(width=0)),
+                        text=sc_sorted["Articles"],
+                        textposition="outside",
+                        textfont=dict(color=_TITLE, size=10, family="DM Mono, monospace"),
+                        hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
+                    ))
+                    _dark(fig_re_st, max(320, n_sc * 22))
+                    fig_re_st.update_layout(
+                        title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
+                        bargap=0.22,
+                    )
+                    st.plotly_chart(fig_re_st, use_container_width=True, config={"displayModeBar": False}, key="pc_re_st")
+
+                col_re_tbl, col_re_drill = st.columns([1, 2])
+                with col_re_tbl:
+                    st.markdown('<div class="sec-head">All States</div>', unsafe_allow_html=True)
+                    unspec_re = len(re_state_df_all[re_state_df_all["State"] == "Unspecified"])
+                    display_re_sc = re_state_counts.copy()
+                    if unspec_re:
+                        display_re_sc = pd.concat([
+                            display_re_sc,
+                            pd.DataFrame([{"State": "Unspecified", "Articles": unspec_re}])
+                        ], ignore_index=True)
+                    st.markdown(dark_table(display_re_sc), unsafe_allow_html=True)
+
+                with col_re_drill:
+                    st.markdown('<div class="sec-head">Drill Into a State</div>', unsafe_allow_html=True)
+                    re_states_list = re_state_counts["State"].tolist() if not re_state_counts.empty else []
+                    if not re_states_list:
+                        st.info("No named states found.")
+                    else:
+                        sel_re_state = st.selectbox(
+                            "Select state / province",
+                            re_states_list,
+                            key="re_state_drill_select",
+                        )
+                        re_state_arts = re_state_df_all[re_state_df_all["State"] == sel_re_state]
+                        s_top_sector = re_state_arts["Sector"].value_counts().idxmax() if not re_state_arts.empty and "Sector" in re_state_arts.columns else "—"
+                        s_latest = re_state_arts["Date"].max() if not re_state_arts.empty else "—"
+                        s_cap_count = int((re_state_arts["Capacity"] != "").sum()) if "Capacity" in re_state_arts.columns else 0
+                        mini_re_pills = (
+                            f'<div class="pill-row">'
+                            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span><b>{len(re_state_arts)}</b>&nbsp;articles</div>'
+                            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Top sector: <b>{s_top_sector}</b></div>'
+                            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Latest: <b>{s_latest}</b></div>'
+                            f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Capacity mentions: <b>{s_cap_count}</b></div>'
+                            f'</div>'
+                        )
+                        st.markdown(mini_re_pills, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div style="font-family:Inter,sans-serif;font-size:.82rem;color:#3a5480;margin-bottom:.7rem;">'
+                            f'<b style="color:#fff">{len(re_state_arts)}</b> articles mentioning '
+                            f'<b style="color:#00e676">{sel_re_state}</b></div>',
+                            unsafe_allow_html=True,
+                        )
+                        for _, row in re_state_arts.iterrows():
+                            st.markdown(
+                                re_article_card(row["Headline"], row["Date"], row["URL"], row["Source"],
+                                    row["Country"], row.get("Sector",""), row.get("Deal Type","General"),
+                                    row.get("Capacity",""), row.get("Deal Size",""), row.get("Status","News")),
+                                unsafe_allow_html=True,
+                            )
+
+        with re_tab5:
+            st.markdown('<div class="sec-head">💰 Deal Flow — PPAs, Tenders, MOUs & AORs</div>', unsafe_allow_html=True)
+            # Filter to deal-relevant articles
+            deal_types_of_interest = ["PPA","Tender / Auction","MOU","AOR / Offtake","Investment","M&A"]
+            re_deal_df = re_df[re_df["Deal Type"].isin(deal_types_of_interest)] if "Deal Type" in re_df.columns else pd.DataFrame()
+            if re_deal_df.empty:
+                re_deal_df = re_df
+
+            # Summary KPIs
+            ppa_cnt    = int((re_df["Deal Type"] == "PPA").sum()) if "Deal Type" in re_df.columns else 0
+            tender_cnt = int((re_df["Deal Type"] == "Tender / Auction").sum()) if "Deal Type" in re_df.columns else 0
+            mou_cnt    = int((re_df["Deal Type"] == "MOU").sum()) if "Deal Type" in re_df.columns else 0
+            aor_cnt    = int((re_df["Deal Type"] == "AOR / Offtake").sum()) if "Deal Type" in re_df.columns else 0
+            inv_cnt    = int((re_df["Deal Type"] == "Investment").sum()) if "Deal Type" in re_df.columns else 0
+            deal_kpi_html = (
+                '<div style="display:flex;gap:.8rem;margin-bottom:1.2rem;flex-wrap:wrap;">'
+                + kpi("PPAs", ppa_cnt, "green", "Power Purchase Agreements")
+                + kpi("Tenders", tender_cnt, "amber", "Auctions & CfD rounds")
+                + kpi("MOUs", mou_cnt, "blue", "MoUs & Framework Agreements")
+                + kpi("AOR / Offtake", aor_cnt, "purple", "Anchor offtake agreements")
+                + kpi("Investment", inv_cnt, "cyan", "Project finance & equity")
+                + '</div>'
+            )
+            st.markdown(deal_kpi_html, unsafe_allow_html=True)
+
+            # Deal type breakdown chart
+            if "Deal Type" in re_df.columns:
+                st.plotly_chart(chart_re_deal_type_bar(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_9")
+
+            # Individual deal cards
+            for dt_label in deal_types_of_interest:
+                dt_sub = re_df[re_df["Deal Type"] == dt_label] if "Deal Type" in re_df.columns else pd.DataFrame()
+                if dt_sub.empty:
+                    continue
+                dt_color = RE_DEAL_TYPE_COLORS.get(dt_label, "#2e4470")
+                st.markdown(
+                    f'<div class="sec-head" style="border-left-color:{dt_color};">{dt_label} — {len(dt_sub)} articles</div>',
+                    unsafe_allow_html=True,
+                )
+                for _, row in dt_sub.head(20).iterrows():
+                    st.markdown(
+                        re_article_card(row["Headline"],row["Date"],row["URL"],row["Source"],
+                            row["Country"],row["Sector"],row.get("Deal Type","General"),
+                            row.get("Capacity",""),row.get("Deal Size",""),row.get("Status","News")),
+                        unsafe_allow_html=True,
+                    )
+
+        with re_tab6:
+            st.markdown('<div class="sec-head">🧠 AI Summarize — Renewables Market Intelligence Briefing</div>', unsafe_allow_html=True)
+            if re_df.empty:
+                st.info("No articles to summarise.")
+            else:
+                re_filter_parts = []
+                re_flt_disp = st.session_state.get("re_filters", {})
+                if re_flt_disp.get("sectors"):
+                    re_filter_parts.append("Sectors: " + ", ".join(re_flt_disp["sectors"]))
+                if re_flt_disp.get("regions"):
+                    re_filter_parts.append("Regions: " + ", ".join(re_flt_disp["regions"]))
+                if re_flt_disp.get("countries"):
+                    re_filter_parts.append("Countries: " + ", ".join(re_flt_disp["countries"][:5]) + ("..." if len(re_flt_disp["countries"]) > 5 else ""))
+                if re_flt_disp.get("states"):
+                    re_filter_parts.append("States: " + ", ".join(re_flt_disp["states"][:5]))
+                if re_flt_disp.get("deal_types"):
+                    re_filter_parts.append("Deal Types: " + ", ".join(re_flt_disp["deal_types"]))
+                if re_flt_disp.get("keyword"):
+                    re_filter_parts.append(f"Keyword: {re_flt_disp['keyword']}")
+                _re_date_min = re_df["Date"].min()
+                _re_date_max = re_df["Date"].max()
+                _re_date_range = f"{_re_date_min} to {_re_date_max}"
+                _re_sel_desc = " | ".join(re_filter_parts) if re_filter_parts else "All sectors / results"
+
+                re_ctx_html = (
+                    f'<div style="background:#0b1820;border:1px solid #0a2a18;border-radius:10px;'
+                    f'padding:.9rem 1.2rem;margin-bottom:1rem;font-size:.8rem;color:#6a80a8;">'
+                    f'<b style="color:#b8c8e0;">Current selection:</b> {_re_sel_desc}<br>'
+                    f'<b style="color:#b8c8e0;">Articles in view:</b> {len(re_df)} &nbsp;&nbsp;'
+                    f'<b style="color:#b8c8e0;">Date range:</b> {_re_date_range}'
+                    f'</div>'
+                )
+                st.markdown(re_ctx_html, unsafe_allow_html=True)
+
+                col_regen1, col_regen2 = st.columns([3, 1])
+                with col_regen1:
+                    st.markdown(
+                        '<div style="font-size:.82rem;color:#2a5040;line-height:1.6;">'
+                        'Analyses all filtered renewables articles using built-in TF-IDF NLP and structured '
+                        'rule-based extraction — no API key required. Generates a structured market '
+                        'intelligence briefing covering sector themes, major deals, capacity pipeline, '
+                        'policy developments, company activity, and forward-looking signals.<br>'
+                        '<span style="color:#00e676;">Download as Word (.docx) or PDF for a polished, '
+                        'formatted report.</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                with col_regen2:
+                    re_gen_btn = st.button("🧠 Generate Briefing", use_container_width=True, type="primary", key="re_intel_btn")
+
+                if re_gen_btn or st.session_state.get("re_intel_summary"):
+                    if re_gen_btn:
+                        with st.spinner("Analysing renewables articles with built-in NLP…"):
+                            try:
+                                re_summary_text = generate_re_summary(re_df, _re_sel_desc, _re_date_range)
+                                st.session_state.re_intel_summary = re_summary_text
+                                st.session_state.re_intel_context = _re_sel_desc
+                                st.session_state.re_intel_df      = re_df.copy()
+                                st.session_state.re_intel_range   = _re_date_range
+                            except Exception as e:
+                                st.error(f"Could not generate summary: {e}")
+                                st.session_state.re_intel_summary = None
+
+                    if st.session_state.get("re_intel_summary"):
+                        re_context_label = st.session_state.get("re_intel_context", "")
+
+                        def _render_re_intel_html(md_text, ctx_label):
+                            def _md_inline_re(t):
+                                t = re.sub(r"\*\*(.+?)\*\*", r'<strong style="color:#ccdaf5;">\1</strong>', t)
+                                t = re.sub(r"`(.+?)`",         r'<code style="color:#00e676;background:rgba(0,200,80,0.1);padding:1px 4px;border-radius:3px;">\1</code>', t)
+                                return t
+
+                            html = (
+                                '<div style="background:#0b1820;border:1px solid #00e676;'
+                                'border-radius:12px;padding:1.6rem 2rem;margin-top:.8rem;">'
+                                f'<div style="font-family:\'DM Mono\',monospace;font-size:.64rem;'
+                                f'letter-spacing:.14em;color:#00e676;text-transform:uppercase;'
+                                f'margin-bottom:1.2rem;">🧠 Renewables Market Intelligence Briefing'
+                                + (f'  ·  {ctx_label}' if ctx_label else '') +
+                                '</div>'
+                            )
+                            for raw_line in md_text.splitlines():
+                                line = raw_line.rstrip()
+                                if line.startswith("## "):
+                                    title = _md_inline_re(line[3:])
+                                    html += (
+                                        f'<div style="font-family:\'Syne\',sans-serif;font-size:.82rem;'
+                                        f'font-weight:700;color:#b8c8e0;letter-spacing:.07em;'
+                                        f'text-transform:uppercase;border-left:3px solid #00e676;'
+                                        f'padding-left:.7rem;margin:1.8rem 0 .8rem;">{title}</div>'
+                                        f'<div style="height:1px;background:linear-gradient(90deg,#00e676,transparent);'
+                                        f'margin-bottom:.9rem;"></div>'
+                                    )
+                                elif line.startswith("• "):
+                                    content = _md_inline_re(line[2:])
+                                    html += (
+                                        f'<div style="display:flex;gap:.6rem;margin-bottom:.55rem;'
+                                        f'line-height:1.6;font-size:.84rem;color:#8aa0c8;">'
+                                        f'<span style="color:#00e676;flex-shrink:0;margin-top:.05rem;">◆</span>'
+                                        f'<span>{content}</span></div>'
+                                    )
+                                elif not line.strip():
+                                    html += '<div style="height:.4rem;"></div>'
+                                else:
+                                    content = _md_inline_re(line)
+                                    html += (
+                                        f'<p style="color:#8aa0c8;font-size:.84rem;line-height:1.7;'
+                                        f'margin:0 0 .6rem;">{content}</p>'
+                                    )
+                            html += '</div>'
+                            return html
+
+                        st.markdown(
+                            _render_re_intel_html(st.session_state.re_intel_summary, re_context_label),
+                            unsafe_allow_html=True,
+                        )
+
+                        ts_re = datetime.now().strftime("%Y%m%d_%H%M")
+                        dl_re1, dl_re2, dl_re3 = st.columns(3)
+                        with dl_re1:
+                            st.download_button(
+                                "📥 Download (.txt)",
+                                data=st.session_state.re_intel_summary.encode(),
+                                file_name=f"RE_Intel_Briefing_{ts_re}.txt",
+                                mime="text/plain",
+                                use_container_width=True,
+                            )
+                        with dl_re2:
+                            _re_sum_df    = st.session_state.get("re_intel_df", re_df)
+                            _re_sum_range = st.session_state.get("re_intel_range", _re_date_range)
+                            re_docx_bytes = build_briefing_docx(
+                                st.session_state.re_intel_summary,
+                                re_context_label, _re_sum_range, _re_sum_df,
+                                title="RENEWABLE ENERGY MARKET INTELLIGENCE BRIEFING",
+                            )
+                            if re_docx_bytes:
+                                st.download_button(
+                                    "📄 Download Word (.docx)",
+                                    data=re_docx_bytes,
+                                    file_name=f"RE_Intel_Briefing_{ts_re}.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.markdown(
+                                    '<div style="font-size:.75rem;color:#2a5040;padding:.5rem 0;">'
+                                    'Add <code>python-docx</code> to requirements.txt for Word export.</div>',
+                                    unsafe_allow_html=True,
+                                )
+                        with dl_re3:
+                            re_pdf_bytes = build_briefing_pdf(
+                                st.session_state.re_intel_summary,
+                                re_context_label, _re_sum_range, _re_sum_df,
+                                title="RENEWABLE ENERGY MARKET INTELLIGENCE BRIEFING",
+                            )
+                            if re_pdf_bytes:
+                                st.download_button(
+                                    "📑 Download PDF",
+                                    data=re_pdf_bytes,
+                                    file_name=f"RE_Intel_Briefing_{ts_re}.pdf",
+                                    mime="application/pdf",
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.markdown(
+                                    '<div style="font-size:.75rem;color:#2a5040;padding:.5rem 0;">'
+                                    'Add <code>reportlab</code> to requirements.txt for PDF export.</div>',
+                                    unsafe_allow_html=True,
+                                )
+
+        with re_tab7:
+            st.markdown('<div class="sec-head">Export Renewables Data</div>', unsafe_allow_html=True)
+            ts_re_exp = datetime.now().strftime("%Y%m%d_%H%M")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown(
+                    '<div style="background:#0b1820;border:1px solid #0a2a18;border-radius:10px;'
+                    'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
+                    '<div style="font-size:1.5rem;margin-bottom:.4rem;">📊</div>'
+                    '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;font-size:.95rem;margin-bottom:.3rem;">Excel Report (.xlsx)</div>'
+                    '<div style="font-size:.78rem;color:#2a5040;line-height:1.5;">All articles · By Sector · By Deal Type · By Country</div></div>',
+                    unsafe_allow_html=True,
+                )
+                # Build a simple RE excel
+                import io as _io_re
+                from openpyxl import Workbook as _WB_re
+                _wb_re = _WB_re()
+                _ws_re = _wb_re.active
+                _ws_re.title = "RE Articles"
+                re_export_cols = [c for c in ["Headline","Date","Source","Country","Region","Sector","Deal Type","Status","Capacity","Deal Size","Companies","URL"] if c in re_df.columns]
+                for ci, col in enumerate(re_export_cols, 1):
+                    _ws_re.cell(1, ci, col)
+                for ri, row in enumerate(re_df[re_export_cols].itertuples(index=False), 2):
+                    for ci, val in enumerate(row, 1):
+                        _ws_re.cell(ri, ci, str(val) if val else "")
+                _buf_re = io.BytesIO()
+                _wb_re.save(_buf_re)
+                _buf_re.seek(0)
+                st.download_button(
+                    "📥 Download Excel Report",
+                    data=_buf_re.read(),
+                    file_name=f"RE_Intel_{ts_re_exp}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            with col_b:
+                st.markdown(
+                    '<div style="background:#0b1820;border:1px solid #0a2a18;border-radius:10px;'
+                    'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
+                    '<div style="font-size:1.5rem;margin-bottom:.4rem;">📄</div>'
+                    '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;font-size:.95rem;margin-bottom:.3rem;">CSV Export</div>'
+                    '<div style="font-size:.78rem;color:#2a5040;line-height:1.5;">Flat CSV for Excel, Python, PowerBI, or Tableau.</div></div>',
+                    unsafe_allow_html=True,
+                )
+                st.download_button(
+                    "📥 Download CSV",
+                    data=re_df.to_csv(index=False).encode(),
+                    file_name=f"RE_Intel_{ts_re_exp}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+            st.markdown('<div class="sec-head">Full Article Preview</div>', unsafe_allow_html=True)
+            re_disp_cols = [c for c in ["Headline","Date","Source","Country","Region","Sector","Deal Type","Status","Capacity","Deal Size","Companies","URL"] if c in re_df.columns]
+            st.markdown(dark_table(re_df[re_disp_cols].head(200)), unsafe_allow_html=True)
+
+        # ── RE Platform footer ─────────────────────────────────────────────────
+        st.markdown(
+            '<div style="margin-top:3rem;padding:1.2rem 0 .6rem;border-top:1px solid #0a2a18;text-align:center;">'
+            '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
+            'color:#0a2a18;text-transform:uppercase;">'
+            'Renewables Power Markets Intelligence &nbsp;·&nbsp; Wood Mac'
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+        return  # End Renewables branch
+
+    # ════════════════════════════════════════════════════════════════════════════
+    #  DATA CENTER PLATFORM (original flow continues below)
+    # ════════════════════════════════════════════════════════════════════════════
+
     _sa_sig = "\u00a9 Sharugh A"
     st.markdown(
         f'<div class="gl-banner">'
@@ -4147,7 +6570,7 @@ def main():
         "\U0001f4ca Analytics",
         "\U0001f3e2 By Company",
         "\U0001f4cd By State",
-        "\U0001f9e0 Market Intel",
+        "\U0001f9e0 AI Summarize",
         "\U0001f4c8 Trend Compare",
         "\U0001f525 Capacity Heatmap",
         "\U0001f4b0 Deal Flow",
@@ -4161,12 +6584,11 @@ def main():
             st.info("No articles match the current filters.")
         else:
             # Pre-compute AI scores for the feed so high-signal articles show their badge
-            from collections import Counter as _Ctr_feed
             _all_co_feed = []
             for _v in df["Companies"]:
                 if _v:
                     _all_co_feed.extend([c.strip() for c in str(_v).split(",") if c.strip()])
-            _co_freq_feed = dict(_Ctr_feed(_all_co_feed))
+            _co_freq_feed = dict(Counter(_all_co_feed))
 
             def _quick_score(row):
                 score = 0.0
@@ -4207,7 +6629,7 @@ def main():
 
     with tab2:
         st.markdown('<div class="sec-head">Global Activity Map</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_world_map(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_world_map(df), use_container_width=True, config={"displayModeBar": False}, key="pc_10")
         st.markdown('<div class="sec-head">Country Breakdown</div>', unsafe_allow_html=True)
         cc_df = df[df["Country"] != "Global"]["Country"].value_counts().reset_index()
         cc_df.columns = ["Country", "Articles"]
@@ -4216,27 +6638,27 @@ def main():
 
     with tab3:
         st.markdown('<div class="sec-head">Topic Distribution</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_topic_bar(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_topic_bar(df), use_container_width=True, config={"displayModeBar": False}, key="pc_11")
 
         st.markdown('<div class="sec-head">Regional Distribution</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_region_bar(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_region_bar(df), use_container_width=True, config={"displayModeBar": False}, key="pc_12")
 
         st.markdown('<div class="sec-head">Top Countries</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_country_bar(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_country_bar(df), use_container_width=True, config={"displayModeBar": False}, key="pc_13")
 
         st.markdown('<div class="sec-head">Publication Volume Over Time</div>', unsafe_allow_html=True)
         tl = chart_timeline(df)
         if tl:
-            st.plotly_chart(tl, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(tl, use_container_width=True, config={"displayModeBar": False}, key="pc_14")
 
         st.markdown('<div class="sec-head">Sentiment / Project Status</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_sentiment(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_sentiment(df), use_container_width=True, config={"displayModeBar": False}, key="pc_15")
 
         st.markdown('<div class="sec-head">Topic Share</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_donut(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_donut(df), use_container_width=True, config={"displayModeBar": False}, key="pc_16")
 
         st.markdown('<div class="sec-head">Articles by Source</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_source_bar(df), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(chart_source_bar(df), use_container_width=True, config={"displayModeBar": False}, key="pc_17")
 
         st.markdown('<div class="sec-head">Capacity Pipeline</div>', unsafe_allow_html=True)
         cap_df = df[df["Capacity"] != ""][["Headline", "Capacity", "Deal Size", "Country", "Topic", "Date"]].head(25)
@@ -4255,7 +6677,6 @@ def main():
                     if co:
                         comp_rows.append(co)
         if comp_rows:
-            from collections import Counter
             co_counts = Counter(comp_rows)
             co_df = pd.DataFrame(co_counts.most_common(30), columns=["Company", "Articles"])
             co_df_sorted = co_df.sort_values("Articles")
@@ -4277,7 +6698,7 @@ def main():
                 title=dict(text="Top 30 Companies by Mentions", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
                 bargap=0.22,
             )
-            st.plotly_chart(fig_co, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_co, use_container_width=True, config={"displayModeBar": False}, key="pc_18")
 
             st.markdown('<div class="sec-head">Drill Into a Company</div>', unsafe_allow_html=True)
             sel_co = st.selectbox("Select company", co_df["Company"].tolist())
@@ -4369,7 +6790,7 @@ def main():
                     title=dict(text="Top States / Provinces by Article Volume", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
                     bargap=0.22,
                 )
-                st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False}, key="pc_19")
 
             # ── Summary table ─────────────────────────────────────────────────
             col_tbl, col_drill = st.columns([1, 2])
@@ -4444,7 +6865,7 @@ def main():
                             xaxis=dict(tickfont=dict(size=9)),
                             bargap=0.3,
                         )
-                        st.plotly_chart(fig_tp, use_container_width=True, config={"displayModeBar": False})
+                        st.plotly_chart(fig_tp, use_container_width=True, config={"displayModeBar": False}, key="pc_20")
 
                     # ── Article cards for selected state ──────────────────────
                     st.markdown(
@@ -4781,7 +7202,7 @@ def main():
                 legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
                 title=dict(text="Article Volume Over Time — Side by Side", font=dict(color=_TITLE, size=13), x=0.01),
             )
-            st.plotly_chart(fig_tl, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_tl, use_container_width=True, config={"displayModeBar": False}, key="pc_21")
 
             # ── Topic comparison chart ────────────────────────────────────────
             st.markdown('<div class="sec-head">Topic Distribution</div>', unsafe_allow_html=True)
@@ -4813,7 +7234,7 @@ def main():
                 legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
                 title=dict(text="Topic Volume", font=dict(color=_TITLE, size=13), x=0.01),
             )
-            st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False}, key="pc_22")
 
             # ── Sentiment comparison ──────────────────────────────────────────
             st.markdown('<div class="sec-head">Sentiment / Status</div>', unsafe_allow_html=True)
@@ -4835,7 +7256,7 @@ def main():
                 legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
                 title=dict(text="Project Status Comparison", font=dict(color=_TITLE, size=13), x=0.01),
             )
-            st.plotly_chart(fig_sent, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_sent, use_container_width=True, config={"displayModeBar": False}, key="pc_23")
 
             # ── Region comparison (only for time-period mode) ─────────────────
             if compare_mode == "📅 Time Periods":
@@ -4851,7 +7272,7 @@ def main():
                     legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10)),
                     title=dict(text="Regional Volume: Period A vs Period B", font=dict(color=_TITLE, size=13), x=0.01),
                 )
-                st.plotly_chart(fig_reg_trend, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_reg_trend, use_container_width=True, config={"displayModeBar": False}, key="pc_24")
 
             # ── Side-by-side article cards ────────────────────────────────────
             st.markdown('<div class="sec-head">Side-by-Side Headlines</div>', unsafe_allow_html=True)
@@ -4940,7 +7361,7 @@ def main():
                     xaxis=dict(tickfont=dict(size=10, color=_TEXT)),
                     yaxis=dict(tickfont=dict(size=10, color=_TEXT)),
                 )
-                st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False}, key="pc_25")
 
                 # Top capacity articles table
                 st.markdown('<div class="sec-head">Top Capacity Announcements</div>', unsafe_allow_html=True)
@@ -5048,7 +7469,7 @@ def main():
                     yaxis=dict(title="Deal Articles", gridcolor=_GRID, linecolor=_GRID, tickfont=dict(color=_TEXT, size=9)),
                     yaxis2=dict(title="$m", overlaying="y", side="right", tickfont=dict(color=_TEXT, size=9), gridcolor="rgba(0,0,0,0)"),
                 )
-                st.plotly_chart(fig_spark, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_spark, use_container_width=True, config={"displayModeBar": False}, key="pc_26")
 
             # ── Deal size distribution chart ──────────────────────────────────
             deal_size_df = df_deal[df_deal["Deal Size"] != ""]["Deal Size"].value_counts().head(20).reset_index()
@@ -5063,7 +7484,7 @@ def main():
                 ))
                 _dark(fig_deal_dist, 280)
                 fig_deal_dist.update_layout(title=dict(text="Disclosed Deal Sizes (Most Frequent)", font=dict(color=_TITLE, size=13), x=0.01))
-                st.plotly_chart(fig_deal_dist, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_deal_dist, use_container_width=True, config={"displayModeBar": False}, key="pc_27")
 
             # Region deal breakdown
             reg_deal = df_deal.groupby("Region").size().reset_index()
@@ -5076,7 +7497,7 @@ def main():
             ))
             _dark(fig_reg_deal, 260)
             fig_reg_deal.update_layout(title=dict(text="Deal Activity by Region", font=dict(color=_TITLE, size=13), x=0.01))
-            st.plotly_chart(fig_reg_deal, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_reg_deal, use_container_width=True, config={"displayModeBar": False}, key="pc_28")
 
             # Full deal article table — sorted largest to smallest
             st.markdown('<div class="sec-head">All Deal-Signal Articles (Largest → Smallest)</div>', unsafe_allow_html=True)
@@ -5099,7 +7520,6 @@ def main():
         if df.empty:
             st.info("No articles to score. Run a scan first.")
         else:
-            from collections import Counter as _Ctr
 
             def _ai_score(row, co_frequency_map):
                 score = 0.0
@@ -5167,7 +7587,7 @@ def main():
             for v in df["Companies"]:
                 if v:
                     _all_co_score.extend([c.strip() for c in str(v).split(",") if c.strip()])
-            co_freq_map = dict(_Ctr(_all_co_score))
+            co_freq_map = dict(Counter(_all_co_score))
 
             df_scored = df.copy()
             df_scored["AI Score"] = df_scored.apply(lambda r: _ai_score(r, co_freq_map), axis=1)
@@ -5208,7 +7628,7 @@ def main():
                 title=dict(text="AI Score Distribution", font=dict(color=_TITLE, size=13, family="Syne, sans-serif"), x=0.01),
                 bargap=0.3,
             )
-            st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False}, key="pc_29")
 
             # High-signal articles with orange top-strip
             st.markdown('<div class="sec-head">🔴 High Signal Articles (Score ≥ 30)</div>', unsafe_allow_html=True)
@@ -5303,7 +7723,7 @@ def main():
         'text-align:center;">'
         '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.14em;'
         'color:#1a2e50;text-transform:uppercase;">'
-        'Global Data Center Intelligence &nbsp;\u00b7&nbsp; Wood Mac'
+        'Global Energy Intelligence Platform &nbsp;·&nbsp; Data Centers &nbsp;·&nbsp; Renewables Power Markets &nbsp;·&nbsp; Wood Mac'
         '</div></div>',
         unsafe_allow_html=True,
     )
