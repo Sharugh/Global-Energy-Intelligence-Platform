@@ -1375,6 +1375,7 @@ RE_FEED_REGISTRY = {
         {"url": "https://www.solarpowerworldonline.com/feed/",             "source": "Solar Power World",  "weight":  8},
         {"url": "https://www.pveurope.eu/taxonomy/term/1/feed",            "source": "PV Europe",          "weight":  7},
         {"url": "https://pv-magazine-usa.com/feed/",                       "source": "PV Magazine USA",    "weight":  8},
+        {"url": "https://www.solarpaces.org/news/feed/",                   "source": "SolarPACES",         "weight":  7},
         # Google News targeted queries
         {"url": _GN + "solar+PPA+power+purchase+agreement",               "source": "GNews/Solar-PPA",    "weight":  9},
         {"url": _GN + "solar+farm+tender+auction+MW+GW",                  "source": "GNews/Solar-Tender", "weight":  9},
@@ -1382,39 +1383,52 @@ RE_FEED_REGISTRY = {
         {"url": _GN + "solar+MOU+memorandum+agreement",                   "source": "GNews/Solar-MOU",    "weight":  8},
         {"url": _GN + "solar+commissioned+groundbreaking+construction",   "source": "GNews/Solar-Dev",    "weight":  8},
         {"url": _GN + "floating+solar+agrivoltaic+rooftop+solar",         "source": "GNews/Solar-Tech",   "weight":  7},
+        {"url": _GN + "utility+scale+solar+GW+MW+announcement+2025",      "source": "GNews/Solar-Util",   "weight":  9},
+        {"url": _GN + "solar+power+plant+acquisition+deal+stake",         "source": "GNews/Solar-MA",     "weight":  8},
+        {"url": _GN + "bifacial+solar+tracker+module+project",            "source": "GNews/Solar-Tech2",  "weight":  7},
     ],
     # ── Wind ──────────────────────────────────────────────────────────────────
     "Wind": [
         {"url": "https://www.windpowermonthly.com/rss",                    "source": "Wind Power Monthly", "weight": 10},
         {"url": "https://windenergynews.com/feed/",                        "source": "Wind Energy News",   "weight":  9},
         {"url": "https://www.windpowerengineering.com/feed/",              "source": "Windpower Eng.",     "weight":  8},
+        {"url": "https://www.awea.org/rss",                                "source": "AWEA",               "weight":  8},
         {"url": _GN + "onshore+wind+farm+tender+auction+MW+GW",           "source": "GNews/Wind-Tender",  "weight":  9},
         {"url": _GN + "wind+energy+PPA+power+purchase+agreement",         "source": "GNews/Wind-PPA",     "weight":  9},
         {"url": _GN + "wind+project+investment+financing+turbine",        "source": "GNews/Wind-Inv",     "weight":  9},
         {"url": _GN + "wind+farm+commissioned+groundbreaking",            "source": "GNews/Wind-Dev",     "weight":  8},
         {"url": _GN + "wind+repowering+capacity+expansion",               "source": "GNews/Wind-Repow",   "weight":  7},
+        {"url": _GN + "wind+turbine+order+supply+agreement+manufacturer", "source": "GNews/Wind-OEM",     "weight":  8},
+        {"url": _GN + "onshore+wind+MW+GW+awarded+contract+2025",        "source": "GNews/Wind-Award",   "weight":  9},
     ],
     # ── Energy Storage ────────────────────────────────────────────────────────
     "Energy Storage": [
         {"url": "https://www.energy-storage.news/feed/",                   "source": "Energy Storage News","weight": 10},
         {"url": "https://www.storagedaily.com/rss/",                       "source": "Storage Daily",      "weight":  8},
+        {"url": "https://batteryindustry.tech/feed/",                      "source": "Battery Industry",   "weight":  7},
         {"url": _GN + "battery+energy+storage+BESS+MW+GWh",              "source": "GNews/BESS",         "weight":  9},
         {"url": _GN + "battery+storage+PPA+offtake+tender",              "source": "GNews/BESS-PPA",     "weight":  9},
         {"url": _GN + "battery+storage+investment+financing+fund",        "source": "GNews/BESS-Inv",     "weight":  9},
         {"url": _GN + "grid+battery+commissioned+BESS+project",          "source": "GNews/BESS-Dev",     "weight":  8},
         {"url": _GN + "long+duration+storage+flow+battery+pumped+hydro", "source": "GNews/LDES",         "weight":  8},
         {"url": _GN + "Tesla+Megapack+Fluence+energy+storage+project",   "source": "GNews/BESS-OEM",     "weight":  7},
+        {"url": _GN + "grid+scale+BESS+storage+GWh+MWh+contract+2025",  "source": "GNews/BESS-2025",    "weight":  9},
+        {"url": _GN + "virtual+power+plant+demand+response+battery",     "source": "GNews/VPP",          "weight":  7},
     ],
     # ── Offshore Wind ─────────────────────────────────────────────────────────
     "Offshore Wind": [
         {"url": "https://www.offshorewind.biz/feed/",                      "source": "Offshore Wind Biz",  "weight": 10},
         {"url": "https://www.4coffshore.com/rss/windfarms-rss.xml",        "source": "4C Offshore",        "weight":  9},
+        {"url": "https://windeurope.org/feed/",                            "source": "WindEurope",         "weight":  9},
         {"url": _GN + "offshore+wind+farm+tender+auction+CfD",            "source": "GNews/OSW-Tender",   "weight": 10},
         {"url": _GN + "offshore+wind+PPA+power+purchase+agreement",       "source": "GNews/OSW-PPA",      "weight":  9},
         {"url": _GN + "offshore+wind+investment+financing+fund",          "source": "GNews/OSW-Inv",      "weight":  9},
         {"url": _GN + "offshore+wind+commissioned+first+power",           "source": "GNews/OSW-Dev",      "weight":  8},
         {"url": _GN + "floating+offshore+wind+project+MOU",               "source": "GNews/FOW",          "weight":  8},
         {"url": _GN + "offshore+wind+lease+seabed+monopile",              "source": "GNews/OSW-Tech",     "weight":  7},
+        {"url": _GN + "offshore+wind+GW+MW+awarded+contract+2025",       "source": "GNews/OSW-2025",     "weight": 10},
+        {"url": _GN + "fixed+bottom+offshore+wind+foundation+installation","source": "GNews/OSW-Found",   "weight":  7},
+        {"url": _GN + "offshore+wind+cable+substation+interconnection",   "source": "GNews/OSW-Grid",     "weight":  7},
     ],
     # ── Hydrogen ──────────────────────────────────────────────────────────────
     "Hydrogen": [
@@ -1422,22 +1436,29 @@ RE_FEED_REGISTRY = {
         {"url": "https://www.h2-view.com/feed/",                           "source": "H2 View",            "weight": 10},
         {"url": "https://fuelcellsworks.com/feed/",                        "source": "Fuel Cells Works",   "weight":  8},
         {"url": "https://www.hydrogenfuelnews.com/feed/",                  "source": "Hydrogen Fuel News", "weight":  8},
+        {"url": "https://www.h2bulletin.com/feed/",                        "source": "H2 Bulletin",        "weight":  8},
         {"url": _GN + "green+hydrogen+electrolyzer+electrolyser+PPA",     "source": "GNews/H2-PPA",       "weight":  9},
         {"url": _GN + "green+hydrogen+project+investment+financing",      "source": "GNews/H2-Inv",       "weight":  9},
         {"url": _GN + "hydrogen+MOU+memorandum+agreement+partnership",    "source": "GNews/H2-MOU",       "weight":  9},
         {"url": _GN + "hydrogen+offtake+supply+agreement+tonnes",         "source": "GNews/H2-Offtake",   "weight":  9},
         {"url": _GN + "green+hydrogen+plant+commissioned+groundbreaking", "source": "GNews/H2-Dev",       "weight":  8},
         {"url": _GN + "ammonia+green+hydrogen+export+terminal",           "source": "GNews/H2-Ammonia",   "weight":  7},
+        {"url": _GN + "hydrogen+GW+MW+electrolysis+capacity+2025",       "source": "GNews/H2-2025",      "weight":  9},
+        {"url": _GN + "blue+hydrogen+CCS+carbon+capture+facility",       "source": "GNews/H2-Blue",      "weight":  7},
     ],
     # ── Other Renewables ──────────────────────────────────────────────────────
     "Other Renewables": [
         {"url": "https://www.rechargenews.com/rss",                        "source": "Recharge News",      "weight":  9},
         {"url": "https://www.enerdata.net/rss.xml",                        "source": "Enerdata",           "weight":  8},
+        {"url": "https://www.renewableenergyworld.com/feed/",              "source": "RE World",           "weight":  8},
+        {"url": "https://www.renewablesnow.com/feed/",                     "source": "Renewables Now",     "weight":  9},
         {"url": _GN + "geothermal+power+project+investment+tender",       "source": "GNews/Geo",          "weight":  9},
         {"url": _GN + "hydropower+hydro+dam+project+tender+financing",    "source": "GNews/Hydro",        "weight":  9},
         {"url": _GN + "tidal+wave+marine+energy+project",                 "source": "GNews/Marine",       "weight":  8},
         {"url": _GN + "biomass+bioenergy+biogas+renewable+project",       "source": "GNews/Bio",          "weight":  8},
         {"url": _GN + "concentrated+solar+CSP+solar+thermal+project",     "source": "GNews/CSP",          "weight":  7},
+        {"url": _GN + "nuclear+SMR+small+modular+reactor+PPA+investment", "source": "GNews/Nuclear",      "weight":  9},
+        {"url": _GN + "geothermal+MW+GW+investment+project+2025",        "source": "GNews/Geo-2025",     "weight":  9},
     ],
 }
 
@@ -1449,10 +1470,18 @@ RE_CROSS_FEEDS = [
     {"url": "https://ieefa.org/feed/",                                     "source": "IEEFA",              "weight": 8},
     {"url": "https://www.carbonbrief.org/feed",                            "source": "Carbon Brief",       "weight": 8},
     {"url": "https://www.greenbiz.com/feeds/all",                          "source": "GreenBiz",           "weight": 7},
+    {"url": "https://www.climatechangenews.com/feed/",                     "source": "Climate Home News",  "weight": 7},
+    {"url": "https://www.spglobal.com/commodityinsights/en/rss/all",       "source": "S&P Global Commod.", "weight": 8},
+    {"url": "https://energymonitor.ai/feed/",                              "source": "Energy Monitor",     "weight": 8},
+    {"url": "https://www.renewableenergyworld.com/feed/",                  "source": "RE World",           "weight": 8},
     {"url": _GN + "renewable+energy+PPA+MOU+tender+investment+deal",      "source": "GNews/RE-Deals",     "weight": 9},
     {"url": _GN + "clean+energy+acquisition+merger+IPO+financing",        "source": "GNews/RE-Finance",   "weight": 9},
     {"url": _GN + "renewable+energy+policy+regulation+target+legislation","source": "GNews/RE-Policy",    "weight": 8},
     {"url": _GN + "wind+solar+storage+hydrogen+commissioned+tender",      "source": "GNews/RE-All",       "weight": 9},
+    {"url": _GN + "clean+energy+GW+MW+project+announcement+2025",        "source": "GNews/RE-2025",      "weight": 9},
+    {"url": _GN + "energy+transition+decarbonization+net+zero+deal",      "source": "GNews/Transition",   "weight": 8},
+    {"url": _GN + "power+purchase+agreement+corporate+renewable+2025",    "source": "GNews/Corp-PPA",     "weight": 9},
+    {"url": _GN + "renewable+energy+financial+close+funded+milestone",    "source": "GNews/RE-FC",        "weight": 8},
 ]
 
 # All unique sources for the KPI banner
@@ -1604,8 +1633,11 @@ def _parse_feed_xml(xml_text, feed_meta, sector_tag, cutoff):
     """
     Parse RSS 2.0 or Atom 1.0 XML.
     Returns list of article dicts.
+    For bounded cutoffs (not datetime.min), articles with NO parseable date are
+    dropped to avoid surfacing stale content.  For open-range scans they're kept.
     """
     articles = []
+    _open_range = (cutoff <= datetime.min + timedelta(days=1))
     try:
         root = _ET.fromstring(xml_text.encode("utf-8", errors="replace"))
     except Exception:
@@ -1633,8 +1665,10 @@ def _parse_feed_xml(xml_text, feed_meta, sector_tag, cutoff):
             date_obj = parse_date_str(pub) if pub else None
             if not title or not url:
                 continue
-            if cutoff and date_obj and date_obj < cutoff:
+            if date_obj and date_obj < cutoff:
                 continue
+            if not date_obj and not _open_range:
+                continue  # drop undated articles for bounded time windows
             articles.append(_mk_re_art(title, url, date_obj, feed_meta, sector_tag))
     else:
         # RSS 2.0 / RSS 1.0
@@ -1661,8 +1695,10 @@ def _parse_feed_xml(xml_text, feed_meta, sector_tag, cutoff):
             date_obj = parse_date_str(pub) if pub else None
             if not title or not url:
                 continue
-            if cutoff and date_obj and date_obj < cutoff:
+            if date_obj and date_obj < cutoff:
                 continue
+            if not date_obj and not _open_range:
+                continue  # drop undated articles for bounded time windows
             articles.append(_mk_re_art(title, url, date_obj, feed_meta, sector_tag))
     return articles
 
@@ -2482,8 +2518,17 @@ def _parse_articles_from_soup(soup, source_name, base_url):
 # ─── DCD scraper: scrapes a single base URL across N pages ─────────────────
 def _scrape_dcd_channel(base_url, source_name, cutoff, max_pages, progress_cb, label="DCD"):
     """
-    Generic DCD channel scraper.  Paginates base_url with &page=N (or ?page=N)
-    until we hit an article older than cutoff or a page returns nothing new.
+    Generic DCD channel scraper.  Paginates base_url with &page=N (or ?page=N).
+
+    Bug-fix (v2): Previously the scraper stopped as soon as it encountered ONE article
+    older than the cutoff, which caused "Past 7 days" / "Past 14 days" to return zero
+    results because DCD pages mix dated and undated articles.  The new logic:
+      - Collects ALL articles on every page regardless of date.
+      - Tracks a rolling count of consecutive DATED articles that are all older than
+        cutoff; only stops pagination once a full page of dated articles are all old.
+      - At the end, filters to articles >= cutoff (undated articles are kept only when
+        cutoff is datetime.min, i.e. "Latest (all)" mode; for short ranges they are
+        excluded so users see only confirmed-fresh content).
 
     base_url    : channel root — may already contain query params (e.g. ?term=…)
     source_name : label stored in article["source"]
@@ -2495,6 +2540,7 @@ def _scrape_dcd_channel(base_url, source_name, cutoff, max_pages, progress_cb, l
 
     all_articles = []
     seen_urls    = set()
+    _is_open_range = (cutoff <= datetime.min + timedelta(days=1))
 
     # Work out whether base_url already has a query string
     _has_qs = "?" in base_url
@@ -2515,28 +2561,47 @@ def _scrape_dcd_channel(base_url, source_name, cutoff, max_pages, progress_cb, l
         if not soup:
             break
 
-        page_arts  = _parse_articles_from_soup(soup, source_name, DCD_BASE)
+        page_arts   = _parse_articles_from_soup(soup, source_name, DCD_BASE)
         new_on_page = 0
-        stop        = False
+        dated_on_page = 0
+        all_dated_old = True   # becomes False if any dated article on page is within cutoff
 
         for art in page_arts:
             norm_url = art["url"].rstrip("/")
             if norm_url in seen_urls:
                 continue
             seen_urls.add(norm_url)
+
             d = art["date_obj"]
-            if d and d < cutoff:
-                stop = True
-                break
+            if d:
+                dated_on_page += 1
+                if d >= cutoff:
+                    all_dated_old = False   # at least one fresh article on this page
+
             all_articles.append(art)
             new_on_page += 1
 
-        if stop or new_on_page == 0:
+        # Stop paginating only when the entire page's dated articles are older than
+        # the cutoff AND there was at least one dated article to judge by.
+        # This prevents early abort due to undated articles.
+        if new_on_page == 0:
+            break
+        if dated_on_page > 0 and all_dated_old and not _is_open_range:
             break
 
         time.sleep(0.4)
 
-    return all_articles
+    # ── Post-scrape date filter ───────────────────────────────────────────────
+    # For open-range ("Latest / all"), keep everything including undated articles.
+    # For bounded ranges (7/14/30 days, custom), drop articles older than cutoff
+    # AND drop undated articles (we cannot verify they are within the window).
+    if _is_open_range:
+        return all_articles
+    else:
+        return [
+            a for a in all_articles
+            if a.get("date_obj") is not None and a["date_obj"] >= cutoff
+        ]
 
 
 # ─── run_all_scrapers: dispatches to the chosen DCD channel(s) ─────────────
@@ -2846,27 +2911,63 @@ def detect_sentiment(text):
 
 
 def _normalise_headline(h):
-    """Normalise headline for comparison: lowercase, strip punctuation/source suffix."""
+    """
+    Normalise headline for comparison: lowercase, strip punctuation/source suffix,
+    remove filler words, collapse whitespace.
+    """
     h = h.lower().strip()
-    # Strip common source suffixes added by Google News
-    h = re.sub(r"\s*[-–|]\s*\w[\w\s]{1,30}$", "", h)
-    # Strip special chars
+    # Strip common source suffixes added by Google News: "– Reuters", "| Bloomberg", etc.
+    h = re.sub(r"\s*[-–—|·]\s*[\w][\w\s,\.]{0,40}$", "", h)
+    # Strip URLs and HTML entities
+    h = re.sub(r"https?://\S+", "", h)
+    h = re.sub(r"&\w+;", " ", h)
+    # Strip all non-word chars except spaces
     h = re.sub(r"[^\w\s]", " ", h)
     h = re.sub(r"\s+", " ", h).strip()
     return h
 
 
-def fuzzy_similar(a, b, threshold=0.88):
-    """True if two normalised headlines are likely the same story."""
+def _token_set_ratio(a, b):
+    """
+    Token-set similarity: splits both strings into sorted word-sets, then
+    computes SequenceMatcher on the intersection + remainders.
+    Much more robust than raw ratio for reordered / partially-matching headlines.
+    """
+    sa = set(a.split())
+    sb = set(b.split())
+    inter = " ".join(sorted(sa & sb))
+    ra = " ".join(sorted(sa - sb))
+    rb = " ".join(sorted(sb - sa))
+    s1 = SequenceMatcher(None, inter, inter + " " + ra).ratio()
+    s2 = SequenceMatcher(None, inter, inter + " " + rb).ratio()
+    s3 = SequenceMatcher(None, inter + " " + ra, inter + " " + rb).ratio()
+    return max(s1, s2, s3)
+
+
+def fuzzy_similar(a, b, threshold=0.85):
+    """
+    True if two normalised headlines are likely the same story.
+    Uses both SequenceMatcher ratio AND token-set ratio for best coverage.
+    """
     na, nb = _normalise_headline(a), _normalise_headline(b)
     # Exact match after normalisation
     if na == nb:
         return True
+    # Must share at least 4 tokens to be candidates (avoid short false-positives)
+    ta, tb = set(na.split()), set(nb.split())
+    # Skip if they share fewer than 3 common meaningful words
+    common = ta & tb - {"the","a","an","in","of","at","to","for","and","or","is","on"}
+    if len(common) < 3 and (len(ta) > 4 or len(tb) > 4):
+        return False
     # Sequence similarity
     ratio = SequenceMatcher(None, na, nb).ratio()
     if ratio >= threshold:
         return True
-    # One is a substring of the other (short headline vs long headline of same story)
+    # Token-set ratio (handles re-ordered words, partial matches)
+    tsr = _token_set_ratio(na, nb)
+    if tsr >= threshold:
+        return True
+    # One is a clear substring of the other
     shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
     if len(shorter) >= 30 and shorter in longer:
         return True
@@ -2875,32 +2976,45 @@ def fuzzy_similar(a, b, threshold=0.88):
 
 def deduplicate(articles):
     """
-    1. URL-based exact dedup (same URL = same article).
-    2. Fuzzy headline dedup — when two articles match, keep the one from
-       the source with the lowest _priority number (DCD = 1 wins).
+    Multi-pass deduplication:
+    1. URL-based exact dedup (same canonical URL = same article).
+    2. Domain-slug dedup (same publication slug under different URL formats).
+    3. Fuzzy headline dedup using both SequenceMatcher + token-set ratio —
+       when two articles match, keep the one from the higher-priority source.
     """
-    # Step 1: URL dedup — sort by priority so DCD URLs win ties
+    # ── Step 1: URL canonical dedup ──────────────────────────────────────────
     seen_urls = {}
     for art in sorted(articles, key=lambda x: x.get("_priority", 99)):
         url = str(art.get("URL", art.get("url", ""))).strip().rstrip("/")
+        # Canonicalise: remove utm_ params and trailing slashes
+        url = re.sub(r"[?&]utm_[^&]*", "", url).rstrip("/")
         if url and url not in seen_urls:
             seen_urls[url] = art
     url_deduped = list(seen_urls.values())
 
-    # Step 2: Fuzzy headline dedup — sort by priority first so DCD is kept
-    url_deduped.sort(key=lambda x: x.get("_priority", 99))
+    # ── Step 2: Fuzzy headline dedup — sorted by priority so best source wins ──
+    url_deduped.sort(key=lambda x: (x.get("_priority", 99), -(x.get("_weight", 5))))
     keep = []
-    seen_headlines = []
+    # Use normalised headlines for O(n) fast-reject before expensive fuzzy check
+    seen_headlines_norm = []
+    seen_headlines_raw  = []
     for art in url_deduped:
         hl = art.get("Headline", art.get("headline", ""))
+        hl_norm = _normalise_headline(hl)
         is_dup = False
-        for seen in seen_headlines:
-            if fuzzy_similar(hl, seen):
+        for i, seen_norm in enumerate(seen_headlines_norm):
+            # Fast-reject: skip if they share fewer than 3 tokens
+            tn = set(hl_norm.split())
+            ts = set(seen_norm.split())
+            if len(tn & ts) < 3 and (len(tn) > 4 or len(ts) > 4):
+                continue
+            if fuzzy_similar(hl, seen_headlines_raw[i]):
                 is_dup = True
                 break
         if not is_dup:
             keep.append(art)
-            seen_headlines.append(hl)
+            seen_headlines_norm.append(hl_norm)
+            seen_headlines_raw.append(hl)
     return keep
 
 
@@ -5667,7 +5781,8 @@ def main():
             elif sel_days is None:
                 re_cutoff = datetime.min
             else:
-                re_cutoff = datetime.now() - timedelta(days=sel_days)
+                _re_boundary = datetime.now() - timedelta(days=sel_days)
+                re_cutoff = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
 
             re_pbar = st.progress(0.0, text="Initialising Renewables scan...")
 
@@ -6403,7 +6518,8 @@ def main():
             cutoff     = datetime.min
             cutoff_end = datetime.max
         else:
-            cutoff     = datetime.now() - timedelta(days=sel_days)
+            _boundary  = datetime.now() - timedelta(days=sel_days)
+            cutoff     = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
             cutoff_end = datetime.max
         st.session_state.cutoff_end = cutoff_end
 
