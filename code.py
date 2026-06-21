@@ -74,6 +74,22 @@ CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap');
 
+/* ── Theme variables (default = Data Center BLUE) ───────────────────────────
+   Overridden to GREEN for Renewables via a small :root block injected
+   after platform_mode is known — see _inject_theme() in main(). */
+:root {
+    --accent:        #0047e1;
+    --accent2:       #00b4ff;
+    --accent-rgb:    0, 71, 225;
+    --accent2-rgb:   0, 180, 255;
+    --accent-soft:   rgba(0, 71, 225, 0.18);
+    --accent-glow:   rgba(0, 71, 225, 0.35);
+    --accent-faint:  rgba(0, 71, 225, 0.12);
+    --tag-bg:        #0f2245;
+    --tag-text:      #7eb8ff;
+    --banner-bg:     linear-gradient(135deg, #07111f 0%, #0b1d3a 45%, #07111f 100%);
+}
+
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .stApp { background: #060a10; color: #e8edf5; }
 
@@ -117,9 +133,9 @@ div[data-testid="collapsedControl"] {
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
-    background: #0047e1 !important;
+    background: var(--accent) !important;
     border-radius: 0 10px 10px 0 !important;
-    border: 1px solid #0060ff !important;
+    border: 1px solid var(--accent2) !important;
     border-left: none !important;
     width: 2rem !important;
     z-index: 99999 !important;
@@ -137,7 +153,7 @@ div[data-testid="collapsedControl"] svg {
 
 /* Sidebar Run button */
 [data-testid="stSidebar"] .stButton button {
-    background: linear-gradient(135deg, #0047e1, #00b4ff) !important;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)) !important;
     color: #fff !important; border: none !important; border-radius: 8px !important;
     font-family: 'Syne', sans-serif !important; font-weight: 700 !important;
     font-size: 0.92rem !important; letter-spacing: 0.04em !important;
@@ -155,8 +171,8 @@ div[data-testid="collapsedControl"] svg {
     border-radius: 8px !important;
 }
 [data-testid="stSidebar"] [data-baseweb="select"] > div:first-child:focus-within {
-    border-color: #0047e1 !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.18) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-soft) !important;
 }
 /* Placeholder text */
 [data-testid="stSidebar"] [data-baseweb="select"] [data-testid="stMarkdownContainer"],
@@ -165,12 +181,12 @@ div[data-testid="collapsedControl"] svg {
 }
 /* Selected tag pills inside multiselect */
 [data-testid="stSidebar"] [data-baseweb="tag"] {
-    background: #0f2245 !important;
-    border: 1px solid #0047e1 !important;
+    background: var(--tag-bg) !important;
+    border: 1px solid var(--accent) !important;
     border-radius: 5px !important;
 }
 [data-testid="stSidebar"] [data-baseweb="tag"] span {
-    color: #7eb8ff !important;
+    color: var(--tag-text) !important;
 }
 [data-testid="stSidebar"] [data-baseweb="tag"] [role="presentation"] svg {
     fill: #3a5480 !important;
@@ -179,7 +195,7 @@ div[data-testid="collapsedControl"] svg {
 [data-testid="stSidebar"] [data-baseweb="select"] input {
     background: transparent !important;
     color: #ccdaf5 !important;
-    caret-color: #0047e1 !important;
+    caret-color: var(--accent) !important;
 }
 
 /* ── Dropdown menu (popover) — dark background ────────────────────────────── */
@@ -202,14 +218,14 @@ ul[data-baseweb="menu"] {
 [data-baseweb="menu"] li:hover,
 [role="option"]:hover,
 [data-baseweb="menu"] [role="option"]:hover {
-    background: #0f2245 !important;
+    background: var(--tag-bg) !important;
     color: #ffffff !important;
 }
 /* Highlighted/active option */
 [data-baseweb="menu"] [aria-selected="true"],
 [role="option"][aria-selected="true"] {
-    background: #0f2245 !important;
-    color: #00b4ff !important;
+    background: var(--tag-bg) !important;
+    color: var(--accent2) !important;
 }
 /* Search input inside dropdown */
 [data-baseweb="popover"] input,
@@ -228,8 +244,8 @@ ul[data-baseweb="menu"] {
     color: #d0dff0 !important;
 }
 [data-testid="stSidebar"] .stTextInput input:focus {
-    border-color: #0047e1 !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.18) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-soft) !important;
 }
 
 /* ── Sidebar number input ─────────────────────────────────────────────────── */
@@ -255,7 +271,7 @@ ul[data-baseweb="menu"] {
     background: #0b1628 !important; border: 1px solid #152038 !important;
     border-radius: 8px !important; color: #d0dff0 !important;
 }
-.stTextInput input:focus { border-color: #0047e1 !important; }
+.stTextInput input:focus { border-color: var(--accent) !important; }
 
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */
 .stTabs [data-baseweb="tab-list"] {
@@ -268,7 +284,7 @@ ul[data-baseweb="menu"] {
     font-weight: 600 !important; font-size: .8rem !important;
     letter-spacing: .04em !important; padding: .45rem 1.1rem !important;
 }
-.stTabs [aria-selected="true"] { background: #0047e1 !important; color: #fff !important; }
+.stTabs [aria-selected="true"] { background: var(--accent) !important; color: #fff !important; }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 1.1rem !important; }
 
 /* ── Download buttons ─────────────────────────────────────────────────────── */
@@ -282,7 +298,7 @@ ul[data-baseweb="menu"] {
 
 /* ── Banner ───────────────────────────────────────────────────────────────── */
 .gl-banner {
-    background: linear-gradient(135deg, #07111f 0%, #0b1d3a 45%, #07111f 100%);
+    background: var(--banner-bg);
     border: 1px solid #132040; border-radius: 16px;
     padding: 2rem 2.5rem; margin-bottom: 1.6rem;
     position: relative; overflow: hidden;
@@ -290,33 +306,61 @@ ul[data-baseweb="menu"] {
 .gl-banner::before {
     content: ''; position: absolute; top: -80px; right: -40px;
     width: 320px; height: 320px;
-    background: radial-gradient(circle, rgba(0,71,225,0.16) 0%, transparent 68%);
+    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.16) 0%, transparent 68%);
     border-radius: 50%;
 }
 .gl-banner::after {
     content: ''; position: absolute; bottom: -50px; left: 25%;
     width: 240px; height: 240px;
-    background: radial-gradient(circle, rgba(0,180,255,0.09) 0%, transparent 68%);
+    background: radial-gradient(circle, rgba(var(--accent2-rgb), 0.09) 0%, transparent 68%);
     border-radius: 50%;
 }
 .banner-eyebrow {
     font-family: 'DM Mono', monospace; font-size: .68rem;
-    letter-spacing: .2em; color: #00b4ff;
+    letter-spacing: .2em; color: var(--accent2);
     text-transform: uppercase; margin-bottom: .45rem;
 }
 .banner-title {
     font-family: 'Syne', sans-serif; font-size: 2rem;
     font-weight: 800; color: #fff; line-height: 1.12; margin-bottom: .35rem;
 }
-.banner-title span { color: #00b4ff; }
+.banner-title span { color: var(--accent2); }
 .banner-sub { font-size: .85rem; color: #6a80a8; font-weight: 300; }
 .banner-ts { font-family: 'DM Mono', monospace; font-size: .68rem; color: #2a3e60; margin-top: .7rem; letter-spacing: .05em; }
+
+/* ── Compact / collapsed banner (post-scan state) ───────────────────────────── */
+.gl-banner-compact {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    background: var(--banner-bg);
+    border: 1px solid #132040; border-radius: 12px;
+    padding: .65rem 1.3rem; margin-bottom: 1.1rem;
+    position: relative; overflow: hidden;
+}
+.gl-banner-compact .cb-left { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+.gl-banner-compact .cb-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor; animation: cb-pulse 2.2s ease-in-out infinite;
+}
+@keyframes cb-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.gl-banner-compact .cb-title {
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.02rem;
+    color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gl-banner-compact .cb-sub {
+    font-family: 'DM Mono', monospace; font-size: .66rem; letter-spacing: .04em;
+    color: #5a6f95; white-space: nowrap;
+}
+.gl-banner-compact .cb-ts {
+    font-family: 'DM Mono', monospace; font-size: .66rem; color: #2a3e60;
+    letter-spacing: .04em; flex-shrink: 0;
+}
 
 /* ── Section headings & pills ─────────────────────────────────────────────── */
 .sec-head {
     font-family: 'Syne', sans-serif; font-size: .9rem; font-weight: 700;
     color: #b8c8e0; letter-spacing: .07em; text-transform: uppercase;
-    border-left: 3px solid #0047e1; padding-left: .7rem;
+    border-left: 3px solid var(--accent); padding-left: .7rem;
     margin: 1.6rem 0 .9rem 0;
 }
 .pill-row { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: 1.4rem; }
@@ -326,7 +370,7 @@ ul[data-baseweb="menu"] {
     display: flex; align-items: center; gap: .38rem;
 }
 .pill b { color: #fff; }
-.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #0047e1; flex-shrink: 0; }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 
 hr { border-color: #152038 !important; }
 #MainMenu, footer, header { visibility: hidden; }
@@ -337,21 +381,21 @@ hr { border-color: #152038 !important; }
 }
 .hover-card:hover {
     transform: translateY(-2px) !important;
-    border-color: #0047e1 !important;
-    box-shadow: 0 6px 28px rgba(0, 71, 225, 0.18) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 6px 28px var(--accent-soft) !important;
 }
 
 /* ── Tooltip-style hover on pills ─────────────────────────────────────────── */
 .pill:hover {
-    border-color: #0047e1 !important;
-    background: #0f2245 !important;
+    border-color: var(--accent) !important;
+    background: var(--tag-bg) !important;
     color: #ccdaf5 !important;
     cursor: default;
 }
 
 /* ── Section heading hover ──────────────────────────────────────────────────── */
 .sec-head:hover {
-    border-left-color: #00b4ff !important;
+    border-left-color: var(--accent2) !important;
     color: #fff !important;
     cursor: default;
 }
@@ -362,25 +406,25 @@ hr { border-color: #152038 !important; }
 }
 .kpi-card:hover {
     transform: translateY(-3px) !important;
-    border-color: #0047e1 !important;
-    box-shadow: 0 8px 32px rgba(0, 71, 225, 0.22) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 8px 32px var(--accent-glow) !important;
 }
 
 /* ── Table row hover ─────────────────────────────────────────────────────────── */
 .dc-table tr:hover td {
-    background: #0f2245 !important;
+    background: var(--tag-bg) !important;
 }
 
 /* ── Tab hover ───────────────────────────────────────────────────────────────── */
 .stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
-    background: rgba(0,71,225,0.12) !important;
+    background: var(--accent-faint) !important;
     color: #ccdaf5 !important;
 }
 
 /* ── Sidebar button hover ───────────────────────────────────────────────────── */
 [data-testid="stSidebar"] .stButton button:hover {
     opacity: .82;
-    box-shadow: 0 4px 16px rgba(0, 71, 225, 0.35) !important;
+    box-shadow: 0 4px 16px var(--accent-glow) !important;
     transform: translateY(-1px) !important;
 }
 
@@ -398,8 +442,8 @@ hr { border-color: #152038 !important; }
 }
 .feature-card:hover {
     transform: translateY(-4px) !important;
-    border-color: #0047e1 !important;
-    box-shadow: 0 10px 36px rgba(0, 71, 225, 0.18) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 10px 36px var(--accent-soft) !important;
 }
 
 /* ── Saved scan row hover ─────────────────────────────────────────────────── */
@@ -416,8 +460,8 @@ hr { border-color: #152038 !important; }
     transition: border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
 }
 .article-card-wrap:hover {
-    border-color: #0047e1 !important;
-    box-shadow: 0 6px 28px rgba(0, 71, 225, 0.15) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 6px 28px var(--accent-soft) !important;
     transform: translateY(-1px) !important;
 }
 
@@ -436,7 +480,7 @@ hr { border-color: #152038 !important; }
     transition: box-shadow 0.25s ease !important;
 }
 [data-testid="stPlotlyChart"]:hover {
-    box-shadow: 0 0 28px rgba(0, 71, 225, 0.13) !important;
+    box-shadow: 0 0 28px var(--accent-soft) !important;
 }
 
 /* ── Futuristic sidebar filter group labels ────────────────────────────────── */
@@ -450,10 +494,63 @@ hr { border-color: #152038 !important; }
 
 /* ── Sidebar number input spinner ──────────────────────────────────────────── */
 [data-testid="stSidebar"] input[type="number"]:focus {
-    border-color: #0047e1 !important;
-    box-shadow: 0 0 0 2px rgba(0,71,225,0.18) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-soft) !important;
+}
+
+/* ── Active filter chip (theme-aware) ────────────────────────────────────── */
+.filter-chip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: var(--tag-bg); border: 1px solid var(--accent);
+    border-radius: 14px; padding: .28rem .55rem .28rem .75rem;
+    font-family: 'DM Mono', monospace; font-size: .68rem;
+    color: var(--tag-text); white-space: nowrap;
+}
+.filter-chip .fc-label { color: #5a6f95; }
+.filter-chip .fc-x {
+    display:inline-flex; align-items:center; justify-content:center;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); color: #b8c8e0;
+    font-size: .62rem; cursor: default;
+}
+
+/* ── Skeleton loading shimmer (theme-aware) ──────────────────────────────── */
+@keyframes skeleton-shimmer {
+    0%   { background-position: -300px 0; }
+    100% { background-position: 300px 0; }
+}
+.skeleton-bar {
+    border-radius: 6px;
+    background: linear-gradient(90deg, #0b1628 25%, var(--tag-bg) 50%, #0b1628 75%);
+    background-size: 600px 100%;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+/* ── Progress bar (scan loading) — theme-aware ───────────────────────────── */
+[data-testid="stProgress"] > div > div > div > div {
+    background: linear-gradient(90deg, var(--accent), var(--accent2)) !important;
+}
+[data-testid="stProgress"] > div > div {
+    background: #101b2e !important;
+}
+[data-testid="stProgressText"], [data-testid="stProgress"] p {
+    color: #7c93bd !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: .76rem !important;
+    letter-spacing: .03em !important;
+}
+
+/* ── Spinner — theme-aware ───────────────────────────────────────────────── */
+[data-testid="stSpinner"] > div > div {
+    border-top-color: var(--accent) !important;
+    border-right-color: var(--accent) !important;
+}
+[data-testid="stSpinner"] p {
+    color: #7c93bd !important;
+    font-family: 'DM Mono', monospace !important;
 }
 </style>
+
 """
 
 MONTHS = {
@@ -1232,6 +1329,7 @@ RE_TOPIC_COLORS = {
     "Offshore Wind":   "#0088cc",
     "Hydrogen":        "#a855f7",
     "Other Renewables":"#00e676",
+    "EPC Companies":   "#ff6400",   # EPC / project company mode
 }
 
 RE_DEAL_TYPE_COLORS = {
@@ -1365,6 +1463,359 @@ RE_DEAL_TYPE_KEYWORDS = {
 # Specialist feeds: direct RSS from each publication — fastest, highest quality.
 
 _GN = "https://news.google.com/rss/search?hl=en&gl=US&ceid=US:en&q="
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  EPC COMPANY REGISTRY — Global EPC / Project Companies (Power & Renewables)
+#  Covers: Solar, Wind, Offshore Wind, Storage/BESS, Hydrogen, Hydro, Gas/Power
+# ═══════════════════════════════════════════════════════════════════════════════
+
+EPC_COMPANIES = {
+    # ── Tier 1 Global EPCs (full spectrum) ────────────────────────────────────
+    "Bechtel":              {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen","Other Renewables"]},
+    "Fluor":                {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen","Other Renewables"]},
+    "Technip Energies":     {"region": "Global", "sectors": ["Hydrogen","Other Renewables"]},
+    "Saipem":               {"region": "Global", "sectors": ["Offshore Wind","Hydrogen","Other Renewables"]},
+    "Wood":                 {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen","Other Renewables"]},
+    "Worley":               {"region": "Global", "sectors": ["Solar","Wind","Hydrogen","Other Renewables"]},
+    "AECOM":                {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "Jacobs":               {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "WSP":                  {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Offshore Wind"]},
+    "Stantec":              {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "Hatch":                {"region": "Global", "sectors": ["Energy Storage","Hydrogen","Other Renewables"]},
+    "Black & Veatch":       {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen","Other Renewables"]},
+    "Burns & McDonnell":    {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "Sargent & Lundy":      {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "Tetra Tech":           {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "AMEC":                 {"region": "Global", "sectors": ["Solar","Wind","Hydrogen","Other Renewables"]},
+    "SNC-Lavalin":          {"region": "Global", "sectors": ["Solar","Wind","Hydrogen","Other Renewables"]},
+    "AtkinsRéalis":         {"region": "Global", "sectors": ["Solar","Wind","Energy Storage","Offshore Wind","Hydrogen"]},
+    "Parsons":              {"region": "Global", "sectors": ["Solar","Wind","Other Renewables"]},
+    "KBR":                  {"region": "Global", "sectors": ["Hydrogen","Other Renewables"]},
+
+    # ── European EPCs ─────────────────────────────────────────────────────────
+    "Acciona Energia":      {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "ACS":                  {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+    "Cobra IS":             {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Elecnor":              {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "TSK":                  {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Grupo T-Solar":        {"region": "Europe",        "sectors": ["Solar"]},
+    "Solaria":              {"region": "Europe",        "sectors": ["Solar"]},
+    "Renovalia":            {"region": "Europe",        "sectors": ["Solar","Wind"]},
+    "Técnicas Reunidas":    {"region": "Europe/Global", "sectors": ["Solar","Hydrogen","Other Renewables"]},
+    "Dragados":             {"region": "Europe/Global", "sectors": ["Offshore Wind","Other Renewables"]},
+    "Saeta Yield":          {"region": "Europe",        "sectors": ["Solar","Wind"]},
+    "Gamesa Electric":      {"region": "Europe/Global", "sectors": ["Wind","Energy Storage"]},
+    "Siemens Gamesa":       {"region": "Global",        "sectors": ["Wind","Offshore Wind"]},
+    "Vestas":               {"region": "Global",        "sectors": ["Wind","Offshore Wind"]},
+    "GE Vernova":           {"region": "Global",        "sectors": ["Wind","Offshore Wind","Energy Storage","Other Renewables"]},
+    "Enercon":              {"region": "Europe/Global", "sectors": ["Wind"]},
+    "Nordex":               {"region": "Europe/Global", "sectors": ["Wind"]},
+    "Envision Energy":      {"region": "Asia/Global",   "sectors": ["Wind","Energy Storage"]},
+    "Senvion":              {"region": "Europe",        "sectors": ["Wind"]},
+    "Bosch Rexroth":        {"region": "Europe/Global", "sectors": ["Wind","Offshore Wind"]},
+    "Prysmian":             {"region": "Europe/Global", "sectors": ["Offshore Wind","Energy Storage"]},
+    "Nexans":               {"region": "Europe/Global", "sectors": ["Offshore Wind","Energy Storage"]},
+    "Alstom":               {"region": "Europe/Global", "sectors": ["Other Renewables"]},
+    "Schneider Electric":   {"region": "Global",        "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "ABB":                  {"region": "Global",        "sectors": ["Solar","Wind","Energy Storage","Offshore Wind","Hydrogen"]},
+    "Siemens Energy":       {"region": "Global",        "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "Hitachi Energy":       {"region": "Global",        "sectors": ["Solar","Wind","Energy Storage","Offshore Wind"]},
+    "Enel Green Power":     {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "Iberdrola":            {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "Vattenfall":           {"region": "Europe/Global", "sectors": ["Wind","Offshore Wind","Solar","Energy Storage"]},
+    "Ørsted":               {"region": "Europe/Global", "sectors": ["Offshore Wind","Wind","Solar","Hydrogen"]},
+    "RWE":                  {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "TotalEnergies":        {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "Engie":                {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "EDF Renewables":       {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+    "Equinor":              {"region": "Europe/Global", "sectors": ["Offshore Wind","Hydrogen","Solar"]},
+    "BP":                   {"region": "Global",        "sectors": ["Solar","Wind","Offshore Wind","Hydrogen","Energy Storage"]},
+    "Shell":                {"region": "Global",        "sectors": ["Solar","Wind","Offshore Wind","Hydrogen","Energy Storage"]},
+    "SSE":                  {"region": "Europe",        "sectors": ["Wind","Offshore Wind","Energy Storage"]},
+    "ScottishPower":        {"region": "Europe",        "sectors": ["Wind","Offshore Wind","Solar"]},
+    "Statkraft":            {"region": "Europe",        "sectors": ["Wind","Solar","Energy Storage","Hydrogen","Other Renewables"]},
+    "Mainstream Renewable Power": {"region": "Global",  "sectors": ["Wind","Solar","Offshore Wind"]},
+    "Lightsource BP":       {"region": "Global",        "sectors": ["Solar"]},
+    "Neoen":                {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Voltalia":             {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "BayWa r.e.":           {"region": "Europe/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Sonnedix":             {"region": "Europe/Global", "sectors": ["Solar"]},
+    "Enerparc":             {"region": "Europe",        "sectors": ["Solar"]},
+    "juwi":                 {"region": "Europe/Global", "sectors": ["Solar","Wind"]},
+    "WPD":                  {"region": "Europe/Global", "sectors": ["Wind","Offshore Wind"]},
+    "DEME":                 {"region": "Europe/Global", "sectors": ["Offshore Wind"]},
+    "Van Oord":             {"region": "Europe/Global", "sectors": ["Offshore Wind"]},
+    "Heerema":              {"region": "Europe/Global", "sectors": ["Offshore Wind"]},
+    "Seaway 7":             {"region": "Europe/Global", "sectors": ["Offshore Wind"]},
+    "Cadeler":              {"region": "Europe",        "sectors": ["Offshore Wind"]},
+    "Eneti":                {"region": "Global",        "sectors": ["Offshore Wind"]},
+    "Windey":               {"region": "Asia",          "sectors": ["Wind"]},
+    "NEG Micon":            {"region": "Europe",        "sectors": ["Wind"]},
+    "Renew Power":          {"region": "Asia",          "sectors": ["Solar","Wind","Energy Storage"]},
+    "John Laing":           {"region": "Europe/Global", "sectors": ["Solar","Wind","Offshore Wind"]},
+    "Cero Generation":      {"region": "Europe",        "sectors": ["Solar","Wind"]},
+    "Cubico":               {"region": "Europe/Global", "sectors": ["Solar","Wind"]},
+    "Copenhagen Infrastructure Partners": {"region": "Europe/Global", "sectors": ["Offshore Wind","Wind","Solar"]},
+    "Eurowind Energy":      {"region": "Europe",        "sectors": ["Wind","Solar"]},
+    "European Energy":      {"region": "Europe",        "sectors": ["Wind","Solar","Energy Storage","Hydrogen"]},
+    "Windpark Capital":     {"region": "Europe",        "sectors": ["Wind"]},
+
+    # ── UK / Ireland EPCs ─────────────────────────────────────────────────────
+    "Balfour Beatty":       {"region": "UK/Global",     "sectors": ["Solar","Wind","Energy Storage"]},
+    "Mott MacDonald":       {"region": "UK/Global",     "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "Arup":                 {"region": "Global",        "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "Turner & Townsend":    {"region": "Global",        "sectors": ["Solar","Wind","Energy Storage","Offshore Wind"]},
+    "Costain":              {"region": "UK/Global",     "sectors": ["Wind","Offshore Wind","Energy Storage"]},
+    "Kier":                 {"region": "UK",            "sectors": ["Solar","Wind","Energy Storage"]},
+    "Morgan Sindall":       {"region": "UK",            "sectors": ["Solar","Wind","Energy Storage"]},
+    "Skanska":              {"region": "Europe/Global", "sectors": ["Wind","Offshore Wind","Solar"]},
+    "Wates":                {"region": "UK",            "sectors": ["Solar","Energy Storage"]},
+    "Laing O'Rourke":       {"region": "UK/Global",     "sectors": ["Offshore Wind","Wind","Energy Storage"]},
+    "Amec Foster Wheeler":  {"region": "UK/Global",     "sectors": ["Solar","Wind","Hydrogen","Other Renewables"]},
+
+    # ── US / North America EPCs ───────────────────────────────────────────────
+    "Mortenson":            {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage","Offshore Wind"]},
+    "Blattner Energy":      {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Primoris Services":    {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Quanta Services":      {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "MYR Group":            {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "IEA Energy Services":  {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Wanzek Construction":  {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Swinerton Renewable Energy": {"region": "North America", "sectors": ["Solar","Energy Storage"]},
+    "Orion Energy Systems": {"region": "North America",  "sectors": ["Solar","Energy Storage"]},
+    "Solect Energy":        {"region": "North America",  "sectors": ["Solar"]},
+    "SunPower":             {"region": "North America/Global", "sectors": ["Solar"]},
+    "First Solar":          {"region": "North America/Global", "sectors": ["Solar"]},
+    "SolarEdge":            {"region": "North America/Global", "sectors": ["Solar","Energy Storage"]},
+    "Enphase Energy":       {"region": "North America/Global", "sectors": ["Solar","Energy Storage"]},
+    "Array Technologies":   {"region": "North America",  "sectors": ["Solar"]},
+    "Nextracker":           {"region": "North America/Global", "sectors": ["Solar"]},
+    "Pattern Energy":       {"region": "North America/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Invenergy":            {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "Longroad Energy":      {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Intersect Power":      {"region": "North America",  "sectors": ["Solar","Energy Storage","Hydrogen"]},
+    "Arevon Energy":        {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "EDF Renewables North America": {"region": "North America", "sectors": ["Solar","Wind","Energy Storage","Offshore Wind"]},
+    "Avangrid Renewables":  {"region": "North America",  "sectors": ["Wind","Offshore Wind","Solar"]},
+    "NextEra Energy Resources": {"region": "North America", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Terra-Gen":            {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Cypress Creek Renewables": {"region": "North America", "sectors": ["Solar","Energy Storage"]},
+    "8minute Solar Energy": {"region": "North America",  "sectors": ["Solar","Energy Storage"]},
+    "Lightsource bp":       {"region": "Global",         "sectors": ["Solar"]},
+    "Amp Solar":            {"region": "North America",  "sectors": ["Solar","Energy Storage"]},
+    "Canadian Solar":       {"region": "Global",         "sectors": ["Solar","Energy Storage"]},
+    "Berkshire Hathaway Energy": {"region": "North America", "sectors": ["Solar","Wind","Energy Storage"]},
+    "AES":                  {"region": "Global",         "sectors": ["Solar","Wind","Energy Storage","Other Renewables"]},
+    "TerraForm Power":      {"region": "North America/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Clearway Energy":      {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Ørsted US":            {"region": "North America",  "sectors": ["Offshore Wind"]},
+    "Vineyard Wind":        {"region": "North America",  "sectors": ["Offshore Wind"]},
+    "Dominion Energy":      {"region": "North America",  "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+    "Duke Energy Renewables": {"region": "North America", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Southern Company":     {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Xcel Energy":          {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Eversource":           {"region": "North America",  "sectors": ["Offshore Wind","Wind","Solar"]},
+    "National Grid Renewables": {"region": "North America", "sectors": ["Solar","Wind","Energy Storage"]},
+
+    # ── Asia-Pacific EPCs ─────────────────────────────────────────────────────
+    "Greenko":              {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage","Hydrogen","Other Renewables"]},
+    "ReNew Power":          {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage"]},
+    "Adani Green Energy":   {"region": "Asia",           "sectors": ["Solar","Wind","Hydrogen"]},
+    "Tata Power Renewables": {"region": "Asia",          "sectors": ["Solar","Wind","Energy Storage"]},
+    "Azure Power":          {"region": "Asia",           "sectors": ["Solar"]},
+    "Hero Future Energies": {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage"]},
+    "Torrent Power":        {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage"]},
+    "CESC":                 {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage"]},
+    "Suzlon":               {"region": "Asia",           "sectors": ["Wind","Solar","Energy Storage"]},
+    "Inox Wind":            {"region": "Asia",           "sectors": ["Wind"]},
+    "Senvion India":        {"region": "Asia",           "sectors": ["Wind"]},
+    "Waaree Energies":      {"region": "Asia",           "sectors": ["Solar"]},
+    "Vikram Solar":         {"region": "Asia",           "sectors": ["Solar"]},
+    "Sterling and Wilson":  {"region": "Asia/Global",    "sectors": ["Solar","Energy Storage"]},
+    "KPI Green Energy":     {"region": "Asia",           "sectors": ["Solar"]},
+    "Amp Energy India":     {"region": "Asia",           "sectors": ["Solar","Energy Storage"]},
+    "Sembcorp Utilities":   {"region": "Asia/Global",    "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "Sunseap":              {"region": "Asia",           "sectors": ["Solar","Energy Storage"]},
+    "Sineng Electric":      {"region": "Asia",           "sectors": ["Solar","Energy Storage"]},
+    "Huawei Smart PV":      {"region": "Asia/Global",    "sectors": ["Solar","Energy Storage"]},
+    "JA Solar":             {"region": "Asia/Global",    "sectors": ["Solar"]},
+    "LONGi Green Energy":   {"region": "Asia/Global",    "sectors": ["Solar"]},
+    "Jinko Solar":          {"region": "Asia/Global",    "sectors": ["Solar"]},
+    "Risen Energy":         {"region": "Asia/Global",    "sectors": ["Solar"]},
+    "TBEA":                 {"region": "Asia/Global",    "sectors": ["Solar","Wind","Energy Storage"]},
+    "CSSC Offshore & Marine": {"region": "Asia",         "sectors": ["Offshore Wind"]},
+    "CIMC Raffles":         {"region": "Asia",           "sectors": ["Offshore Wind"]},
+    "China Three Gorges":   {"region": "Asia/Global",    "sectors": ["Offshore Wind","Solar","Wind","Other Renewables"]},
+    "China Energy Engineering": {"region": "Asia",       "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+    "PowerChina":           {"region": "Asia/Global",    "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "Goldwind":             {"region": "Asia/Global",    "sectors": ["Wind","Offshore Wind","Energy Storage"]},
+    "CRRC":                 {"region": "Asia",           "sectors": ["Wind","Energy Storage"]},
+    "CSSC":                 {"region": "Asia",           "sectors": ["Offshore Wind","Wind"]},
+    "Mingyang Smart Energy": {"region": "Asia/Global",   "sectors": ["Wind","Offshore Wind"]},
+    "Sany Renewable Energy": {"region": "Asia",          "sectors": ["Wind","Solar"]},
+    "DEC":                  {"region": "Asia",           "sectors": ["Wind","Solar","Energy Storage"]},
+    "DPOWER":               {"region": "Asia",           "sectors": ["Wind","Energy Storage"]},
+    "NHPC":                 {"region": "Asia",           "sectors": ["Other Renewables","Solar","Wind"]},
+    "SECI":                 {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "NTPC":                 {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "APA Group":            {"region": "Asia Pacific",   "sectors": ["Hydrogen","Solar","Energy Storage"]},
+    "Origin Energy":        {"region": "Asia Pacific",   "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "AGL Energy":           {"region": "Asia Pacific",   "sectors": ["Solar","Wind","Energy Storage"]},
+    "Infigen Energy":       {"region": "Asia Pacific",   "sectors": ["Wind","Solar"]},
+    "Tilt Renewables":      {"region": "Asia Pacific",   "sectors": ["Wind","Solar","Energy Storage"]},
+    "Contact Energy":       {"region": "Asia Pacific",   "sectors": ["Other Renewables","Wind"]},
+    "Meridian Energy":      {"region": "Asia Pacific",   "sectors": ["Other Renewables","Wind","Solar"]},
+    "JERA":                 {"region": "Asia",           "sectors": ["Offshore Wind","Solar","Hydrogen","Other Renewables"]},
+    "Marubeni":             {"region": "Asia/Global",    "sectors": ["Wind","Offshore Wind","Solar"]},
+    "Mitsubishi Power":     {"region": "Asia/Global",    "sectors": ["Hydrogen","Energy Storage","Other Renewables"]},
+    "Sumitomo":             {"region": "Asia/Global",    "sectors": ["Solar","Wind","Offshore Wind"]},
+    "Mitsui":               {"region": "Asia/Global",    "sectors": ["Solar","Wind","Offshore Wind","Hydrogen"]},
+    "Doosan Enerbility":    {"region": "Asia/Global",    "sectors": ["Hydrogen","Offshore Wind","Energy Storage"]},
+    "Hyundai Heavy Industries": {"region": "Asia/Global", "sectors": ["Offshore Wind","Energy Storage","Hydrogen"]},
+    "Samsung C&T":          {"region": "Asia/Global",    "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+    "KEPCO":                {"region": "Asia/Global",    "sectors": ["Offshore Wind","Solar","Wind"]},
+    "SK Ecoplant":          {"region": "Asia",           "sectors": ["Offshore Wind","Hydrogen","Energy Storage"]},
+    "Hanwha Q Cells":       {"region": "Asia/Global",    "sectors": ["Solar","Energy Storage"]},
+
+    # ── Middle East & Africa EPCs ─────────────────────────────────────────────
+    "ACWA Power":           {"region": "Middle East/Global", "sectors": ["Solar","Wind","Energy Storage","Hydrogen","Other Renewables"]},
+    "Masdar":               {"region": "Middle East/Global", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage","Hydrogen"]},
+    "ENEC":                 {"region": "Middle East",    "sectors": ["Other Renewables"]},
+    "Arabian Construction Company": {"region": "Middle East", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Metito":               {"region": "Middle East",    "sectors": ["Solar","Energy Storage"]},
+    "AMEA Power":           {"region": "Middle East/Africa", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Scatec":               {"region": "Africa/Global",  "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "Lekela Power":         {"region": "Africa",         "sectors": ["Wind","Solar"]},
+    "Globeleq":             {"region": "Africa",         "sectors": ["Solar","Wind","Energy Storage"]},
+    "CrossBoundary Energy": {"region": "Africa",         "sectors": ["Solar","Energy Storage"]},
+    "SOLA Group":           {"region": "Africa",         "sectors": ["Solar","Energy Storage"]},
+    "Enertrag":             {"region": "Africa/Europe",  "sectors": ["Wind","Solar","Hydrogen"]},
+    "Red Rocket":           {"region": "Africa",         "sectors": ["Solar","Wind","Energy Storage"]},
+
+    # ── Latin America EPCs ────────────────────────────────────────────────────
+    "Eneva":                {"region": "Latin America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Casa dos Ventos":      {"region": "Latin America",  "sectors": ["Wind","Solar","Energy Storage"]},
+    "Caubvento":            {"region": "Latin America",  "sectors": ["Wind"]},
+    "Atlas Renewable Energy": {"region": "Latin America/Global", "sectors": ["Solar","Wind","Energy Storage"]},
+    "Orazul Energy":        {"region": "Latin America",  "sectors": ["Other Renewables","Solar","Wind"]},
+    "Elecda":               {"region": "Latin America",  "sectors": ["Solar","Wind"]},
+    "Mainstream":           {"region": "Latin America/Global", "sectors": ["Solar","Wind"]},
+    "Sonnedix LATAM":       {"region": "Latin America",  "sectors": ["Solar"]},
+    "ISA":                  {"region": "Latin America",  "sectors": ["Solar","Wind","Other Renewables"]},
+    "Enel X":               {"region": "Global",         "sectors": ["Energy Storage","Solar","Wind"]},
+
+    # ── Energy Storage Specialists ────────────────────────────────────────────
+    "Fluence":              {"region": "Global",         "sectors": ["Energy Storage"]},
+    "Tesla Energy":         {"region": "Global",         "sectors": ["Energy Storage"]},
+    "Wartsila":             {"region": "Global",         "sectors": ["Energy Storage","Other Renewables"]},
+    "Wärtsilä":             {"region": "Global",         "sectors": ["Energy Storage","Other Renewables"]},
+    "NEC Energy Solutions": {"region": "Global",         "sectors": ["Energy Storage"]},
+    "CATL":                 {"region": "Asia/Global",    "sectors": ["Energy Storage"]},
+    "BYD Energy":           {"region": "Asia/Global",    "sectors": ["Energy Storage","Solar"]},
+    "LG Energy Solution":   {"region": "Asia/Global",    "sectors": ["Energy Storage"]},
+    "Samsung SDI":          {"region": "Asia/Global",    "sectors": ["Energy Storage"]},
+    "Panasonic Energy":     {"region": "Asia/Global",    "sectors": ["Energy Storage"]},
+    "Powin Energy":         {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Stem Inc":             {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Glidepath":            {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Energy Vault":         {"region": "Global",         "sectors": ["Energy Storage"]},
+    "Form Energy":          {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Highview Power":       {"region": "UK/Global",      "sectors": ["Energy Storage"]},
+    "Storelectric":         {"region": "UK",             "sectors": ["Energy Storage"]},
+    "Malta Inc":            {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Ambri":                {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Saft":                 {"region": "Europe/Global",  "sectors": ["Energy Storage"]},
+    "EnerSys":              {"region": "Global",         "sectors": ["Energy Storage"]},
+    "Kokam":                {"region": "Asia/Global",    "sectors": ["Energy Storage"]},
+    "Leclanché":            {"region": "Europe/Global",  "sectors": ["Energy Storage"]},
+    "Electrovaya":          {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Invinity Energy":      {"region": "UK/Global",      "sectors": ["Energy Storage"]},
+    "VRB Energy":           {"region": "Asia/Global",    "sectors": ["Energy Storage"]},
+    "Primus Power":         {"region": "North America",  "sectors": ["Energy Storage"]},
+    "ESS Tech":             {"region": "North America",  "sectors": ["Energy Storage"]},
+    "Redflow":              {"region": "Asia Pacific",   "sectors": ["Energy Storage"]},
+
+    # ── Hydrogen EPC Specialists ──────────────────────────────────────────────
+    "ITM Power":            {"region": "UK/Global",      "sectors": ["Hydrogen"]},
+    "Nel Hydrogen":         {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "Plug Power":           {"region": "North America/Global", "sectors": ["Hydrogen","Energy Storage"]},
+    "Bloom Energy":         {"region": "North America/Global", "sectors": ["Hydrogen","Energy Storage"]},
+    "Air Products":         {"region": "Global",         "sectors": ["Hydrogen"]},
+    "Air Liquide":          {"region": "Global",         "sectors": ["Hydrogen"]},
+    "Linde":                {"region": "Global",         "sectors": ["Hydrogen"]},
+    "ThyssenKrupp Nucera":  {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "Cummins Electrolyzer": {"region": "Global",         "sectors": ["Hydrogen"]},
+    "Haldor Topsoe":        {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "Topsoe":               {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "McPhy Energy":         {"region": "Europe",         "sectors": ["Hydrogen"]},
+    "Sunfire":              {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "ElectroChaea":         {"region": "Europe",         "sectors": ["Hydrogen"]},
+    "HydrogenPro":          {"region": "Europe",         "sectors": ["Hydrogen"]},
+    "Fortescue":            {"region": "Asia Pacific/Global", "sectors": ["Hydrogen","Energy Storage"]},
+    "ACME Group":           {"region": "Asia",           "sectors": ["Hydrogen","Solar"]},
+    "Gentari":              {"region": "Asia/Global",    "sectors": ["Hydrogen","Solar","Wind"]},
+    "Yara Clean Ammonia":   {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "OCI Global":           {"region": "Global",         "sectors": ["Hydrogen"]},
+    "CF Industries":        {"region": "North America",  "sectors": ["Hydrogen"]},
+    "Hy2gen":               {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "Enerkem":              {"region": "Europe/Global",  "sectors": ["Hydrogen"]},
+    "H2Pro":                {"region": "Middle East/Global", "sectors": ["Hydrogen"]},
+
+    # ── Power Transmission & Grid EPC ─────────────────────────────────────────
+    "Kalpataru Projects":   {"region": "Asia/Global",    "sectors": ["Solar","Wind","Other Renewables"]},
+    "KEC International":    {"region": "Asia/Global",    "sectors": ["Solar","Wind","Other Renewables"]},
+    "Sterlite Power":       {"region": "Asia/Global",    "sectors": ["Solar","Wind","Energy Storage"]},
+    "PGCIL":                {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage"]},
+    "Tata Projects":        {"region": "Asia",           "sectors": ["Solar","Wind","Energy Storage","Hydrogen"]},
+    "L&T Construction":     {"region": "Asia/Global",    "sectors": ["Solar","Wind","Energy Storage","Offshore Wind","Hydrogen"]},
+    "GE Grid Solutions":    {"region": "Global",         "sectors": ["Solar","Wind","Energy Storage","Offshore Wind"]},
+    "Eaton":                {"region": "Global",         "sectors": ["Solar","Wind","Energy Storage"]},
+    "Vertiv":               {"region": "Global",         "sectors": ["Energy Storage","Solar"]},
+    "Hubbell":              {"region": "North America",  "sectors": ["Solar","Wind","Energy Storage"]},
+    "Terna":                {"region": "Europe/Global",  "sectors": ["Solar","Wind","Offshore Wind"]},
+    "National Grid":        {"region": "UK/North America", "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+    "RTE":                  {"region": "Europe",         "sectors": ["Solar","Wind","Offshore Wind","Energy Storage"]},
+}
+
+# ── EPC color for the sector picker ───────────────────────────────────────────
+EPC_SECTOR_COLOR = "#ff6400"
+
+# ── Build EPC Google News feed list dynamically ────────────────────────────────
+def build_epc_feeds(selected_companies=None, region_filter=None, sector_filter=None):
+    """
+    Dynamically generate Google News RSS feeds for EPC companies.
+    If selected_companies is given, only generate feeds for those.
+    If region_filter / sector_filter is given, additionally cross-filter the registry.
+    Returns a list of feed_meta dicts ready for _fetch_feed().
+    """
+    companies_to_use = selected_companies if selected_companies else list(EPC_COMPANIES.keys())
+
+    # Apply sector filter from the sidebar sector selector
+    if sector_filter:
+        companies_to_use = [
+            c for c in companies_to_use
+            if any(s in EPC_COMPANIES.get(c, {}).get("sectors", []) for s in sector_filter)
+        ]
+
+    feeds = []
+    seen_queries = set()
+    for co in companies_to_use:
+        co_clean = co.replace(" ", "+").replace("&", "%26").replace("'", "")
+        # Core news query
+        q1 = f"{co_clean}+renewable+energy+solar+wind+storage+hydrogen+power"
+        q2 = f"{co_clean}+EPC+contract+project+construction+MW+GW"
+        q3 = f"{co_clean}+power+plant+project+award+commissioned"
+        for q in [q1, q2, q3]:
+            if q not in seen_queries:
+                seen_queries.add(q)
+                feeds.append({
+                    "url":    _GN + q,
+                    "source": f"GNews/EPC-{co[:12].replace(' ', '')}",
+                    "weight": 9,
+                    "_epc_company": co,
+                })
+    return feeds
+
 
 RE_FEED_REGISTRY = {
     # ── Solar ──────────────────────────────────────────────────────────────────
@@ -1552,22 +2003,6 @@ def detect_re_capacity(text):
         return val + " " + unit
     return ""
 
-def detect_re_project_status(text):
-    t = text.lower()
-    for status, keywords in [
-        ("Commissioned",      ["commissioned","energized","energised","goes live","first power","commercial operation","cod","inaugurated","begins generation"]),
-        ("Financed",          ["financial close","reached financial close","fc achieved","fully funded","financing agreed","financing closed"]),
-        ("Under Construction",["broke ground","groundbreaking","under construction","construction begins","installation begins","ntp issued"]),
-        ("Approved",          ["approved","consent granted","planning approved","permit granted","green light","go-ahead","eia approved"]),
-        ("Tendered",          ["tender","auction","bid","rfp","solicitation","cfd round","procurement round"]),
-        ("Contracted",        ["ppa signed","ppa agreed","ppa awarded","offtake signed","contract signed","mou signed","agreement signed","deal signed"]),
-        ("Proposed",          ["proposed","plans","eyes","could build","may build","announced plans","seeks","targeting","plans to build"]),
-        ("Challenged",        ["cancelled","rejected","denied","moratorium","blocked","withdrawn","lawsuit","challenged","opposition"]),
-    ]:
-        if any(w in t for w in keywords):
-            return status
-    return "News"
-
 def is_re_relevant(text):
     t = text.lower()
     return any(p in t for p in [
@@ -1730,27 +2165,52 @@ def _mk_re_art(headline, url, date_obj, feed_meta, sector_tag):
     }
 
 
-def run_re_scrapers(max_html_pages, cutoff, progress_cb, re_sectors=None):
+def run_re_scrapers(max_html_pages, cutoff, progress_cb, re_sectors=None,
+                    epc_companies=None, epc_sector_filter=None):
     """
     Multi-source parallel RSS engine.
     - Fetches specialist publication feeds + Google News query feeds concurrently
-    - Covers all 6 sectors with sector-specific + cross-sector feeds
+    - Covers all 6 sectors + EPC Companies mode with sector-specific + cross-sector feeds
     - re_sectors: list of selected sectors (filters which feeds to hit)
+    - epc_companies: list of EPC company names to generate targeted feeds for
+    - epc_sector_filter: sector list to cross-filter EPC companies by
     - max_html_pages: repurposed as a depth signal (1=light, 3+=deep)
     - cutoff: datetime — articles older than this are dropped
     """
-    # Build list of (feed_meta, sector_tag) to fetch
-    active_sectors = re_sectors if re_sectors else list(RE_FEED_REGISTRY.keys())
+    _epc_mode = re_sectors and "EPC Companies" in re_sectors
+    # Sectors excluding the virtual EPC sector (it has no RE_FEED_REGISTRY entry)
+    _real_sectors = [s for s in (re_sectors or list(RE_FEED_REGISTRY.keys())) if s != "EPC Companies"]
+    active_sectors = _real_sectors if _real_sectors else list(RE_FEED_REGISTRY.keys())
+
     feed_jobs = []
 
-    # Sector-specific feeds — only include selected sectors
-    for sector in active_sectors:
-        for feed in RE_FEED_REGISTRY.get(sector, []):
-            feed_jobs.append((feed, sector))
+    if _epc_mode:
+        # ── EPC MODE: only fire EPC company-specific Google News feeds ─────────
+        # Also include the standard sector feeds if other sectors are selected too
+        for sector in _real_sectors:
+            for feed in RE_FEED_REGISTRY.get(sector, []):
+                feed_jobs.append((feed, sector))
 
-    # Cross-sector feeds — always include, tag by keyword during enrichment
-    for feed in RE_CROSS_FEEDS:
-        feed_jobs.append((feed, None))  # None = detect sector from headline
+        # Build targeted EPC feeds
+        epc_feeds = build_epc_feeds(
+            selected_companies=epc_companies if epc_companies else None,
+            sector_filter=epc_sector_filter or _real_sectors or None,
+        )
+        for feed in epc_feeds:
+            feed_jobs.append((feed, "EPC Companies"))
+
+        # Cross-sector feeds — include for broader coverage
+        for feed in RE_CROSS_FEEDS:
+            feed_jobs.append((feed, None))
+    else:
+        # ── NORMAL MODE: sector-specific + cross-sector feeds ──────────────────
+        for sector in active_sectors:
+            for feed in RE_FEED_REGISTRY.get(sector, []):
+                feed_jobs.append((feed, sector))
+
+        # Cross-sector feeds — always include, tag by keyword during enrichment
+        for feed in RE_CROSS_FEEDS:
+            feed_jobs.append((feed, None))  # None = detect sector from headline
 
     total_feeds = len(feed_jobs)
     progress_cb(0.0, f"🌿 Fetching {total_feeds} RSS feeds across {len(active_sectors)} sectors…")
@@ -1803,12 +2263,26 @@ def run_re_scrapers(max_html_pages, cutoff, progress_cb, re_sectors=None):
             a["_sector"] = detect_re_topic(a["headline"])
 
     # Apply sector filter if set (cross-sector articles may belong to multiple)
-    if re_sectors:
+    _effective_sectors = [s for s in (re_sectors or []) if s != "EPC Companies"]
+    if _epc_mode and epc_companies:
+        # In EPC mode: keep articles that mention at least one selected EPC company
+        _epc_lower = [c.lower() for c in epc_companies]
+        def _epc_match(art):
+            hl = art["headline"].lower()
+            return any(ec in hl for ec in _epc_lower)
+        raw = [a for a in raw if _epc_match(a) or art.get("_sector") != "EPC Companies"]
+    elif _effective_sectors:
         def _match(art):
             detected = detect_re_topic(art["headline"])
             tagged   = art.get("_sector")
-            return detected in re_sectors or tagged in re_sectors
+            return detected in _effective_sectors or tagged in _effective_sectors
         raw = [a for a in raw if _match(a)]
+    elif re_sectors and not _epc_mode:
+        def _match2(art):
+            detected = detect_re_topic(art["headline"])
+            tagged   = art.get("_sector")
+            return detected in re_sectors or tagged in re_sectors
+        raw = [a for a in raw if _match2(a)]
 
     # Sort: dated articles first (newest → oldest), undated at end
     raw.sort(key=lambda a: a.get("date_obj") or datetime.min, reverse=True)
@@ -1819,10 +2293,13 @@ def run_re_scrapers(max_html_pages, cutoff, progress_cb, re_sectors=None):
 
 def enrich_re(raw_item):
     """Enrich a raw RE article dict → structured display dict."""
-    hl      = raw_item["headline"]
-    d       = raw_item.get("date_obj")
-    country = detect_country(hl)
-    region  = COUNTRY_TO_REGION.get(country, "Global")
+    hl       = raw_item["headline"]
+    d        = raw_item.get("date_obj")
+    country  = detect_country(hl)
+    region   = COUNTRY_TO_REGION.get(country, "Global")
+    capacity = detect_re_capacity(hl)
+    deal_sz  = detect_deal_size(hl)
+    sentiment_label, sentiment_score = detect_re_sentiment(hl, deal_size=deal_sz, capacity=capacity)
     return {
         "Headline":  hl,
         "Date":      d.strftime("%Y-%m-%d") if d else "Unknown",
@@ -1833,9 +2310,11 @@ def enrich_re(raw_item):
         "Sector":    raw_item.get("_sector") or detect_re_topic(hl),
         "Deal Type": detect_re_deal_type(hl),
         "Status":    detect_re_project_status(hl),
-        "Capacity":  detect_re_capacity(hl),
-        "Deal Size": detect_deal_size(hl),
+        "Capacity":  capacity,
+        "Deal Size": deal_sz,
         "Companies": detect_companies(hl),
+        "Sentiment": sentiment_label,
+        "Sentiment Score": sentiment_score,
         "_date_obj": d,
     }
 
@@ -1976,33 +2455,151 @@ def detect_re_capacity(text):
         return val + " " + unit
     return ""
 
+def _re_stem(word):
+    """Crude suffix-stripping stemmer so 'approved' also matches 'approves'/
+    'approving', 'blocked' matches 'blocks', etc. Only used for single-token
+    phrases — multi-word phrases stay literal (far less tense ambiguity)."""
+    for suf in ("ied", "ies", "ing", "ed", "es", "s", "d"):
+        if word.endswith(suf) and len(word) - len(suf) >= 3:
+            return word[: -len(suf)]
+    return word
+
+
+def _re_phrase_match(t, phrase):
+    """Match a rule phrase against lowercased text t. Single-token phrases
+    are stemmed + prefix-matched (catches verb tense variants); multi-word
+    phrases are matched literally with word boundaries."""
+    phrase = phrase.strip()
+    if " " in phrase:
+        return re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", t) is not None
+    stem = _re_stem(phrase)
+    return re.search(r"\b" + re.escape(stem) + r"\w*\b", t) is not None
+
+
 def detect_re_project_status(text):
+    """
+    Classify the project lifecycle stage of an RE headline.
+    Scores every category (not just the first match, which was the old
+    behaviour and silently let an early generic word like "plans" win over
+    a more specific later phrase like "cancelled"). Uses word-boundary
+    phrase matching, weighted by specificity, with a fixed severity order
+    to break ties.
+    """
     t = text.lower()
-    if any(w in t for w in ["commissioned","energized","energised","goes live","online",
-                              "began operations","first power","commercial operation","cod",
-                              "inaugurated","opened"]):
-        return "Commissioned"
-    if any(w in t for w in ["financial close","reached financial close","fc achieved",
-                              "fully funded","financing agreed"]):
-        return "Financed"
-    if any(w in t for w in ["broke ground","groundbreaking","under construction",
-                              "construction begins","installation begins"]):
-        return "Under Construction"
-    if any(w in t for w in ["approved","consent granted","planning approved",
-                              "permit granted","green light","go-ahead","eia approved"]):
-        return "Approved"
-    if any(w in t for w in ["tender","auction","bid","rfp","solicitation","cfd round"]):
-        return "Tendered"
-    if any(w in t for w in ["ppa signed","ppa agreed","ppa awarded","offtake signed",
-                              "contract signed","mou signed","agreement signed"]):
-        return "Contracted"
-    if any(w in t for w in ["proposed","plans","eyes","could build","may build",
-                              "announced plans","seeks","targeting"]):
-        return "Proposed"
-    if any(w in t for w in ["cancelled","rejected","denied","moratorium","blocked",
-                              "withdrawn","lawsuit","challenged","opposition"]):
-        return "Challenged"
-    return "News"
+
+    RULES = {
+        "Commissioned": [
+            ("commissioned", 2), ("energized", 3), ("energised", 3),
+            ("goes live", 3), ("online", 1), ("began operations", 3),
+            ("first power", 3), ("commercial operation", 3), (" cod ", 2),
+            ("inaugurated", 2), ("now operational", 3), ("fully operational", 3),
+        ],
+        "Financed": [
+            ("financial close", 3), ("reached financial close", 3),
+            ("fc achieved", 3), ("fully funded", 2), ("financing agreed", 3),
+            ("financing closed", 3), ("secures financing", 2), ("raises debt", 2),
+        ],
+        "Under Construction": [
+            ("broke ground", 3), ("groundbreaking", 2), ("under construction", 3),
+            ("construction begins", 3), ("construction starts", 3),
+            ("installation begins", 2), ("ntp issued", 2), ("notice to proceed", 3),
+        ],
+        "Approved": [
+            ("approved", 1), ("consent granted", 3), ("planning approved", 3),
+            ("permit granted", 3), ("permits granted", 3), ("green light", 2),
+            ("go-ahead", 2), ("eia approved", 3), ("regulatory approval", 3),
+        ],
+        "Tendered": [
+            ("tender", 1), ("auction", 1), ("rfp", 2), ("solicitation", 2),
+            ("cfd round", 3), ("procurement round", 3), ("invites bids", 2),
+            ("request for proposals", 3),
+        ],
+        "Contracted": [
+            ("ppa signed", 3), ("ppa agreed", 3), ("ppa awarded", 3),
+            ("offtake signed", 3), ("offtake agreement", 2), ("contract signed", 2),
+            ("mou signed", 2), ("agreement signed", 2), ("deal signed", 2),
+            ("wins contract", 2), ("awarded contract", 2),
+        ],
+        "Proposed": [
+            ("proposed", 1), ("plans to build", 2), ("announced plans", 2),
+            ("unveils plans", 2), ("eyes", 1), ("could build", 1),
+            ("may build", 1), ("seeks approval", 2), ("targeting", 1),
+        ],
+        "Challenged": [
+            ("cancelled", 3), ("canceled", 3), ("rejected", 2), ("denied", 2),
+            ("moratorium", 3), ("blocked", 2), ("withdrawn", 2), ("lawsuit", 3),
+            ("sues", 2), ("legal challenge", 3), ("opposition grows", 3),
+            ("scraps", 3), ("halts", 2), ("suspended", 2),
+        ],
+    }
+    # Fixed severity order, used only to break exact score ties.
+    SEVERITY = ["Challenged", "Commissioned", "Contracted", "Financed",
+                "Under Construction", "Approved", "Tendered", "Proposed"]
+
+    scores = {}
+    for status, phrases in RULES.items():
+        s = 0
+        for phrase, weight in phrases:
+            if _re_phrase_match(t, phrase):
+                s += weight
+        if s:
+            scores[status] = s
+
+    if not scores:
+        return "News"
+    best = max(scores.values())
+    candidates = [k for k, v in scores.items() if v == best]
+    if len(candidates) == 1:
+        return candidates[0]
+    for status in SEVERITY:
+        if status in candidates:
+            return status
+    return candidates[0]
+
+
+def detect_re_sentiment(text, deal_size="", capacity=""):
+    """
+    True market-sentiment classifier for RE headlines — Positive / Negative /
+    Neutral — distinct from (and complementary to) the lifecycle Status field
+    above. Weighted lexicon, word-boundary matched, with a small boost when a
+    headline carries a disclosed deal size or capacity figure (concrete,
+    sourced news reads more positive in market-news framing than a vague
+    mention). Returns (label, score).
+    """
+    t = text.lower()
+
+    POSITIVE = [
+        ("wins", 2), ("secures", 2), ("surges", 2), ("record", 2), ("boosts", 1),
+        ("expands", 1), ("launches", 1), ("approved", 1), ("signs", 1),
+        ("commissioned", 2), ("energized", 2), ("energised", 2), ("milestone", 1),
+        ("breakthrough", 2), ("doubles", 1), ("growth", 1), ("green light", 2),
+        ("completes", 1), ("inaugurated", 1), ("partners with", 1), ("backs", 1),
+        ("funds", 1), ("invests", 1), ("achieves", 1), ("unveils", 1),
+        ("first power", 2), ("goes live", 2),
+    ]
+    NEGATIVE = [
+        ("delay", 2), ("delays", 2), ("delayed", 2), ("cuts", 2), ("scraps", 3),
+        ("halts", 2), ("halted", 2), ("cancelled", 3), ("canceled", 3),
+        ("lawsuit", 3), ("sues", 2), ("fine", 2), ("fined", 2), ("loses", 2),
+        ("blocked", 2), ("opposition", 2), ("warns", 1), ("slump", 2),
+        ("falls", 1), ("withdraws", 2), ("withdrawn", 2), ("suspended", 2),
+        ("moratorium", 3), ("denied", 2), ("rejected", 2), ("shuts down", 3),
+        ("bankrupt", 3), ("layoffs", 2), ("probe", 2), ("investigation", 2),
+    ]
+
+    pos = sum(w for phrase, w in POSITIVE if _re_phrase_match(t, phrase))
+    neg = sum(w for phrase, w in NEGATIVE if _re_phrase_match(t, phrase))
+
+    if (deal_size or capacity) and pos == neg:
+        pos += 1  # concrete disclosed figures nudge ambiguous headlines positive
+
+    score = pos - neg
+    if score > 0:
+        return ("Positive", score)
+    if score < 0:
+        return ("Negative", score)
+    return ("Neutral", score)
+
 
 def is_re_relevant(text):
     """Quick relevance check for renewable energy news."""
@@ -2840,6 +3437,27 @@ def detect_topic(text):
     return "General"
 
 
+def detect_energy_mwh(text):
+    """
+    Detect energy-storage capacity (GWh / MWh / kWh) and normalise to MWh,
+    so "1 GWh", "1,000MWh" and "1,000 MWh" (embedded in a longer "250 MW/1,000
+    MWh" phrase) all compare equal regardless of which unit the outlet used.
+    """
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GWh|MWh|kWh)\b", text, re.I)
+    if not m:
+        return ""
+    try:
+        val = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return ""
+    unit = m.group(2).lower()
+    if unit == "gwh":
+        val *= 1000
+    elif unit == "kwh":
+        val /= 1000
+    return str(round(val))
+
+
 def detect_mw(text):
     # MW/GW capacity
     m = re.search(r"([\d,]+(?:\.\d+)?)\s*(GW|MW|gigawatt|megawatt|kilowatt|kw)\b", text, re.I)
@@ -2859,7 +3477,7 @@ def detect_mw(text):
 def detect_deal_size(text):
     # Try multi-currency: $, €, £, ¥, ₹, AED, SGD, etc.
     m = re.search(
-        r"(\$|€|£|¥|₹|US\$|USD|EUR|GBP|AED|SGD|INR|JPY|AUD|CAD|BRL)\s*([\d,.]+)\s*(billion|bn|million|mn|m\b|crore|lakh)",
+        r"(\$|€|£|¥|₹|US\$|USD|EUR|GBP|AED|SGD|INR|JPY|AUD|CAD|BRL)\s*([\d,.]+)\s*-?\s*(billion|bn|million|mn|m\b|crore|lakh)",
         text, re.I
     )
     if m:
@@ -2921,6 +3539,18 @@ def _normalise_headline(h):
     # Strip URLs and HTML entities
     h = re.sub(r"https?://\S+", "", h)
     h = re.sub(r"&\w+;", " ", h)
+    # Canonicalise currency/magnitude phrasing so "US$3.5 billion", "USD 3.5bn",
+    # "$3.5bn" and "$3.5-Billion" all collapse to the same token before the
+    # decimal point and surrounding punctuation get stripped below.
+    h = re.sub(r"\b(?:us\$|usd|eur|gbp|aed|sgd|inr|jpy|aud|cad|brl)\s*", "$", h)
+    h = re.sub(r"(\d)\s*,\s*(\d{3})", r"\1\2", h)               # 3,500 -> 3500
+    h = re.sub(r"(\d)\.(\d)", r"\1DECPT\2", h)                  # protect decimal point
+    h = re.sub(r"[\$€£]\s*([\d,]+(?:DECPT\d+)?)\s*-?\s*(billion|bn)\b", r"\1b", h)
+    h = re.sub(r"[\$€£]\s*([\d,]+(?:DECPT\d+)?)\s*-?\s*(million|mn)\b", r"\1m", h)
+    h = re.sub(r"\b([\d,]+(?:DECPT\d+)?)\s*-?\s*(billion)\b", r"\1b", h)
+    h = re.sub(r"\b([\d,]+(?:DECPT\d+)?)\s*-?\s*(million)\b", r"\1m", h)
+    h = re.sub(r"\bbn\b", "b", h)
+    h = re.sub(r"\bmn\b", "m", h)
     # Strip all non-word chars except spaces
     h = re.sub(r"[^\w\s]", " ", h)
     h = re.sub(r"\s+", " ", h).strip()
@@ -2974,48 +3604,380 @@ def fuzzy_similar(a, b, threshold=0.85):
     return False
 
 
-def deduplicate(articles):
+def _canonical_url(url):
     """
-    Multi-pass deduplication:
-    1. URL-based exact dedup (same canonical URL = same article).
-    2. Domain-slug dedup (same publication slug under different URL formats).
-    3. Fuzzy headline dedup using both SequenceMatcher + token-set ratio —
-       when two articles match, keep the one from the higher-priority source.
+    Normalise a URL for exact-match dedup:
+    - Strip trailing slash
+    - Remove ALL query params that are tracking noise (utm_*, fbclid, ref, etc.)
+    - Lowercase scheme+host, preserve path case
+    - Strip fragment (#...)
     """
-    # ── Step 1: URL canonical dedup ──────────────────────────────────────────
-    seen_urls = {}
-    for art in sorted(articles, key=lambda x: x.get("_priority", 99)):
-        url = str(art.get("URL", art.get("url", ""))).strip().rstrip("/")
-        # Canonicalise: remove utm_ params and trailing slashes
-        url = re.sub(r"[?&]utm_[^&]*", "", url).rstrip("/")
-        if url and url not in seen_urls:
-            seen_urls[url] = art
-    url_deduped = list(seen_urls.values())
+    url = str(url).strip()
+    # Remove fragment
+    url = url.split("#")[0]
+    # Remove common tracking params
+    url = re.sub(r"[?&](utm_[^&]*|fbclid=[^&]*|ref=[^&]*|source=[^&]*|campaign=[^&]*|medium=[^&]*)", "", url)
+    url = re.sub(r"[?&]$", "", url)
+    # Normalise scheme+host to lowercase
+    m = re.match(r"(https?://)([^/]+)(.*)", url)
+    if m:
+        url = m.group(1) + m.group(2).lower() + m.group(3)
+    return url.rstrip("/")
 
-    # ── Step 2: Fuzzy headline dedup — sorted by priority so best source wins ──
-    url_deduped.sort(key=lambda x: (x.get("_priority", 99), -(x.get("_weight", 5))))
-    keep = []
-    # Use normalised headlines for O(n) fast-reject before expensive fuzzy check
-    seen_headlines_norm = []
-    seen_headlines_raw  = []
-    for art in url_deduped:
-        hl = art.get("Headline", art.get("headline", ""))
-        hl_norm = _normalise_headline(hl)
-        is_dup = False
-        for i, seen_norm in enumerate(seen_headlines_norm):
-            # Fast-reject: skip if they share fewer than 3 tokens
-            tn = set(hl_norm.split())
-            ts = set(seen_norm.split())
-            if len(tn & ts) < 3 and (len(tn) > 4 or len(ts) > 4):
+
+def _url_slug(url):
+    """
+    Extract the slug (last meaningful path segment) from a URL,
+    for cross-source same-story detection.
+    e.g. https://pv-tech.org/2025/06/10/vestas-wins-200mw-india/ → vestas-wins-200mw-india
+    """
+    try:
+        path = url.rstrip("/").rsplit("/", 1)[-1]
+        # Strip common file extensions
+        path = re.sub(r"\.(html?|php|aspx?)$", "", path, flags=re.I)
+        return path.lower() if len(path) > 10 else ""
+    except Exception:
+        return ""
+
+
+def deduplicate(articles, is_renewables=False):
+    """
+    Zero-tolerance multi-pass deduplication — eliminates ALL duplicates.
+
+    Pass 1 — Canonical URL dedup
+        Strip tracking params, normalise scheme+host, compare exact URLs.
+        Best-priority source wins when URLs collide.
+
+    Pass 2 — URL slug dedup
+        Different domains can carry the same story under identical slugs
+        (wire syndication pattern). Match on slug + headline prefix.
+
+    Pass 3 — Exact normalised headline dedup
+        After stripping source suffixes, punctuation, and stop-words,
+        identical normalised headlines are merged.
+
+    Pass 4 — Aggressive fuzzy headline dedup (SequenceMatcher + token-set)
+        Catches reworded, reordered, or truncated variants of the same story.
+        Threshold is deliberately tight (0.82) to prefer false negatives
+        over false positives; also catches substring containment.
+
+    Pass 5 — N-gram fingerprint dedup
+        Build a 3-gram fingerprint of each headline; articles sharing ≥60%
+        of their top-10 trigrams are treated as duplicates regardless of
+        word order or synonym substitution.
+
+    When two articles are merged, the one with the lower _priority value
+    (i.e. higher-quality source) is kept; weight is used as tiebreaker.
+    """
+
+    if not articles:
+        return []
+
+    # Helper: get headline regardless of key name
+    def _hl(art):
+        return art.get("Headline", art.get("headline", "")) or ""
+
+    def _pri(art):
+        return (art.get("_priority", 99), -(art.get("_weight", 5)))
+
+    # Sort: best source first so it wins every merge
+    articles = sorted(articles, key=_pri)
+
+    # ── Pass 1: Canonical URL exact dedup ────────────────────────────────────
+    seen_curl = {}
+    for art in articles:
+        raw_url = str(art.get("URL", art.get("url", ""))).strip()
+        curl = _canonical_url(raw_url)
+        if not curl or len(curl) < 12:
+            # URL-less: carry through, handle in headline passes
+            seen_curl.setdefault("__no_url__" + _normalise_headline(_hl(art))[:60], art)
+        elif curl not in seen_curl:
+            seen_curl[curl] = art
+    p1 = list(seen_curl.values())
+
+    # ── Pass 2: URL slug dedup (cross-domain syndication) ────────────────────
+    seen_slug = {}
+    p2 = []
+    for art in p1:
+        raw_url = str(art.get("URL", art.get("url", ""))).strip()
+        slug = _url_slug(raw_url)
+        hl_prefix = _normalise_headline(_hl(art))[:40]
+        slug_key = slug if slug else None
+        if slug_key and slug_key in seen_slug:
+            # Same slug seen — compare headline prefix to confirm same story
+            existing_prefix = _normalise_headline(_hl(seen_slug[slug_key]))[:40]
+            if SequenceMatcher(None, hl_prefix, existing_prefix).ratio() > 0.70:
+                continue  # duplicate
+        if slug_key:
+            seen_slug[slug_key] = art
+        p2.append(art)
+
+    # ── Pass 3: Exact normalised headline dedup ───────────────────────────────
+    seen_norm_exact = {}
+    p3 = []
+    for art in p2:
+        norm = _normalise_headline(_hl(art))
+        if norm not in seen_norm_exact:
+            seen_norm_exact[norm] = art
+            p3.append(art)
+
+    # ── Pass 3.5: Weighted fact-signature dedup (RENEWABLES ONLY) ────────────
+    # Headlines covering the same press-release event are often worded totally
+    # differently across outlets ("US$3.5 billion" vs "USD 3.5bn", "1 GWh" vs
+    # "1,000MWh", "Cypress Creek" vs "Cypress Creek Renewables"), so pure
+    # text-similarity passes (3/4/5) can miss them. This pass instead builds a
+    # structured fact-signature per article — companies (with alias
+    # resolution), generic proper-noun entities, money, power (MW), energy
+    # (MWh), and US state/location — and scores pairwise overlap. Two
+    # articles merge once their combined evidence crosses a threshold, gated
+    # by a same-week date window to avoid merging two genuinely different
+    # stories that happen to share a company and a round number months apart.
+    #
+    # This pass is intentionally gated to is_renewables=True only — the Data
+    # Center section keeps its original URL/headline-only dedup behaviour.
+    p3b = p3
+    if is_renewables:
+        _FINGERPRINT_COMPANIES = set(KNOWN_COMPANIES) | set(EPC_COMPANIES.keys())
+        # Canonical alias map: different outlets/sources refer to the same
+        # company by different names/abbreviations. Extend this list whenever
+        # a new alias pattern is spotted — no other code needs to change.
+        _COMPANY_ALIASES = {
+            "cypress creek renewables": "cypress creek",
+            "srp": "salt river project",
+            "salt river project": "salt river project",
+            "edf renewables north america": "edf renewables",
+            "avangrid renewables": "avangrid",
+            "nextera energy resources": "nextera energy",
+            "duke energy renewables": "duke energy",
+            "swinerton renewable energy": "swinerton",
+        }
+        _GENERIC_ENTITY_STOP = {
+            "solar","wind","energy","power","storage","battery","bess","project",
+            "projects","renewable","renewables","plant","farm","construction",
+            "financing","deal","online","new","ppa","epc","ipo","gw","mw","gwh",
+            "mwh","kwh","us","usa","uk","eu","llc","inc","co","group","news",
+            "the","large","giant","major","plans","report","update","closes",
+            "secures","announces","brings","launches","completes","north",
+            "south","east","west","january","february","march","april","may",
+            "june","july","august","september","october","november","december",
+        }
+        _ALL_US_STATES = {s.lower() for s in COUNTRY_STATES.get("United States", [])}
+
+        def _canon_company(key):
+            return _COMPANY_ALIASES.get(key, key)
+
+        def _fp_companies(text):
+            keys = set()
+            for co in _FINGERPRINT_COMPANIES:
+                words = co.split()
+                key = " ".join(words[:2]) if len(words) >= 2 else words[0]
+                if re.search(r"\b" + re.escape(key) + r"\b", text, re.I):
+                    keys.add(_canon_company(key.lower()))
+            return frozenset(keys)
+
+        def _fp_entities(raw_headline):
+            text = re.sub(r"\s*[-–—|·]\s*[\w][\w\s,\.]{0,40}$", "", raw_headline)
+            tokens = re.findall(r"\b[A-Z][a-zA-Z]{1,}\b", text)
+            return frozenset(
+                t.lower() for t in tokens
+                if t.lower() not in _GENERIC_ENTITY_STOP and len(t) >= 3
+            )
+
+        def _fp_locations(text):
+            return frozenset(s for s in _ALL_US_STATES if re.search(r"\b" + re.escape(s) + r"\b", text, re.I))
+
+        def _fp_date(art):
+            d = art.get("_date_obj")
+            return d
+
+        def _fingerprint(art):
+            raw_hl = _hl(art)
+            text = (raw_hl + " " + str(art.get("Summary", art.get("summary", "")) or ""))[:500]
+            return {
+                "companies": _fp_companies(text),
+                "entities":  _fp_entities(raw_hl),
+                "locations": _fp_locations(text),
+                "deal":      detect_deal_size(text),
+                "cap_mw":    detect_mw(text),
+                "cap_mwh":   detect_energy_mwh(text),
+                "date":      _fp_date(art),
+            }
+
+        DATE_WINDOW_DAYS = 7
+
+        def _is_duplicate(a, b):
+            # Hard gate: if both dates are known and more than DATE_WINDOW_DAYS
+            # apart, never treat as duplicates — prevents merging two
+            # genuinely separate stories about the same company months apart.
+            if a["date"] and b["date"]:
+                try:
+                    if abs((a["date"] - b["date"]).days) > DATE_WINDOW_DAYS:
+                        return False
+                except TypeError:
+                    pass
+
+            company_overlap = a["companies"] & b["companies"]
+            entity_overlap  = a["entities"] & b["entities"]
+            numeric_match = (
+                (a["deal"] and a["deal"] == b["deal"]) or
+                (a["cap_mw"] and a["cap_mw"] == b["cap_mw"]) or
+                (a["cap_mwh"] and a["cap_mwh"] == b["cap_mwh"])
+            )
+
+            # A shared deal/capacity figure plus ANY shared entity (known
+            # company, OR ≥2 generic proper-noun tokens for companies not in
+            # our lists) is strong evidence of the same underlying story.
+            if numeric_match and (company_overlap or len(entity_overlap) >= 2):
+                return True
+
+            # ≥2 distinct known companies in common is rare enough on its own
+            # to imply the same story even with zero shared numbers (e.g. two
+            # outlets covering "Meta...RWE..." where neither states a figure).
+            if len(company_overlap) >= 2:
+                return True
+
+            return False
+
+        seen_fps = []
+        p3b = []
+        for art in p3:
+            fp = _fingerprint(art)
+            is_dup = False
+            for s_fp in seen_fps:
+                if _is_duplicate(fp, s_fp):
+                    is_dup = True
+                    break
+            if is_dup:
                 continue
-            if fuzzy_similar(hl, seen_headlines_raw[i]):
+            seen_fps.append(fp)
+            p3b.append(art)
+
+    # ── Pass 4: Fuzzy headline dedup (SequenceMatcher + token-set) ───────────
+    FUZZY_THRESHOLD = 0.82   # tight — avoid false positives
+    SUBSTR_MIN_LEN  = 25     # min chars for substring containment check
+
+    seen_norms_4 = []
+    seen_raws_4  = []
+    p4 = []
+
+    for art in p3b:
+        hl      = _hl(art)
+        hl_norm = _normalise_headline(hl)
+        hl_toks = set(hl_norm.split()) - {"the","a","an","in","of","at","to","for","and","or","is","on","by","with"}
+        is_dup  = False
+
+        for i, seen_norm in enumerate(seen_norms_4):
+            seen_toks = set(seen_norm.split()) - {"the","a","an","in","of","at","to","for","and","or","is","on","by","with"}
+            common = hl_toks & seen_toks
+
+            # Fast-reject: need at least 3 meaningful shared tokens for long headlines
+            if len(hl_toks) > 5 and len(seen_toks) > 5 and len(common) < 3:
+                continue
+
+            # Direct SequenceMatcher ratio
+            ratio = SequenceMatcher(None, hl_norm, seen_norm).ratio()
+            if ratio >= FUZZY_THRESHOLD:
                 is_dup = True
                 break
+
+            # Token-set ratio (order-independent)
+            tsr = _token_set_ratio(hl_norm, seen_norm)
+            if tsr >= FUZZY_THRESHOLD:
+                is_dup = True
+                break
+
+            # Substring containment: one headline is a strict prefix of the other
+            shorter, longer = (hl_norm, seen_norm) if len(hl_norm) <= len(seen_norm) else (seen_norm, hl_norm)
+            if len(shorter) >= SUBSTR_MIN_LEN and shorter in longer:
+                is_dup = True
+                break
+
         if not is_dup:
-            keep.append(art)
-            seen_headlines_norm.append(hl_norm)
-            seen_headlines_raw.append(hl)
-    return keep
+            p4.append(art)
+            seen_norms_4.append(hl_norm)
+            seen_raws_4.append(hl)
+
+    # ── Pass 4.5: Meaningful-word overlap + shared proper noun (RE ONLY) ─────
+    # Catches same-story headlines that share no numeric anchor and mention
+    # no company from our known lists, but clearly cover the same event via
+    # overlapping substantive vocabulary plus at least one shared proper noun
+    # — e.g. "Salzgitter Secures ... from EWE Electrolysis Plant" vs
+    # "Salzgitter secures ... for low-carbon steel project in Germany", or
+    # "CGN Breaks Ground at World's Largest Concentrated Solar Power Plant"
+    # vs "CGN Breaks Ground on World's Largest Solar Thermal Power Station in
+    # Qinghai". These fall well under the tight Pass-4 SequenceMatcher
+    # threshold (as low as 0.50–0.65) because the wording diverges a lot, but
+    # they share >50% of substantive words AND a distinctive proper noun
+    # (Salzgitter / CGN / Zelestra), which is strong same-story evidence.
+    if is_renewables:
+        OVERLAP_RATIO_THRESHOLD = 0.50
+        MIN_MEANINGFUL_TOKENS = 4
+        DATE_WINDOW_DAYS_FUZZY = 10
+        _STOP_45 = {"the","a","an","in","of","at","to","for","and","or","is","on","by","with","from"}
+
+        seen_45 = []  # (tokens, entities, date)
+        p4b = []
+        for art in p4:
+            hl = _hl(art)
+            norm = _normalise_headline(hl)
+            toks = set(norm.split()) - _STOP_45
+            ents = _fp_entities(hl)
+            d = art.get("_date_obj")
+            is_dup = False
+            for s_toks, s_ents, s_date in seen_45:
+                if d and s_date:
+                    try:
+                        if abs((d - s_date).days) > DATE_WINDOW_DAYS_FUZZY:
+                            continue
+                    except TypeError:
+                        pass
+                if min(len(toks), len(s_toks)) < MIN_MEANINGFUL_TOKENS:
+                    continue
+                common = toks & s_toks
+                ratio = len(common) / min(len(toks), len(s_toks))
+                if ratio >= OVERLAP_RATIO_THRESHOLD and (ents & s_ents):
+                    is_dup = True
+                    break
+            if is_dup:
+                continue
+            seen_45.append((toks, ents, d))
+            p4b.append(art)
+        p4 = p4b
+
+    # ── Pass 5: N-gram fingerprint dedup ─────────────────────────────────────
+    def _trigrams(text):
+        words = text.split()
+        return set(" ".join(words[i:i+3]) for i in range(max(0, len(words)-2)))
+
+    NGRAM_OVERLAP_THRESHOLD = 0.60   # ≥60% trigram overlap = same story
+
+    seen_ngrams = []
+    p5 = []
+
+    for art in p4:
+        hl_norm = _normalise_headline(_hl(art))
+        tg = _trigrams(hl_norm)
+
+        # Only apply for headlines long enough to have meaningful trigrams
+        if len(tg) < 3:
+            p5.append(art)
+            seen_ngrams.append(tg)
+            continue
+
+        is_dup = False
+        for stg in seen_ngrams:
+            if not stg:
+                continue
+            overlap = len(tg & stg) / max(len(tg), len(stg))
+            if overlap >= NGRAM_OVERLAP_THRESHOLD:
+                is_dup = True
+                break
+
+        if not is_dup:
+            p5.append(art)
+            seen_ngrams.append(tg)
+
+    return p5
 
 
 def enrich(raw_item):
@@ -3840,12 +4802,125 @@ def build_excel(df):
     return buf.read()
 
 
+def build_excel_re(df):
+    """Styled, multi-sheet Excel export for Renewables — same format/look as build_excel()."""
+    wb = Workbook()
+    thin = Side(border_style="thin", color="CCCCCC")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hf = Font(bold=True, color="FFFFFF", name="Calibri", size=10)
+    hfill = PatternFill("solid", fgColor="0A2A18")
+    ev = PatternFill("solid", fgColor="0B1820")
+    od = PatternFill("solid", fgColor="060A10")
+    nf = Font(name="Calibri", size=9, color="C8D4E8")
+    lf = Font(name="Calibri", size=9, color="00B4FF", underline="single")
+
+    def write_sheet(ws, data_df, cols, widths):
+        for ci, (col, w) in enumerate(zip(cols, widths), 1):
+            c = ws.cell(1, ci, col)
+            c.font = hf; c.fill = hfill
+            c.alignment = Alignment(horizontal="center", vertical="center")
+            c.border = brd
+            ws.column_dimensions[get_column_letter(ci)].width = w
+        ws.row_dimensions[1].height = 24
+        for ri, row in enumerate(data_df[cols if all(c in data_df.columns for c in cols) else data_df.columns].itertuples(index=False), start=2):
+            fill = ev if ri % 2 == 0 else od
+            for ci, val in enumerate(row, 1):
+                v = str(val) if val is not None else ""
+                c = ws.cell(ri, ci, v)
+                c.fill = fill; c.border = brd
+                col_name = cols[ci - 1] if ci <= len(cols) else ""
+                if col_name == "URL":
+                    c.hyperlink = v; c.font = lf
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+                elif col_name == "Sector":
+                    tc = RE_TOPIC_COLORS.get(v, "2e4470")
+                    c.font = Font(name="Calibri", size=9, bold=True, color=tc.replace("#", ""))
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+                elif col_name == "Deal Type":
+                    tc = RE_DEAL_TYPE_COLORS.get(v, "2e4470")
+                    c.font = Font(name="Calibri", size=9, bold=True, color=tc.replace("#", ""))
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+                elif col_name == "Headline":
+                    c.font = nf
+                    c.alignment = Alignment(vertical="center", wrap_text=True)
+                else:
+                    c.font = nf
+                    c.alignment = Alignment(horizontal="center", vertical="center")
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{len(data_df)+1}"
+
+    ws1 = wb.active
+    ws1.title = "All Articles"
+    main_cols = ["Headline","Date","Source","Country","Region","Sector",
+                 "Deal Type","Status","Capacity","Deal Size","Companies","URL"]
+    main_widths = [62, 12, 18, 18, 16, 16, 16, 14, 12, 12, 28, 50]
+    safe_cols = [c for c in main_cols if c in df.columns]
+    write_sheet(ws1, df[safe_cols], safe_cols, main_widths[:len(safe_cols)])
+
+    ws2 = wb.create_sheet("By Country")
+    cc = df["Country"].value_counts().reset_index()
+    cc.columns = ["Country", "Articles"]
+    write_sheet(ws2, cc, ["Country","Articles"], [24, 14])
+
+    ws3 = wb.create_sheet("By Region")
+    if "Region" in df.columns:
+        rc = df["Region"].value_counts().reset_index()
+        rc.columns = ["Region", "Articles"]
+        write_sheet(ws3, rc, ["Region","Articles"], [20, 14])
+
+    ws4 = wb.create_sheet("By Sector")
+    if "Sector" in df.columns:
+        sc = df["Sector"].value_counts().reset_index()
+        sc.columns = ["Sector", "Articles"]
+        write_sheet(ws4, sc, ["Sector","Articles"], [20, 14])
+
+    ws5 = wb.create_sheet("By Deal Type")
+    if "Deal Type" in df.columns:
+        dtc = df["Deal Type"].value_counts().reset_index()
+        dtc.columns = ["Deal Type", "Articles"]
+        write_sheet(ws5, dtc, ["Deal Type","Articles"], [22, 14])
+
+    ws6 = wb.create_sheet("By Company")
+    comp_rows = []
+    for _, row in df.iterrows():
+        if row.get("Companies"):
+            for co in str(row["Companies"]).split(", "):
+                co = co.strip()
+                if co:
+                    comp_rows.append({"Company": co, "Headline": row["Headline"],
+                                      "Date": row["Date"], "Country": row["Country"],
+                                      "URL": row["URL"]})
+    if comp_rows:
+        comp_df = pd.DataFrame(comp_rows)
+        write_sheet(ws6, comp_df, ["Company","Headline","Date","Country","URL"],
+                    [22, 55, 12, 18, 45])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
 _BG = "#060a10"
 _PAPER = "#0b1628"
 _GRID = "#152038"
 _TEXT = "#6a80a8"
 _TITLE = "#b8c8e0"
 _FONT = "Inter, sans-serif"
+
+# ── Chart accent theme (mutable; set once per run from platform_mode) ───────
+# Charts that use a *platform* accent color (hover border, timeline line/fill)
+# read from here. Charts using *category* colors (TOPIC_COLORS, REGION_COLORS,
+# RE_TOPIC_COLORS, etc.) are unaffected — those encode data meaning, not theme.
+_CHART_THEME = {"accent": "#0047e1", "accent2": "#00b4ff"}
+
+def _set_chart_theme(is_renewables: bool):
+    if is_renewables:
+        _CHART_THEME["accent"]  = "#00a846"
+        _CHART_THEME["accent2"] = "#00e676"
+    else:
+        _CHART_THEME["accent"]  = "#0047e1"
+        _CHART_THEME["accent2"] = "#00b4ff"
 
 
 def _dark(fig, height=320):
@@ -3871,7 +4946,7 @@ def _dark(fig, height=320):
         showlegend=False,
         hoverlabel=dict(
             bgcolor="#0d1e38",
-            bordercolor="#0047e1",
+            bordercolor=_CHART_THEME["accent"],
             font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
         ),
         hovermode="closest",
@@ -3894,7 +4969,7 @@ def chart_topic_bar(df):
         text=tc["Count"], textposition="outside",
         textfont=dict(color=_TITLE, size=11, family="DM Mono, monospace"),
         hovertemplate="<b>%{y}</b><br>📰 %{x} articles<extra></extra>",
-        hoverlabel=dict(bgcolor="#0d1e38", bordercolor="#0047e1",
+        hoverlabel=dict(bgcolor="#0d1e38", bordercolor=_CHART_THEME["accent"],
                         font=dict(color="#ccdaf5", size=12)),
     ))
     _dark(fig, 320)
@@ -3957,14 +5032,16 @@ def chart_timeline(df):
     df2["dt"] = pd.to_datetime(df2["Date"])
     daily = df2.groupby(df2["dt"].dt.date).size().reset_index()
     daily.columns = ["Date", "Articles"]
+    _ac, _ac2 = _CHART_THEME["accent"], _CHART_THEME["accent2"]
+    _ac_r, _ac_g, _ac_b = int(_ac[1:3], 16), int(_ac[3:5], 16), int(_ac[5:7], 16)
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=daily["Date"], y=daily["Articles"],
         mode="lines+markers",
-        line=dict(color="#00b4ff", width=2.5, shape="spline", smoothing=0.8),
-        marker=dict(color="#0047e1", size=6, line=dict(color="#00b4ff", width=1.5),
+        line=dict(color=_ac2, width=2.5, shape="spline", smoothing=0.8),
+        marker=dict(color=_ac, size=6, line=dict(color=_ac2, width=1.5),
                     symbol="circle"),
-        fill="tozeroy", fillcolor="rgba(0,71,225,0.09)",
+        fill="tozeroy", fillcolor=f"rgba({_ac_r},{_ac_g},{_ac_b},0.09)",
         hovertemplate="<b>%{x}</b><br>📰 %{y} articles<extra></extra>",
     ))
     _dark(fig, 260)
@@ -4020,7 +5097,7 @@ def chart_donut(df):
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=_TITLE, size=10),
                     orientation="v", x=1.02, y=0.5),
         hoverlabel=dict(
-            bgcolor="#0d1e38", bordercolor="#0047e1",
+            bgcolor="#0d1e38", bordercolor=_CHART_THEME["accent"],
             font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
         ),
         annotations=[dict(
@@ -4053,7 +5130,7 @@ def chart_source_bar(df):
     return fig
 
 
-def chart_world_map(df):
+def chart_world_map(df, title="Global Data Center Activity"):
     cc = df[df["Country"] != "Global"]["Country"].value_counts().reset_index()
     cc.columns = ["Country", "Count"]
     cc["ISO"] = cc["Country"].map(COUNTRY_ISO)
@@ -4109,7 +5186,7 @@ def chart_world_map(df):
         ),
         hovertemplate=(
             "<b style='color:#fff;font-size:13px;'>%{text}</b><br>"
-            "<span style='color:#00b4ff;'>Articles: %{z}</span>"
+            f"<span style='color:{_CHART_THEME['accent2']};'>Articles: %{{z}}</span>"
             "<extra></extra>"
         ),
         showscale=True,
@@ -4141,14 +5218,14 @@ def chart_world_map(df):
         height=520,
         margin=dict(l=0, r=60, t=44, b=0),
         title=dict(
-            text="<b>Global Data Center Activity</b>",
+            text=f"<b>{title}</b>",
             font=dict(color="#b8c8e0", size=14, family="Syne, sans-serif"),
             x=0.01, y=0.98,
         ),
         geo=dict(bgcolor=_M_BG),
         hoverlabel=dict(
             bgcolor="#0b1628",
-            bordercolor="#0047e1",
+            bordercolor=_CHART_THEME["accent"],
             font=dict(color="#ccdaf5", size=12, family="Inter, sans-serif"),
         ),
     )
@@ -4158,8 +5235,8 @@ def chart_world_map(df):
 def dark_table(df_in, max_rows=300):
     th = (
         "background:#0f1e36;color:#b8c8e0;font-family:monospace;"
-        "font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;"
-        "padding:.55rem .85rem;border-bottom:2px solid #0047e1;"
+        f"font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;"
+        f"padding:.55rem .85rem;border-bottom:2px solid {_CHART_THEME['accent']};"
         "white-space:nowrap;text-align:left;"
     )
     td = (
@@ -4177,7 +5254,7 @@ def dark_table(df_in, max_rows=300):
                 cells += (
                     f'<td style="{td}background:{bg};">'
                     f'<a href="{v}" target="_blank" '
-                    f'style="color:#0047e1;text-decoration:none;font-size:.75rem;">'
+                    f'style="color:{_CHART_THEME["accent2"]};text-decoration:none;font-size:.75rem;">'
                     f'Open \u2192</a></td>'
                 )
             elif col == "Capacity" and v:
@@ -4353,6 +5430,47 @@ def kpi(label, value, accent="blue", delta=""):
     )
 
 
+def render_filter_chips(active, on_clear_key=None):
+    """Render a row of themed chips summarizing active filters.
+
+    `active` is a list of (label, display_value) tuples — callers should only
+    pass entries that are actually set (non-empty), so this always reflects
+    real, current filter state rather than a static list of every possible
+    filter field.
+    """
+    if not active:
+        return
+    chips_html = "".join(
+        f'<div class="filter-chip"><span class="fc-label">{lbl}:</span> <b style="color:#fff;">{val}</b></div>'
+        for lbl, val in active
+    )
+    st.markdown(
+        f'<div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;'
+        f'margin:-.4rem 0 1.1rem;">'
+        f'<span style="font-family:DM Mono,monospace;font-size:.62rem;letter-spacing:.1em;'
+        f'color:#2a3e60;text-transform:uppercase;margin-right:.2rem;">Active Filters</span>'
+        f'{chips_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def empty_state(message, hint="Try broadening your filters or running a wider scan.", icon="\U0001f50d"):
+    """Themed, actionable empty-state panel — replaces bare st.info() calls
+    for 'no results' situations so the message matches the active theme
+    (blue for Data Center, green for Renewables) instead of Streamlit's
+    generic default blue box."""
+    st.markdown(
+        f'<div style="background:#0b1628;border:1px dashed var(--accent);border-radius:12px;'
+        f'padding:1.4rem 1.6rem;margin:.4rem 0 1rem;text-align:center;">'
+        f'<div style="font-size:1.6rem;margin-bottom:.5rem;opacity:.75;">{icon}</div>'
+        f'<div style="font-family:Syne,sans-serif;font-weight:700;color:#ccdaf5;'
+        f'font-size:.92rem;margin-bottom:.3rem;">{message}</div>'
+        f'<div style="font-size:.78rem;color:#5a6f95;">{hint}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 
 # ─── RE-specific chart helpers ─────────────────────────────────────────────────
 def chart_re_sector_bar(df):
@@ -4483,7 +5601,7 @@ def re_article_card(headline, date, url, source, country, sector, deal_type,
         f'border-radius:4px;padding:2px 6px;font-family:monospace;font-size:.62rem;">{status}</span>'
         f'{cap_html}{deal_html}{score_badge_html}'
         f'<a href="{url}" target="_blank" '
-        f'style="font-family:monospace;font-size:.65rem;color:#00b4ff;text-decoration:none;">↗ open</a>'
+        f'style="font-family:monospace;font-size:.65rem;color:#00e676;text-decoration:none;">↗ open</a>'
         f'</div></div>'
     )
 
@@ -5261,6 +6379,32 @@ def main():
                 'letter-spacing:.08em;margin-bottom:.5rem;">🏢 DATA CENTER ACTIVE</div>',
                 unsafe_allow_html=True,
             )
+
+        # ── App-wide theme switch: BLUE (Data Center) vs GREEN (Renewables) ──
+        # Overrides the CSS variables declared in CUSTOM_CSS's :root block,
+        # so every themed control (tabs, buttons, focus rings, chart glows,
+        # banner accents, chips) flips color with the active module.
+        _set_chart_theme("Renewables" in platform_mode)
+        if "Renewables" in platform_mode:
+            st.markdown(
+                """
+                <style>
+                :root {
+                    --accent:        #00a846;
+                    --accent2:       #00e676;
+                    --accent-rgb:    0, 168, 70;
+                    --accent2-rgb:   0, 230, 118;
+                    --accent-soft:   rgba(0, 168, 70, 0.18);
+                    --accent-glow:   rgba(0, 168, 70, 0.35);
+                    --accent-faint:  rgba(0, 168, 70, 0.12);
+                    --tag-bg:        #0f3322;
+                    --tag-text:      #7eebac;
+                    --banner-bg:     linear-gradient(135deg, #071a0f 0%, #0b2a18 45%, #071a0f 100%);
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
         st.divider()
 
 
@@ -5453,20 +6597,25 @@ def main():
 
             # ── Sector (drives which feeds are fetched) ────────────────────────
             _lbl("🌱 Sector")
+            # Build options: standard sectors + EPC Companies
+            _sector_options = list(RE_TOPIC_COLORS.keys())  # includes "EPC Companies"
             re_sector_sel = st.multiselect(
                 "Sector",
-                options=list(RE_TOPIC_COLORS.keys()),
+                options=_sector_options,
                 default=[],
-                placeholder="All sectors  (Solar · Wind · Storage · OSW · H₂ · Other)",
+                placeholder="All sectors  (Solar · Wind · Storage · OSW · H₂ · EPC…)",
                 label_visibility="collapsed",
                 key=_fk("f_re_sector"),
             )
+            _epc_mode_active = "EPC Companies" in re_sector_sel
             # Show feed count hint
             if re_sector_sel:
-                n_feeds = sum(len(RE_FEED_REGISTRY.get(s, [])) for s in re_sector_sel) + len(RE_CROSS_FEEDS)
+                _non_epc = [s for s in re_sector_sel if s != "EPC Companies"]
+                n_feeds = sum(len(RE_FEED_REGISTRY.get(s, [])) for s in _non_epc) + len(RE_CROSS_FEEDS)
+                _epc_note = f" + EPC company feeds" if _epc_mode_active else ""
                 st.markdown(
                     f'<div style="font-size:.62rem;color:#2a6040;font-family:monospace;'
-                    f'margin:.1rem 0 .4rem .05rem;">↳ {n_feeds} feeds · '
+                    f'margin:.1rem 0 .4rem .05rem;">↳ {n_feeds} feeds{_epc_note} · '
                     + " · ".join(re_sector_sel)
                     + '</div>',
                     unsafe_allow_html=True,
@@ -5475,9 +6624,53 @@ def main():
                 total_feeds = sum(len(v) for v in RE_FEED_REGISTRY.values()) + len(RE_CROSS_FEEDS)
                 st.markdown(
                     f'<div style="font-size:.62rem;color:#1a4a2e;font-family:monospace;'
-                    f'margin:.1rem 0 .4rem .05rem;">↳ All {total_feeds} feeds across 6 sectors</div>',
+                    f'margin:.1rem 0 .4rem .05rem;">↳ All {total_feeds} feeds across 6 sectors + EPC</div>',
                     unsafe_allow_html=True,
                 )
+
+            # ── EPC Company Selector (appears only when EPC Companies is chosen) ──
+            re_epc_sel_companies = []
+            if _epc_mode_active:
+                st.markdown(
+                    '<div style="background:linear-gradient(90deg,rgba(255,100,0,0.1),transparent);'
+                    'border-left:3px solid #ff6400;border-radius:0 6px 6px 0;'
+                    'padding:.4rem .7rem;margin:.5rem 0 .4rem;font-family:DM Mono,monospace;'
+                    'font-size:.62rem;color:#ff6400;letter-spacing:.08em;">🏗️ EPC MODE ACTIVE</div>',
+                    unsafe_allow_html=True,
+                )
+                _lbl("🏗️ Select EPC Companies")
+                # Sorted company list for the picker
+                _epc_company_list = sorted(EPC_COMPANIES.keys())
+                re_epc_sel_companies = st.multiselect(
+                    "EPC Companies",
+                    options=_epc_company_list,
+                    default=[],
+                    placeholder="All EPC companies (leave blank) or pick specific ones…",
+                    label_visibility="collapsed",
+                    key=_fk("f_re_epc_sel"),
+                    help=(
+                        "Leave blank to track ALL EPC/project companies, or select specific ones. "
+                        "The scraper will fire targeted Google News feeds for each selected company "
+                        "across renewables, storage, hydrogen and power sectors globally."
+                    ),
+                )
+                if re_epc_sel_companies:
+                    st.markdown(
+                        f'<div style="font-size:.62rem;color:#ff6400;font-family:monospace;'
+                        f'margin:.1rem 0 .35rem .05rem;">'
+                        f'↳ Targeting {len(re_epc_sel_companies)} companies · '
+                        f'{", ".join(re_epc_sel_companies[:4])}'
+                        + (f' +{len(re_epc_sel_companies)-4} more' if len(re_epc_sel_companies) > 4 else '')
+                        + '</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        f'<div style="font-size:.62rem;color:#ff6400;font-family:monospace;'
+                        f'margin:.1rem 0 .35rem .05rem;">'
+                        f'↳ All {len(EPC_COMPANIES)} EPC companies tracked globally</div>',
+                        unsafe_allow_html=True,
+                    )
 
             # ── Deal Type ─────────────────────────────────────────────────────
             _lbl("📋 Deal Type")
@@ -5521,14 +6714,16 @@ def main():
                 st.rerun()
 
             st.session_state["re_filters"] = {
-                "sectors":    re_sector_sel,
-                "deal_types": re_deal_type_sel,
-                "statuses":   re_status_sel,
-                "sources":    [],
-                "keyword":    re_keyword,
-                "regions":    sel_regions,
-                "countries":  sel_countries,
-                "states":     re_state_sel,
+                "sectors":          re_sector_sel,
+                "epc_mode":         _epc_mode_active,
+                "epc_companies":    re_epc_sel_companies,
+                "deal_types":       re_deal_type_sel,
+                "statuses":         re_status_sel,
+                "sources":          [],
+                "keyword":          re_keyword,
+                "regions":          sel_regions,
+                "countries":        sel_countries,
+                "states":           re_state_sel,
             }
 
             # Null-out DC-only vars so nothing downstream crashes
@@ -5540,6 +6735,9 @@ def main():
             sel_states    = []
             sel_iso_rto   = []
             min_mw        = 0
+            # Safe defaults for RE-only vars (prevent NameError in DC path)
+            re_epc_sel_companies = []
+            _epc_mode_active     = False
 
         else:
             # ── DATA CENTER FILTERS ────────────────────────────────────────────
@@ -5723,17 +6921,37 @@ def main():
     if "Renewables" in platform_mode:
         # ── RENEWABLES POWER MARKETS PLATFORM ────────────────────────────────
         _re_accent = "#00e676"
-        st.markdown(
-            f'<div class="gl-banner" style="background:linear-gradient(135deg,#071a0f 0%,#0b2a18 45%,#071a0f 100%);">'
-            f'<div class="banner-eyebrow" style="color:{_re_accent};">◉ Live Renewables Feed  ·  Solar · Wind · Storage · Hydrogen · Nuclear · Gas</div>'
-            f'<div class="banner-title">Renewables <span style="color:{_re_accent};">Power Markets</span></div>'
-            f'<div class="banner-title" style="margin-top:-.15rem;">Intelligence Platform</div>'
-            f'<div class="banner-sub">Real-time news from Renewables Now · Solar · Wind · Storage · Hydrogen · Offshore Wind · Other Renewables '
-            f'· Corporate PPAs · Orders · Financing · Tenders · Regulations · Deals · IPOs</div>'
-            f'<div class="banner-ts">🕐 {now_str}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
+        _re_has_scanned = (
+            "re_df_full" in st.session_state
+            and st.session_state.re_df_full is not None
+            and not st.session_state.re_df_full.empty
         )
+        if _re_has_scanned and not go_btn:
+            _re_n  = len(st.session_state.re_df_full)
+            _re_ts = st.session_state.get("re_scan_time", now_str)
+            st.markdown(
+                f'<div class="gl-banner-compact" style="background:linear-gradient(135deg,#071a0f 0%,#0b2a18 60%,#071a0f 100%);">'
+                f'<div class="cb-left">'
+                f'<div class="cb-dot" style="background:{_re_accent};color:{_re_accent};"></div>'
+                f'<div class="cb-title">Renewables <span style="color:{_re_accent};">Power Markets</span></div>'
+                f'<div class="cb-sub">{_re_n} unique articles tracked</div>'
+                f'</div>'
+                f'<div class="cb-ts">🕐 {_re_ts}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="gl-banner" style="background:linear-gradient(135deg,#071a0f 0%,#0b2a18 45%,#071a0f 100%);">'
+                f'<div class="banner-eyebrow" style="color:{_re_accent};">◉ Live Renewables Feed  ·  Solar · Wind · Storage · Hydrogen · Nuclear · Gas</div>'
+                f'<div class="banner-title">Renewables <span style="color:{_re_accent};">Power Markets</span></div>'
+                f'<div class="banner-title" style="margin-top:-.15rem;">Intelligence Platform</div>'
+                f'<div class="banner-sub">Real-time news from Renewables Now · Solar · Wind · Storage · Hydrogen · Offshore Wind · Other Renewables '
+                f'· Corporate PPAs · Orders · Financing · Tenders · Regulations · Deals · IPOs</div>'
+                f'<div class="banner-ts">🕐 {now_str}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
         if "re_df_full" not in st.session_state:
             st.session_state.re_df_full = None
@@ -5789,15 +7007,22 @@ def main():
             def re_progress_cb(frac, label=""):
                 re_pbar.progress(min(frac, 1.0), text=f"🌱 Renewables Sweep · {label}")
 
-            re_raw = run_re_scrapers(max_pages, re_cutoff, re_progress_cb,
-                                     re_sectors=re_sector_sel if re_sector_sel else None)
+            _re_epc_flt = st.session_state.get("re_filters", {})
+            re_raw = run_re_scrapers(
+                max_pages, re_cutoff, re_progress_cb,
+                re_sectors=re_sector_sel if re_sector_sel else None,
+                epc_companies=_re_epc_flt.get("epc_companies") or None,
+                epc_sector_filter=[s for s in re_sector_sel if s != "EPC Companies"] or None,
+            )
             re_pbar.progress(1.0, text="Enriching articles...")
 
             re_enriched = [enrich_re(i) for i in re_raw]
-            re_deduped  = deduplicate(re_enriched)
+            re_deduped  = deduplicate(re_enriched, is_renewables=True)
             _re_df = pd.DataFrame(re_deduped).drop(columns=["_date_obj"], errors="ignore")
             if "Date" in _re_df.columns and not _re_df.empty:
                 _re_df = _re_df.sort_values("Date", ascending=False)
+            _prev = st.session_state.get("re_df_full")
+            st.session_state.re_prev_count = int(len(_prev)) if _prev is not None and not _prev.empty else None
             st.session_state.re_df_full   = _re_df.reset_index(drop=True)
             st.session_state.re_raw_count = len(re_raw)
             st.session_state.re_scan_time = fmt_local(now_local())
@@ -5835,7 +7060,26 @@ def main():
         if re_flt.get("states"):
             state_kw = [s.lower() for s in re_flt["states"]]
             re_df = re_df[re_df["Headline"].apply(lambda h: any(sk in str(h).lower() for sk in state_kw))]
+        # EPC company post-filter: if specific companies were selected, filter headlines
+        if re_flt.get("epc_mode") and re_flt.get("epc_companies"):
+            _epc_names_lower = [c.lower() for c in re_flt["epc_companies"]]
+            re_df = re_df[re_df["Headline"].apply(
+                lambda h: any(ec in str(h).lower() for ec in _epc_names_lower)
+            )]
         re_df = re_df.reset_index(drop=True)
+
+        # ── Active filter chips ─────────────────────────────────────────────
+        _re_chips = []
+        if re_flt.get("sectors"):       _re_chips.append(("Sector", ", ".join(re_flt["sectors"])))
+        if re_flt.get("deal_types"):    _re_chips.append(("Deal Type", ", ".join(re_flt["deal_types"])))
+        if re_flt.get("statuses"):      _re_chips.append(("Status", ", ".join(re_flt["statuses"])))
+        if re_flt.get("regions"):       _re_chips.append(("Region", ", ".join(re_flt["regions"])))
+        if re_flt.get("countries"):     _re_chips.append(("Country", ", ".join(re_flt["countries"])))
+        if re_flt.get("states"):        _re_chips.append(("State/City", ", ".join(re_flt["states"])))
+        if re_flt.get("keyword"):       _re_chips.append(("Keyword", re_flt["keyword"]))
+        if re_flt.get("epc_mode") and re_flt.get("epc_companies"):
+            _re_chips.append(("EPC Company", ", ".join(re_flt["epc_companies"])))
+        render_filter_chips(_re_chips)
 
         # ── RE KPI row ────────────────────────────────────────────────────────
         re_scan_ts  = st.session_state.get("re_scan_time", "—")
@@ -5865,8 +7109,41 @@ def main():
                     _re_mw_total += _v * 1000 if _m.group(2).upper() == "GW" else _v
         _re_mw_str = f"{_re_mw_total:,.0f} MW" if _re_mw_total > 0 else "—"
 
+        # ── New market-intelligence KPIs ────────────────────────────────────
+        _re_top_region = re_df["Region"].value_counts().idxmax() if "Region" in re_df.columns and not re_df.empty else "—"
+
+        _re_co_counter = Counter()
+        if "Companies" in re_df.columns:
+            for _comps in re_df["Companies"]:
+                for _c in str(_comps).split(", "):
+                    _c = _c.strip()
+                    if _c:
+                        _re_co_counter[_c] += 1
+        _re_top_company = _re_co_counter.most_common(1)[0][0] if _re_co_counter else "—"
+
+        # Avg disclosed deal size — USD-denominated entries only (others use
+        # non-comparable currencies/units like "AED 50m" or "₹500 Cr").
+        _usd_vals = []
+        if "Deal Size" in re_df.columns:
+            for _ds in re_df["Deal Size"]:
+                _ds = str(_ds)
+                _mm = re.match(r"\$([\d.]+)(bn|m)$", _ds)
+                if _mm:
+                    _v = float(_mm.group(1))
+                    _usd_vals.append(_v * 1000 if _mm.group(2) == "bn" else _v)
+        _re_avg_deal = f"${(sum(_usd_vals)/len(_usd_vals)):,.0f}m" if _usd_vals else "—"
+
+        _re_prev_count = st.session_state.get("re_prev_count")
+        if _re_prev_count:
+            _re_growth_pct = (len(re_df_full) - _re_prev_count) / _re_prev_count * 100
+            _re_growth_str = f"{'+' if _re_growth_pct >= 0 else ''}{_re_growth_pct:.0f}%"
+            _re_growth_accent = "green" if _re_growth_pct >= 0 else "red"
+        else:
+            _re_growth_str = "—"
+            _re_growth_accent = "blue"
+
         re_kpi_html = (
-            '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
+            '<div style="display:flex;gap:.8rem;margin-bottom:.8rem;flex-wrap:wrap;">'
             + kpi("Sources Active", sum(len(v) for v in RE_FEED_REGISTRY.values()) + len(RE_CROSS_FEEDS), "green", "RSS · Google News · Specialist feeds")
             + kpi("Unique Articles", len(re_df_full), "cyan", "after deduplication")
             + kpi("Filtered View", len(re_df), "amber", "current filters applied")
@@ -5876,6 +7153,16 @@ def main():
             + '</div>'
         )
         st.markdown(re_kpi_html, unsafe_allow_html=True)
+
+        re_kpi_html_2 = (
+            '<div style="display:flex;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap;">'
+            + kpi("Top Region", _re_top_region, "cyan", "by article volume in view")
+            + kpi("Top Company", _re_top_company, "blue", "most-mentioned company in view")
+            + kpi("Avg Deal Size", _re_avg_deal, "purple", "USD-disclosed deals only")
+            + kpi("Growth vs Last Scan", _re_growth_str, _re_growth_accent, "unique article count, scan over scan")
+            + '</div>'
+        )
+        st.markdown(re_kpi_html_2, unsafe_allow_html=True)
 
         # Secondary sector breakdown pills
         _sector_pills = ""
@@ -5898,8 +7185,21 @@ def main():
             f'<div class="pill"><span class="pill-dot" style="background:#00e5c8;"></span>Storage: <b>{_re_storage}</b></div>'
             f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Countries: <b>{re_df["Country"].nunique()}</b></div>'
             f'<div class="pill"><span class="pill-dot" style="background:#00e676;"></span>Latest: <b>{re_df["Date"].max()}</b></div>'
-            + _sector_pills +
-            "</div>"
+            + _sector_pills
+            + (
+                f'<div class="pill" style="border-color:#ff640044;background:#1a0e00;">'
+                f'<span class="pill-dot" style="background:#ff6400;"></span>'
+                + (
+                    f'EPC: <b style="color:#ff6400;">{", ".join(re_flt.get("epc_companies",[])[:3])}'
+                    + (f' +{len(re_flt.get("epc_companies",[]))-3} more' if len(re_flt.get("epc_companies",[])) > 3 else '')
+                    + '</b>'
+                    if re_flt.get("epc_companies")
+                    else f'EPC Mode: <b style="color:#ff6400;">All {len(EPC_COMPANIES)} Companies</b>'
+                )
+                + '</div>'
+                if re_flt.get("epc_mode") else ''
+            )
+            + "</div>"
         )
         st.markdown(re_pills_html, unsafe_allow_html=True)
 
@@ -5918,7 +7218,7 @@ def main():
         with re_tab1:
             st.markdown('<div class="sec-head">🌱 Renewables Power Markets Feed</div>', unsafe_allow_html=True)
             if re_df.empty:
-                st.info("No articles match current filters.")
+                empty_state("No articles match current filters.")
             else:
                 for _, row in re_df.iterrows():
                     st.markdown(
@@ -5933,7 +7233,7 @@ def main():
 
         with re_tab2:
             st.markdown('<div class="sec-head">🌍 Global Activity Map</div>', unsafe_allow_html=True)
-            st.plotly_chart(chart_world_map(re_df), use_container_width=True, config={"displayModeBar": False}, key="pc_1")
+            st.plotly_chart(chart_world_map(re_df, title="Global Renewables Activity"), use_container_width=True, config={"displayModeBar": False}, key="pc_1")
             st.markdown('<div class="sec-head">Country Breakdown</div>', unsafe_allow_html=True)
             re_cc_df = re_df[re_df["Country"] != "Global"]["Country"].value_counts().reset_index()
             re_cc_df.columns = ["Country", "Articles"]
@@ -5961,7 +7261,7 @@ def main():
             if not re_cap_df.empty:
                 st.markdown(dark_table(re_cap_df), unsafe_allow_html=True)
             else:
-                st.info("No capacity mentions in current view.")
+                empty_state("No capacity mentions in current view.", icon="\U000026a1")
 
         with re_tab4:
             st.markdown('<div class="sec-head">Company Activity</div>', unsafe_allow_html=True)
@@ -6002,7 +7302,7 @@ def main():
                         unsafe_allow_html=True,
                     )
             else:
-                st.info("No company mentions detected.")
+                empty_state("No company mentions detected.", icon="\U0001f3e2")
 
         with re_tab4b:
             st.markdown('<div class="sec-head">📍 By State / Province</div>', unsafe_allow_html=True)
@@ -6036,7 +7336,7 @@ def main():
                     })
 
             if not re_state_rows:
-                st.info("No state/province mentions detected in the current filtered view. Try broadening your filters.")
+                empty_state("No state/province mentions detected.", icon="\U0001f4cd")
             else:
                 re_state_df_all = pd.DataFrame(re_state_rows)
                 re_state_counts = (
@@ -6086,7 +7386,7 @@ def main():
                     st.markdown('<div class="sec-head">Drill Into a State</div>', unsafe_allow_html=True)
                     re_states_list = re_state_counts["State"].tolist() if not re_state_counts.empty else []
                     if not re_states_list:
-                        st.info("No named states found.")
+                        empty_state("No named states found.", icon="\U0001f4cd")
                     else:
                         sel_re_state = st.selectbox(
                             "Select state / province",
@@ -6170,7 +7470,7 @@ def main():
         with re_tab6:
             st.markdown('<div class="sec-head">🧠 AI Summarize — Renewables Market Intelligence Briefing</div>', unsafe_allow_html=True)
             if re_df.empty:
-                st.info("No articles to summarise.")
+                empty_state("No articles to summarise.", hint="Adjust filters or run a wider scan to generate a briefing.", icon="\U0001f9e0")
             else:
                 re_filter_parts = []
                 re_flt_disp = st.session_state.get("re_filters", {})
@@ -6345,28 +7645,16 @@ def main():
                     '<div style="background:#0b1820;border:1px solid #0a2a18;border-radius:10px;'
                     'padding:1.1rem 1.2rem;margin-bottom:.8rem;">'
                     '<div style="font-size:1.5rem;margin-bottom:.4rem;">📊</div>'
-                    '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;font-size:.95rem;margin-bottom:.3rem;">Excel Report (.xlsx)</div>'
-                    '<div style="font-size:.78rem;color:#2a5040;line-height:1.5;">All articles · By Sector · By Deal Type · By Country</div></div>',
+                    '<div style="font-family:Syne,sans-serif;font-weight:700;color:#b8c8e0;'
+                    'font-size:.95rem;margin-bottom:.3rem;">Excel Report (.xlsx)</div>'
+                    '<div style="font-size:.78rem;color:#2a5040;line-height:1.5;">'
+                    '6 sheets: All Articles \u00b7 By Country \u00b7 By Region \u00b7 By Sector \u00b7 By Deal Type \u00b7 By Company<br>'
+                    'Colour-coded badges, auto-filter, frozen headers, clickable URLs.</div></div>',
                     unsafe_allow_html=True,
                 )
-                # Build a simple RE excel
-                import io as _io_re
-                from openpyxl import Workbook as _WB_re
-                _wb_re = _WB_re()
-                _ws_re = _wb_re.active
-                _ws_re.title = "RE Articles"
-                re_export_cols = [c for c in ["Headline","Date","Source","Country","Region","Sector","Deal Type","Status","Capacity","Deal Size","Companies","URL"] if c in re_df.columns]
-                for ci, col in enumerate(re_export_cols, 1):
-                    _ws_re.cell(1, ci, col)
-                for ri, row in enumerate(re_df[re_export_cols].itertuples(index=False), 2):
-                    for ci, val in enumerate(row, 1):
-                        _ws_re.cell(ri, ci, str(val) if val else "")
-                _buf_re = io.BytesIO()
-                _wb_re.save(_buf_re)
-                _buf_re.seek(0)
                 st.download_button(
-                    "📥 Download Excel Report",
-                    data=_buf_re.read(),
+                    "\U0001f4e5 Download Excel Report",
+                    data=build_excel_re(re_df),
                     file_name=f"RE_Intel_{ts_re_exp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
@@ -6407,19 +7695,40 @@ def main():
     # ════════════════════════════════════════════════════════════════════════════
 
     _sa_sig = "\u00a9 Sharugh A"
-    st.markdown(
-        f'<div class="gl-banner">'
-        f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} DCD Channels Active</div>'
-        f'<div class="banner-title">Global Data Center</div>'
-        f'<div class="banner-title" style="margin-top:-.15rem;"><span>Intelligence</span> Platform</div>'
-        f'<div class="banner-sub">Real-time scraping of DataCenterDynamics Construction & General News channels \u00b7 '
-        f'Auto-tagged by region, topic, company & capacity \u00b7 '
-        f'Filtered by region, country, company &amp; more</div>'
-        f'<div class="banner-ts">\U0001f550 {now_str}'
-        f'</div>'
-        f'</div>',
-        unsafe_allow_html=True,
+    _dc_accent = "#00b4ff"
+    _dc_has_scanned = (
+        "df_full" in st.session_state
+        and st.session_state.df_full is not None
+        and not st.session_state.df_full.empty
     )
+    if _dc_has_scanned and not go_btn:
+        _dc_n  = len(st.session_state.df_full)
+        _dc_ts = st.session_state.get("scan_time", now_str)
+        st.markdown(
+            f'<div class="gl-banner-compact">'
+            f'<div class="cb-left">'
+            f'<div class="cb-dot" style="background:{_dc_accent};color:{_dc_accent};"></div>'
+            f'<div class="cb-title">Global Data Center <span style="color:{_dc_accent};">Intelligence</span></div>'
+            f'<div class="cb-sub">{_dc_n} unique articles tracked</div>'
+            f'</div>'
+            f'<div class="cb-ts">🕐 {_dc_ts}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f'<div class="gl-banner">'
+            f'<div class="banner-eyebrow">\u25cf Live Intelligence Feed  \u00b7  {len(SCRAPE_SOURCES)} DCD Channels Active</div>'
+            f'<div class="banner-title">Global Data Center</div>'
+            f'<div class="banner-title" style="margin-top:-.15rem;"><span>Intelligence</span> Platform</div>'
+            f'<div class="banner-sub">Real-time scraping of DataCenterDynamics Construction & General News channels \u00b7 '
+            f'Auto-tagged by region, topic, company & capacity \u00b7 '
+            f'Filtered by region, country, company &amp; more</div>'
+            f'<div class="banner-ts">\U0001f550 {now_str}'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     if "df_full" not in st.session_state:
         st.session_state.df_full = None
@@ -6648,6 +7957,19 @@ def main():
         df = df[df["Capacity"].apply(extract_mw_val) >= filters["min_mw"]]
     df = df.reset_index(drop=True)
 
+    # ── Active filter chips ─────────────────────────────────────────────────
+    _dc_chips = []
+    if filters.get("regions"):    _dc_chips.append(("Region", ", ".join(filters["regions"])))
+    if filters.get("countries"):  _dc_chips.append(("Country", ", ".join(filters["countries"])))
+    if filters.get("states"):     _dc_chips.append(("State/City", ", ".join(filters["states"])))
+    if filters.get("iso_rto"):    _dc_chips.append(("ISO / RTO", ", ".join(filters["iso_rto"])))
+    if filters.get("topics"):     _dc_chips.append(("Topic", ", ".join(filters["topics"])))
+    if filters.get("sents"):      _dc_chips.append(("Sentiment", ", ".join(filters["sents"])))
+    if filters.get("companies"):  _dc_chips.append(("Company", ", ".join(filters["companies"])))
+    if filters.get("keyword"):    _dc_chips.append(("Keyword", filters["keyword"]))
+    if filters.get("min_mw", 0) > 0: _dc_chips.append(("Min Capacity", f"{filters['min_mw']} MW"))
+    render_filter_chips(_dc_chips)
+
     scan_ts = st.session_state.get("scan_time", "\u2014")
     top_country = df["Country"].value_counts().idxmax() if not df.empty else "\u2014"
     top_topic   = df["Topic"].value_counts().idxmax()   if not df.empty else "\u2014"
@@ -6697,7 +8019,7 @@ def main():
     with tab1:
         st.markdown('<div class="sec-head">Global Intelligence Feed</div>', unsafe_allow_html=True)
         if df.empty:
-            st.info("No articles match the current filters.")
+            empty_state("No articles match the current filters.")
         else:
             # Pre-compute AI scores for the feed so high-signal articles show their badge
             _all_co_feed = []
@@ -6781,7 +8103,7 @@ def main():
         if not cap_df.empty:
             st.markdown(dark_table(cap_df), unsafe_allow_html=True)
         else:
-            st.info("No capacity mentions in current filtered view.")
+            empty_state("No capacity mentions in current filtered view.", icon="\U000026a1")
 
     with tab4:
         st.markdown('<div class="sec-head">Company Activity</div>', unsafe_allow_html=True)
@@ -6836,7 +8158,7 @@ def main():
                     unsafe_allow_html=True,
                 )
         else:
-            st.info("No company mentions detected in the current filtered view.")
+            empty_state("No company mentions detected.", icon="\U0001f3e2")
 
     with tab4b:
         st.markdown('<div class="sec-head">📍 State / Province Drill-Down</div>', unsafe_allow_html=True)
@@ -6873,7 +8195,7 @@ def main():
                 })
 
         if not state_rows:
-            st.info("No state/province mentions detected in the current filtered view. Try broadening your filters.")
+            empty_state("No state/province mentions detected.", icon="\U0001f4cd")
         else:
             state_df_all = pd.DataFrame(state_rows)
             state_counts = (
@@ -6929,7 +8251,7 @@ def main():
                 all_states_list = state_counts["State"].tolist() if not state_counts.empty else []
 
                 if not all_states_list:
-                    st.info("No named states found.")
+                    empty_state("No named states found.", icon="\U0001f4cd")
                 else:
                     sel_state = st.selectbox(
                         "Select state / province",
@@ -7035,7 +8357,7 @@ def main():
         st.markdown(ctx_html, unsafe_allow_html=True)
 
         if df.empty:
-            st.info("No articles in the current filtered view. Adjust filters to generate a summary.")
+            empty_state("No articles in the current filtered view.", hint="Adjust filters to generate a summary.", icon="\U0001f9e0")
         else:
             col_gen1, col_gen2 = st.columns([3, 1])
             with col_gen1:
@@ -7199,7 +8521,7 @@ def main():
         df_trend = df.copy()
         df_trend = df_trend[df_trend["Date"] != "Unknown"].copy()
         if df_trend.empty:
-            st.info("No dated articles available for trend comparison.")
+            empty_state("No dated articles available for trend comparison.", icon="\U0001f4c8")
         else:
             df_trend["dt"] = pd.to_datetime(df_trend["Date"])
 
@@ -7430,7 +8752,7 @@ def main():
 
         cap_df_heat = df[df["Capacity"] != ""].copy()
         if cap_df_heat.empty:
-            st.info("No capacity mentions in current filtered view. Run a broader scan to populate this view.")
+            empty_state("No capacity mentions in current filtered view.", hint="Run a broader scan to populate this view.", icon="\U0001f525")
         else:
             def _to_mw(cap):
                 import re as _re
@@ -7442,7 +8764,7 @@ def main():
             cap_df_heat = cap_df_heat[cap_df_heat["MW_val"] > 0]
 
             if cap_df_heat.empty:
-                st.info("No parseable MW/GW values found.")
+                empty_state("No parseable MW/GW values found.", icon="\U000026a1")
             else:
                 # Country × Topic pivot
                 pivot = cap_df_heat.groupby(["Country", "Topic"])["MW_val"].sum().reset_index()
@@ -7513,7 +8835,7 @@ def main():
         df_deal = df[deal_mask | deal_lang_mask].copy()
 
         if df_deal.empty:
-            st.info("No deal-signal articles found in current filtered view.")
+            empty_state("No deal-signal articles found in current filtered view.", icon="\U0001f4b0")
         else:
             # Parse numeric deal value for sorting
             def _parse_deal_usd(deal_str):
@@ -7634,7 +8956,7 @@ def main():
         )
 
         if df.empty:
-            st.info("No articles to score. Run a scan first.")
+            empty_state("No articles to score.", hint="Run a scan first.", icon="\U0001f916")
         else:
 
             def _ai_score(row, co_frequency_map):
@@ -7750,7 +9072,7 @@ def main():
             st.markdown('<div class="sec-head">🔴 High Signal Articles (Score ≥ 30)</div>', unsafe_allow_html=True)
             top_scored = df_scored[df_scored["AI Score"] >= 30].head(25)
             if top_scored.empty:
-                st.info("No articles scored 30+ in current view. Try a broader scan.")
+                empty_state("No articles scored 30+ in current view.", hint="Try a broader scan.", icon="\U0001f534")
             else:
                 for _, row in top_scored.iterrows():
                     st.markdown(article_card(
