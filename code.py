@@ -96,6 +96,20 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 /* ── Global hover transitions ──────────────────────────────────────────────── */
 * { transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease, opacity 0.15s ease, transform 0.15s ease; }
 
+/* Plotly renders hover tooltips as SVG <g>/<rect>/<text> layers positioned
+   via inline transforms. The global transition rule above interferes with
+   that positioning — the tooltip background and its text can end up
+   animating independently, so the box appears empty while the value renders
+   elsewhere. Plotly's own chart internals must be excluded from all
+   transitions so hover labels position instantly and stay attached to their
+   text. */
+[data-testid="stPlotlyChart"] *,
+.js-plotly-plot *,
+.plotly *,
+.plot-container * {
+    transition: none !important;
+}
+
 /* ── Sidebar shell ─────────────────────────────────────────────────────────── */
 [data-testid="stSidebar"] { background: #0a0f1a !important; border-right: 1px solid #151f35; }
 [data-testid="stSidebar"] * { color: #b8c8e0 !important; }
@@ -5415,17 +5429,18 @@ def kpi(label, value, accent="blue", delta=""):
         "red":   ("#ff2d6b", "#ff0044"),
     }
     c1, c2 = accent_map.get(accent, accent_map["blue"])
-    delta_html = f'<div style="font-size:.7rem;color:#2a3e60;margin-top:.25rem;">{delta}</div>' if delta else ""
+    delta_html = f'<div style="font-size:.62rem;color:#2a3e60;margin-top:.18rem;line-height:1.3;">{delta}</div>' if delta else ""
     return (
-        f'<div class="kpi-card" style="flex:1;min-width:150px;background:#0b1628;border:1px solid #152038;'
-        f'border-radius:12px;padding:1.1rem 1.3rem;position:relative;overflow:hidden;" '
+        f'<div class="kpi-card" style="flex:1;min-width:120px;background:#0b1628;border:1px solid #152038;'
+        f'border-radius:10px;padding:.7rem .85rem;position:relative;overflow:hidden;" '
         f'title="{label}">'
         f'<div style="position:absolute;top:0;left:0;right:0;height:2px;'
         f'background:linear-gradient(90deg,{c1},{c2});"></div>'
-        f'<div style="font-family:monospace;font-size:.64rem;letter-spacing:.13em;'
-        f'text-transform:uppercase;color:#2a3e60;margin-bottom:.4rem;">{label}</div>'
-        f'<div style="font-family:Syne,sans-serif;font-size:1.9rem;font-weight:800;'
-        f'color:#fff;line-height:1;">{value}</div>'
+        f'<div style="font-family:monospace;font-size:.58rem;letter-spacing:.1em;'
+        f'text-transform:uppercase;color:#2a3e60;margin-bottom:.3rem;white-space:nowrap;'
+        f'overflow:hidden;text-overflow:ellipsis;">{label}</div>'
+        f'<div style="font-family:Syne,sans-serif;font-size:1.3rem;font-weight:800;'
+        f'color:#fff;line-height:1.1;">{value}</div>'
         f'{delta_html}</div>'
     )
 
@@ -7133,15 +7148,6 @@ def main():
                     _usd_vals.append(_v * 1000 if _mm.group(2) == "bn" else _v)
         _re_avg_deal = f"${(sum(_usd_vals)/len(_usd_vals)):,.0f}m" if _usd_vals else "—"
 
-        _re_prev_count = st.session_state.get("re_prev_count")
-        if _re_prev_count:
-            _re_growth_pct = (len(re_df_full) - _re_prev_count) / _re_prev_count * 100
-            _re_growth_str = f"{'+' if _re_growth_pct >= 0 else ''}{_re_growth_pct:.0f}%"
-            _re_growth_accent = "green" if _re_growth_pct >= 0 else "red"
-        else:
-            _re_growth_str = "—"
-            _re_growth_accent = "blue"
-
         re_kpi_html = (
             '<div style="display:flex;gap:.8rem;margin-bottom:.8rem;flex-wrap:wrap;">'
             + kpi("Sources Active", sum(len(v) for v in RE_FEED_REGISTRY.values()) + len(RE_CROSS_FEEDS), "green", "RSS · Google News · Specialist feeds")
@@ -7159,7 +7165,6 @@ def main():
             + kpi("Top Region", _re_top_region, "cyan", "by article volume in view")
             + kpi("Top Company", _re_top_company, "blue", "most-mentioned company in view")
             + kpi("Avg Deal Size", _re_avg_deal, "purple", "USD-disclosed deals only")
-            + kpi("Growth vs Last Scan", _re_growth_str, _re_growth_accent, "unique article count, scan over scan")
             + '</div>'
         )
         st.markdown(re_kpi_html_2, unsafe_allow_html=True)
