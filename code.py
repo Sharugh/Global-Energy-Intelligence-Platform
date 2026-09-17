@@ -4,6 +4,7 @@ import io
 import time
 import math
 import textwrap
+import requests
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from collections import Counter
@@ -53,7 +54,6 @@ try:
     )
     _USE_CS = True
 except ImportError:
-    import requests
     _CS = requests.Session()
     _USE_CS = False
 
@@ -3002,14 +3002,31 @@ def parse_date_str(raw):
         return None
     raw = str(raw).strip()
     raw = re.sub(r"\s+", " ", raw)
+
+    # DCD emits ISO timestamps such as 2026-09-17T00:00:00Z. Handle these
+    # explicitly before the legacy display-date formats below.
+    iso_raw = raw.replace("Z", "+00:00") if raw.endswith("Z") else raw
+    try:
+        iso_dt = datetime.fromisoformat(iso_raw)
+        return iso_dt.replace(tzinfo=None)
+    except ValueError:
+        pass
+
+    iso_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", raw)
+    if iso_date:
+        try:
+            return datetime.strptime(iso_date.group(1), "%Y-%m-%d")
+        except ValueError:
+            pass
+
     # ISO with timezone
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ",
                 "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z",
                 "%Y-%m-%d", "%d %b %Y", "%B %d, %Y", "%b %d, %Y"):
         try:
-            dt = datetime.strptime(raw[:25], fmt[:len(raw[:25])])
+            dt = datetime.strptime(raw, fmt)
             return dt.replace(tzinfo=None)
-        except Exception:
+        except ValueError:
             pass
     m = re.search(r"(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{4})", raw, re.I)
     if m:
@@ -3038,24 +3055,36 @@ _DCD_HEADERS = {
 }
 
 def fetch_html(url, retries=2):
+    clients = []
+    if _USE_CS:
+        clients.append(_CS)
+    clients.append(requests.Session())
+
+    last_error = None
     for attempt in range(retries):
         try:
-            if _USE_CS:
-                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
-            else:
-                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
+            client = clients[min(attempt, len(clients) - 1)]
+            r = client.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
             if r.status_code in (403, 429):
                 raise RuntimeError(f"HTTP {r.status_code}")
             r.raise_for_status()
             text = r.text or ""
-            if "cloudflare" in text.lower() or "access denied" in text.lower() or "verify you are human" in text.lower():
-                raise RuntimeError("DCD blocked automated request")
-            return BeautifulSoup(text, "html.parser")
-        except Exception:
+            soup = BeautifulSoup(text, "html.parser")
+            has_dcd_content = bool(soup.select_one("a[href*='/en/news/']"))
+            blocker_text = re.search(
+                r"verify you are human|access denied|cf-chl-|challenge-platform",
+                text,
+                re.I,
+            )
+            if blocker_text and not has_dcd_content:
+                raise RuntimeError("DCD anti-bot challenge returned without article markup")
+            return soup
+        except Exception as exc:
+            last_error = exc
             if attempt < retries - 1:
-                time.sleep(2 + attempt)
+                time.sleep(1 + attempt)
                 continue
-            return None
+    print(f"[DCD] fetch failed: {url} -> {last_error}")
     return None
 
 
@@ -4092,6 +4121,23 @@ def enrich(raw_item):
         "ISO / RTO": detect_iso_rto(hl),
         "_date_obj": d,
     }
+
+
+_DC_SCHEMA_DEFAULTS = {
+    "Headline": "", "Date": "Unknown", "Source": "DataCenterDynamics",
+    "URL": "", "Country": "Global", "Region": "Global", "Topic": "Other",
+    "Sentiment": "Neutral", "Capacity": "", "Deal Size": "", "Companies": "",
+    "ISO / RTO": "",
+}
+
+
+def ensure_dc_schema(frame):
+    """Guarantee the columns used by the Data Center UI always exist."""
+    frame = frame.copy() if isinstance(frame, pd.DataFrame) else pd.DataFrame()
+    for column, default in _DC_SCHEMA_DEFAULTS.items():
+        if column not in frame.columns:
+            frame[column] = default
+    return frame
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -6579,8 +6625,8 @@ def main():
 
         if _is_re_mode and _re_loaded:
             _src = st.session_state.re_df_full
-            all_regions_av   = sorted(_src["Region"].dropna().unique().tolist())
-            all_countries_av = sorted(_src["Country"].dropna().unique().tolist())
+            all_regions_av   = sorted(_src.get("Region", pd.Series(dtype=str)).dropna().unique().tolist())
+            all_countries_av = sorted(_src.get("Country", pd.Series(dtype=str)).dropna().unique().tolist())
             # DC-only lists (safe defaults — never rendered in RE mode)
             all_topics_av    = sorted(TOPIC_COLORS.keys())
             all_sents_av     = ["Opened / Live", "Approved", "Proposed",
@@ -6588,7 +6634,7 @@ def main():
             all_companies_av = KNOWN_COMPANIES
             _all_iso_in_data = []
         elif not _is_re_mode and _dc_loaded:
-            _src = st.session_state.df_full
+            _src = ensure_dc_schema(st.session_state.df_full)
             all_regions_av   = sorted(_src["Region"].dropna().unique().tolist())
             all_countries_av = sorted(_src["Country"].dropna().unique().tolist())
             all_topics_av    = sorted(_src["Topic"].dropna().unique().tolist())
@@ -7971,7 +8017,7 @@ def main():
         _df_raw = pd.DataFrame(deduped).drop(columns=["_date_obj"], errors="ignore")
         if "Date" in _df_raw.columns and not _df_raw.empty:
             _df_raw = _df_raw.sort_values("Date", ascending=False)
-        df_full = _df_raw.reset_index(drop=True)
+        df_full = ensure_dc_schema(_df_raw.reset_index(drop=True))
 
         st.session_state.df_full   = df_full
         st.session_state.raw_count = len(raw)
@@ -7989,7 +8035,7 @@ def main():
 
         st.rerun()
 
-    df_full = st.session_state.df_full
+    df_full = ensure_dc_schema(st.session_state.df_full)
     if df_full is None or df_full.empty:
         st.warning("No articles found. Try expanding the date range or enabling more sources.")
         return
