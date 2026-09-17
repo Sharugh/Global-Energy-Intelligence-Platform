@@ -5,7 +5,6 @@ import time
 import math
 import textwrap
 from datetime import datetime, timedelta
-from urllib.parse import quote_plus
 from difflib import SequenceMatcher
 from collections import Counter
 
@@ -2800,13 +2799,6 @@ DCD_BASE             = "https://www.datacenterdynamics.com"
 DCD_CONSTRUCTION_URL = DCD_BASE + "/en/news/?term=the-data-center-construction-channel"
 # General news: the plain news listing
 DCD_GENERAL_URL      = DCD_BASE + "/en/news/"
-DCD_FALLBACK_QUERIES = [
-    "data center construction expansion",
-    "data center hyperscale AI campus",
-    "data center power grid interconnection",
-    "data center investment acquisition",
-    "data center campus approval permit",
-]
 
 # ─── News-type labels (used in sidebar filter) ─────────────────────────────
 NEWS_TYPE_CONSTRUCTION = "Construction"
@@ -3067,53 +3059,6 @@ def fetch_html(url, retries=2):
     return None
 
 
-def _scrape_google_news_fallback(cutoff, max_pages, progress_cb):
-    """Fallback when DCD blocks automated access from Streamlit Cloud or other hosted environments."""
-    results = []
-    seen_urls = set()
-    queries = DCD_FALLBACK_QUERIES[:]
-
-    for idx, query in enumerate(queries):
-        url = "https://news.google.com/rss/search?q=" + quote_plus(query) + "&hl=en&gl=US&ceid=US:en"
-        try:
-            resp = _CS.get(url, headers=_DCD_HEADERS, timeout=20, allow_redirects=True)
-            resp.raise_for_status()
-            xml = resp.text
-        except Exception:
-            continue
-
-        try:
-            root = __import__("xml.etree.ElementTree", fromlist=["ElementTree"]).fromstring(xml.encode("utf-8", errors="replace"))
-        except Exception:
-            continue
-
-        for item in root.findall(".//item"):
-            title = (item.findtext("title") or "").strip()
-            link = (item.findtext("link") or "").strip()
-            pub = (item.findtext("pubDate") or "").strip()
-            if not title or not link:
-                continue
-            if link in seen_urls:
-                continue
-            seen_urls.add(link)
-            date_obj = parse_date_str(pub) if pub else None
-            if date_obj and date_obj < cutoff:
-                continue
-            if not date_obj and cutoff != datetime.min:
-                continue
-            results.append({
-                "headline": re.sub(r"\s+", " ", title).strip(),
-                "url": link,
-                "date_obj": date_obj,
-                "source": "Google News",
-                "_priority": 1,
-            })
-
-        progress_cb((idx + 1) / max(len(queries), 1), f"Fallback news scan · {idx + 1}/{len(queries)}")
-
-    return results
-
-
 # ─── Article parser — DCD HTML pages ──────────────────────────────────────
 def _parse_articles_from_soup(soup, source_name, base_url):
     """
@@ -3281,10 +3226,7 @@ def _scrape_dcd_channel(base_url, source_name, cutoff, max_pages, progress_cb, l
 def run_all_scrapers(max_html_pages, cutoff, progress_cb,
                      news_types=None, region_terms=None):
     """
-    news_types : list containing any of ["Construction", "General News"].
-                 Pass [] or None to scrape both channels.
-    region_terms : ignored (kept for API compatibility) — filtering by
-                   region/country/company is done post-scrape in main().
+    Scrape only DataCenterDynamics channels. No fallback providers.
     """
     if not news_types:
         news_types = [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
@@ -3319,10 +3261,6 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb,
         )
         raw.extend(arts)
         progress_cb(1.0, f"General news: {len(arts)} articles fetched")
-
-    if not raw:
-        progress_cb(1.0, "DCD blocked automated access; falling back to Google News RSS")
-        raw = _scrape_google_news_fallback(cutoff, max_html_pages, progress_cb)
 
     return raw
 
@@ -7918,6 +7856,7 @@ def main():
             "regions": [], "topics": [], "sources": [],
             "sents": [], "keyword": "", "min_mw": 0,
         }
+
         if time_opt == "Custom Range" and custom_start and custom_end:
             cutoff_start = datetime.combine(custom_start, datetime.min.time())
             cutoff_end = datetime.combine(custom_end, datetime.max.time())
@@ -7930,6 +7869,8 @@ def main():
             _boundary = datetime.now() - timedelta(days=sel_days)
             cutoff_start = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
             cutoff_end = datetime.max
+
+        st.session_state.cutoff_start = cutoff_start
         st.session_state.cutoff_end = cutoff_end
 
         pbar = st.progress(0.0, text="Initialising global scan...")
@@ -7937,23 +7878,21 @@ def main():
         def progress_cb(frac, label=""):
             pbar.progress(min(frac, 1.0), text=f"⚡ GDCI Intelligence Sweep · {label}")
 
-        # Determine which DCD channels to scrape based on sidebar selection.
-        # news_type_sel is the multiselect from the sidebar; default = both channels.
         _chosen_news_types = news_type_sel if news_type_sel else [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
-
         raw = run_all_scrapers(max_pages, cutoff_start, progress_cb,
                                news_types=_chosen_news_types)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
 
-        cutoff_end_val = st.session_state.get("cutoff_end", datetime.max)
+        cutoff_start_val = st.session_state.get("cutoff_start", cutoff_start)
+        cutoff_end_val = st.session_state.get("cutoff_end", cutoff_end)
         filtered = []
         for item in raw:
             d = item.get("date_obj")
             if d is not None:
-                if d < cutoff_start or d > cutoff_end_val:
+                if d < cutoff_start_val or d > cutoff_end_val:
                     continue
-            elif cutoff_start != datetime.min:
+            elif cutoff_start_val != datetime.min:
                 continue
             filtered.append(item)
 
