@@ -3041,21 +3041,14 @@ def fetch_html(url, retries=2):
     for attempt in range(retries):
         try:
             if _USE_CS:
-                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
+                r = _CS.get(url, timeout=20)
             else:
-                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
-            if r.status_code in (403, 429):
-                raise RuntimeError(f"HTTP {r.status_code}")
+                r = _CS.get(url, headers=_DCD_HEADERS, timeout=20)
             r.raise_for_status()
-            text = r.text or ""
-            if "cloudflare" in text.lower() or "access denied" in text.lower() or "verify you are human" in text.lower():
-                raise RuntimeError("DCD blocked automated request")
-            return BeautifulSoup(text, "html.parser")
+            return BeautifulSoup(r.text, "html.parser")
         except Exception:
-            if attempt < retries - 1:
-                time.sleep(2 + attempt)
-                continue
-            return None
+            if attempt == 0:
+                time.sleep(2)
     return None
 
 
@@ -3226,7 +3219,10 @@ def _scrape_dcd_channel(base_url, source_name, cutoff, max_pages, progress_cb, l
 def run_all_scrapers(max_html_pages, cutoff, progress_cb,
                      news_types=None, region_terms=None):
     """
-    Scrape only DataCenterDynamics channels. No fallback providers.
+    news_types : list containing any of ["Construction", "General News"].
+                 Pass [] or None to scrape both channels.
+    region_terms : ignored (kept for API compatibility) — filtering by
+                   region/country/company is done post-scrape in main().
     """
     if not news_types:
         news_types = [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
@@ -3537,12 +3533,7 @@ def detect_sentiment(text):
     if any(w in t for w in ["proposed", "plans", "eyes", "looks to", "could build",
                              "may build", "files for", "announces plans"]):
         return "Proposed"
-    if any(w in t for w in ["moratorium", "pause on permits", "permit freeze",
-                             "halts new data center", "halts new data centre",
-                             "suspends data center", "suspends data centre",
-                             "freeze on data center", "freeze on data centre"]):
-        return "Moratorium"
-    if any(w in t for w in ["rejected", "denied", "blocked",
+    if any(w in t for w in ["rejected", "denied", "moratorium", "blocked",
                              "lawsuit", "sues", "opposition", "withdrawn"]):
         return "Challenged"
     if any(w in t for w in ["under construction", "construction begins",
@@ -4231,18 +4222,11 @@ def generate_local_summary(df, sel_desc, date_range):
     reg_df  = df2[df2["Topic"] == "Permits"]
     chall_df= df2[df2["Sentiment"] == "Challenged"]
     appr_df = df2[df2["Sentiment"] == "Approved"]
-    mora_df = df2[df2["Sentiment"] == "Moratorium"]
 
     reg_intro = (
         f"Permitting and regulatory dynamics account for {len(reg_df)} articles "
         f"({pct(len(reg_df))}) in the current selection. "
     )
-    if len(mora_df) > 0:
-        reg_intro += (
-            f"Moratoriums or grid/permit freezes are reported in {len(mora_df)} articles, "
-            f"signaling {'significant' if len(mora_df) > 3 else 'localized'} regulatory pushback "
-            f"against new data center capacity in the affected markets. "
-        )
     if len(chall_df) > 0:
         reg_intro += (
             f"Contested or blocked projects number {len(chall_df)}, "
@@ -4251,10 +4235,10 @@ def generate_local_summary(df, sel_desc, date_range):
         )
     if len(appr_df) > 0:
         reg_intro += f"Approvals recorded: {len(appr_df)} projects cleared planning in the period. "
-    if reg_df.empty and chall_df.empty and mora_df.empty:
+    if reg_df.empty and chall_df.empty:
         reg_intro += "No specific permitting friction or approval events detected in the current filter."
 
-    reg_bullets = ["• " + h for h in hl(pd.concat([reg_df, chall_df, appr_df, mora_df]).drop_duplicates(), 8)]
+    reg_bullets = ["• " + h for h in hl(pd.concat([reg_df, chall_df, appr_df]).drop_duplicates(), 8)]
     if not reg_bullets:
         reg_bullets = ["• No permitting-specific articles in current selection."]
 
@@ -5089,7 +5073,7 @@ def chart_sentiment(df):
     sent_colors = {
         "Opened / Live": "#00e676", "Approved": "#00b4ff",
         "Proposed": "#ffaa00", "Under Construction": "#00e5c8",
-        "Moratorium": "#ff8c00", "Challenged": "#ff2d6b", "News": "#2e4470",
+        "Challenged": "#ff2d6b", "News": "#2e4470",
     }
     colors = [sent_colors.get(s, "#2e4470") for s in sc["Sentiment"]]
     fig = go.Figure(go.Bar(
@@ -5318,7 +5302,7 @@ def dark_table(df_in, max_rows=300):
             elif col == "Sentiment":
                 sent_c = {
                     "Opened / Live":"#00e676","Approved":"#00b4ff","Proposed":"#ffaa00",
-                    "Under Construction":"#00e5c8","Moratorium":"#ff8c00","Challenged":"#ff2d6b","News":"#2e4470",
+                    "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
                 }.get(v, "#2e4470")
                 cells += (
                     f'<td style="{td}background:{bg};">'
@@ -5375,7 +5359,7 @@ def article_card(headline, date, url, source, country, topic, capacity, deal, se
     ) if deal else ""
     sent_c = {
         "Opened / Live":"#00e676","Approved":"#00b4ff","Proposed":"#ffaa00",
-        "Under Construction":"#00e5c8","Moratorium":"#ff8c00","Challenged":"#ff2d6b","News":"#2e4470",
+        "Under Construction":"#00e5c8","Challenged":"#ff2d6b","News":"#2e4470",
     }.get(sentiment, "#2e4470")
     arrow = "\u2197"
 
@@ -6515,7 +6499,7 @@ def main():
             # DC-only lists (safe defaults — never rendered in RE mode)
             all_topics_av    = sorted(TOPIC_COLORS.keys())
             all_sents_av     = ["Opened / Live", "Approved", "Proposed",
-                                 "Under Construction", "Moratorium", "Challenged", "News"]
+                                 "Under Construction", "Challenged", "News"]
             all_companies_av = KNOWN_COMPANIES
             _all_iso_in_data = []
         elif not _is_re_mode and _dc_loaded:
@@ -6538,7 +6522,7 @@ def main():
             all_countries_av = sorted(COUNTRY_TO_REGION.keys())
             all_topics_av    = sorted(TOPIC_COLORS.keys())
             all_sents_av     = ["Opened / Live", "Approved", "Proposed",
-                                 "Under Construction", "Moratorium", "Challenged", "News"]
+                                 "Under Construction", "Challenged", "News"]
             all_companies_av = KNOWN_COMPANIES
             _all_iso_in_data = []
 
@@ -7026,17 +7010,12 @@ def main():
 
         if go_btn:
             if time_opt == "Custom Range" and custom_start and custom_end:
-                re_cutoff_start = datetime.combine(custom_start, datetime.min.time())
-                re_cutoff_end = datetime.combine(custom_end, datetime.max.time())
-                if re_cutoff_end < re_cutoff_start:
-                    re_cutoff_start, re_cutoff_end = re_cutoff_end, re_cutoff_start
+                re_cutoff = datetime.combine(custom_start, datetime.min.time())
             elif sel_days is None:
-                re_cutoff_start = datetime.min
-                re_cutoff_end = datetime.max
+                re_cutoff = datetime.min
             else:
                 _re_boundary = datetime.now() - timedelta(days=sel_days)
-                re_cutoff_start = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
-                re_cutoff_end = datetime.max
+                re_cutoff = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
 
             re_pbar = st.progress(0.0, text="Initialising Renewables scan...")
 
@@ -7045,24 +7024,14 @@ def main():
 
             _re_epc_flt = st.session_state.get("re_filters", {})
             re_raw = run_re_scrapers(
-                max_pages, re_cutoff_start, re_progress_cb,
+                max_pages, re_cutoff, re_progress_cb,
                 re_sectors=re_sector_sel if re_sector_sel else None,
                 epc_companies=_re_epc_flt.get("epc_companies") or None,
                 epc_sector_filter=[s for s in re_sector_sel if s != "EPC Companies"] or None,
             )
             re_pbar.progress(1.0, text="Enriching articles...")
 
-            re_filtered = []
-            for item in re_raw:
-                d = item.get("date_obj")
-                if d is not None:
-                    if d < re_cutoff_start or d > re_cutoff_end:
-                        continue
-                elif re_cutoff_start != datetime.min:
-                    continue
-                re_filtered.append(item)
-
-            re_enriched = [enrich_re(i) for i in re_filtered]
+            re_enriched = [enrich_re(i) for i in re_raw]
             re_deduped  = deduplicate(re_enriched, is_renewables=True)
             _re_df = pd.DataFrame(re_deduped).drop(columns=["_date_obj"], errors="ignore")
             if "Date" in _re_df.columns and not _re_df.empty:
@@ -7856,21 +7825,16 @@ def main():
             "regions": [], "topics": [], "sources": [],
             "sents": [], "keyword": "", "min_mw": 0,
         }
-
         if time_opt == "Custom Range" and custom_start and custom_end:
-            cutoff_start = datetime.combine(custom_start, datetime.min.time())
-            cutoff_end = datetime.combine(custom_end, datetime.max.time())
-            if cutoff_end < cutoff_start:
-                cutoff_start, cutoff_end = cutoff_end, cutoff_start
+            cutoff    = datetime.combine(custom_start, datetime.min.time())
+            cutoff_end = datetime.combine(custom_end,   datetime.max.time())
         elif sel_days is None:
-            cutoff_start = datetime.min
+            cutoff     = datetime.min
             cutoff_end = datetime.max
         else:
-            _boundary = datetime.now() - timedelta(days=sel_days)
-            cutoff_start = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
+            _boundary  = datetime.now() - timedelta(days=sel_days)
+            cutoff     = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
             cutoff_end = datetime.max
-
-        st.session_state.cutoff_start = cutoff_start
         st.session_state.cutoff_end = cutoff_end
 
         pbar = st.progress(0.0, text="Initialising global scan...")
@@ -7878,21 +7842,20 @@ def main():
         def progress_cb(frac, label=""):
             pbar.progress(min(frac, 1.0), text=f"⚡ GDCI Intelligence Sweep · {label}")
 
+        # Determine which DCD channels to scrape based on sidebar selection.
+        # news_type_sel is the multiselect from the sidebar; default = both channels.
         _chosen_news_types = news_type_sel if news_type_sel else [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
-        raw = run_all_scrapers(max_pages, cutoff_start, progress_cb,
+
+        raw = run_all_scrapers(max_pages, cutoff, progress_cb,
                                news_types=_chosen_news_types)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
 
-        cutoff_start_val = st.session_state.get("cutoff_start", cutoff_start)
-        cutoff_end_val = st.session_state.get("cutoff_end", cutoff_end)
+        cutoff_end_val = st.session_state.get("cutoff_end", datetime.max)
         filtered = []
         for item in raw:
             d = item.get("date_obj")
-            if d is not None:
-                if d < cutoff_start_val or d > cutoff_end_val:
-                    continue
-            elif cutoff_start_val != datetime.min:
+            if d and d > cutoff_end_val:
                 continue
             filtered.append(item)
 
@@ -8073,7 +8036,7 @@ def main():
             def _quick_score(row):
                 score = 0.0
                 hl = str(row.get("Headline", "")).lower()
-                sent_w = {"Opened / Live":10,"Approved":8,"Under Construction":6,"Proposed":4,"Moratorium":7,"Challenged":5,"News":2}
+                sent_w = {"Opened / Live":10,"Approved":8,"Under Construction":6,"Proposed":4,"Challenged":5,"News":2}
                 score += sent_w.get(row.get("Sentiment","News"), 2)
                 cap = str(row.get("Capacity",""))
                 if cap:
@@ -9008,7 +8971,7 @@ def main():
                 # 1. Sentiment weight
                 sent_w = {
                     "Opened / Live": 10, "Approved": 8, "Under Construction": 6,
-                    "Proposed": 4, "Moratorium": 7, "Challenged": 5, "News": 2,
+                    "Proposed": 4, "Challenged": 5, "News": 2,
                 }
                 score += sent_w.get(row.get("Sentiment", "News"), 2)
 
