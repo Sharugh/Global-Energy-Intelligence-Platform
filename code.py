@@ -5,6 +5,7 @@ import time
 import math
 import textwrap
 from datetime import datetime, timedelta
+from urllib.parse import quote_plus
 from difflib import SequenceMatcher
 from collections import Counter
 
@@ -2799,6 +2800,13 @@ DCD_BASE             = "https://www.datacenterdynamics.com"
 DCD_CONSTRUCTION_URL = DCD_BASE + "/en/news/?term=the-data-center-construction-channel"
 # General news: the plain news listing
 DCD_GENERAL_URL      = DCD_BASE + "/en/news/"
+DCD_FALLBACK_QUERIES = [
+    "data center construction expansion",
+    "data center hyperscale AI campus",
+    "data center power grid interconnection",
+    "data center investment acquisition",
+    "data center campus approval permit",
+]
 
 # ─── News-type labels (used in sidebar filter) ─────────────────────────────
 NEWS_TYPE_CONSTRUCTION = "Construction"
@@ -3041,15 +3049,69 @@ def fetch_html(url, retries=2):
     for attempt in range(retries):
         try:
             if _USE_CS:
-                r = _CS.get(url, timeout=20)
+                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
             else:
-                r = _CS.get(url, headers=_DCD_HEADERS, timeout=20)
+                r = _CS.get(url, headers=_DCD_HEADERS, timeout=25, allow_redirects=True)
+            if r.status_code in (403, 429):
+                raise RuntimeError(f"HTTP {r.status_code}")
             r.raise_for_status()
-            return BeautifulSoup(r.text, "html.parser")
+            text = r.text or ""
+            if "cloudflare" in text.lower() or "access denied" in text.lower() or "verify you are human" in text.lower():
+                raise RuntimeError("DCD blocked automated request")
+            return BeautifulSoup(text, "html.parser")
         except Exception:
-            if attempt == 0:
-                time.sleep(2)
+            if attempt < retries - 1:
+                time.sleep(2 + attempt)
+                continue
+            return None
     return None
+
+
+def _scrape_google_news_fallback(cutoff, max_pages, progress_cb):
+    """Fallback when DCD blocks automated access from Streamlit Cloud or other hosted environments."""
+    results = []
+    seen_urls = set()
+    queries = DCD_FALLBACK_QUERIES[:]
+
+    for idx, query in enumerate(queries):
+        url = "https://news.google.com/rss/search?q=" + quote_plus(query) + "&hl=en&gl=US&ceid=US:en"
+        try:
+            resp = _CS.get(url, headers=_DCD_HEADERS, timeout=20, allow_redirects=True)
+            resp.raise_for_status()
+            xml = resp.text
+        except Exception:
+            continue
+
+        try:
+            root = __import__("xml.etree.ElementTree", fromlist=["ElementTree"]).fromstring(xml.encode("utf-8", errors="replace"))
+        except Exception:
+            continue
+
+        for item in root.findall(".//item"):
+            title = (item.findtext("title") or "").strip()
+            link = (item.findtext("link") or "").strip()
+            pub = (item.findtext("pubDate") or "").strip()
+            if not title or not link:
+                continue
+            if link in seen_urls:
+                continue
+            seen_urls.add(link)
+            date_obj = parse_date_str(pub) if pub else None
+            if date_obj and date_obj < cutoff:
+                continue
+            if not date_obj and cutoff != datetime.min:
+                continue
+            results.append({
+                "headline": re.sub(r"\s+", " ", title).strip(),
+                "url": link,
+                "date_obj": date_obj,
+                "source": "Google News",
+                "_priority": 1,
+            })
+
+        progress_cb((idx + 1) / max(len(queries), 1), f"Fallback news scan · {idx + 1}/{len(queries)}")
+
+    return results
 
 
 # ─── Article parser — DCD HTML pages ──────────────────────────────────────
@@ -3257,6 +3319,10 @@ def run_all_scrapers(max_html_pages, cutoff, progress_cb,
         )
         raw.extend(arts)
         progress_cb(1.0, f"General news: {len(arts)} articles fetched")
+
+    if not raw:
+        progress_cb(1.0, "DCD blocked automated access; falling back to Google News RSS")
+        raw = _scrape_google_news_fallback(cutoff, max_html_pages, progress_cb)
 
     return raw
 
@@ -7022,12 +7088,17 @@ def main():
 
         if go_btn:
             if time_opt == "Custom Range" and custom_start and custom_end:
-                re_cutoff = datetime.combine(custom_start, datetime.min.time())
+                re_cutoff_start = datetime.combine(custom_start, datetime.min.time())
+                re_cutoff_end = datetime.combine(custom_end, datetime.max.time())
+                if re_cutoff_end < re_cutoff_start:
+                    re_cutoff_start, re_cutoff_end = re_cutoff_end, re_cutoff_start
             elif sel_days is None:
-                re_cutoff = datetime.min
+                re_cutoff_start = datetime.min
+                re_cutoff_end = datetime.max
             else:
                 _re_boundary = datetime.now() - timedelta(days=sel_days)
-                re_cutoff = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
+                re_cutoff_start = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
+                re_cutoff_end = datetime.max
 
             re_pbar = st.progress(0.0, text="Initialising Renewables scan...")
 
@@ -7036,14 +7107,24 @@ def main():
 
             _re_epc_flt = st.session_state.get("re_filters", {})
             re_raw = run_re_scrapers(
-                max_pages, re_cutoff, re_progress_cb,
+                max_pages, re_cutoff_start, re_progress_cb,
                 re_sectors=re_sector_sel if re_sector_sel else None,
                 epc_companies=_re_epc_flt.get("epc_companies") or None,
                 epc_sector_filter=[s for s in re_sector_sel if s != "EPC Companies"] or None,
             )
             re_pbar.progress(1.0, text="Enriching articles...")
 
-            re_enriched = [enrich_re(i) for i in re_raw]
+            re_filtered = []
+            for item in re_raw:
+                d = item.get("date_obj")
+                if d is not None:
+                    if d < re_cutoff_start or d > re_cutoff_end:
+                        continue
+                elif re_cutoff_start != datetime.min:
+                    continue
+                re_filtered.append(item)
+
+            re_enriched = [enrich_re(i) for i in re_filtered]
             re_deduped  = deduplicate(re_enriched, is_renewables=True)
             _re_df = pd.DataFrame(re_deduped).drop(columns=["_date_obj"], errors="ignore")
             if "Date" in _re_df.columns and not _re_df.empty:
@@ -7838,14 +7919,16 @@ def main():
             "sents": [], "keyword": "", "min_mw": 0,
         }
         if time_opt == "Custom Range" and custom_start and custom_end:
-            cutoff    = datetime.combine(custom_start, datetime.min.time())
-            cutoff_end = datetime.combine(custom_end,   datetime.max.time())
+            cutoff_start = datetime.combine(custom_start, datetime.min.time())
+            cutoff_end = datetime.combine(custom_end, datetime.max.time())
+            if cutoff_end < cutoff_start:
+                cutoff_start, cutoff_end = cutoff_end, cutoff_start
         elif sel_days is None:
-            cutoff     = datetime.min
+            cutoff_start = datetime.min
             cutoff_end = datetime.max
         else:
-            _boundary  = datetime.now() - timedelta(days=sel_days)
-            cutoff     = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
+            _boundary = datetime.now() - timedelta(days=sel_days)
+            cutoff_start = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
             cutoff_end = datetime.max
         st.session_state.cutoff_end = cutoff_end
 
@@ -7858,7 +7941,7 @@ def main():
         # news_type_sel is the multiselect from the sidebar; default = both channels.
         _chosen_news_types = news_type_sel if news_type_sel else [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
 
-        raw = run_all_scrapers(max_pages, cutoff, progress_cb,
+        raw = run_all_scrapers(max_pages, cutoff_start, progress_cb,
                                news_types=_chosen_news_types)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
@@ -7867,7 +7950,10 @@ def main():
         filtered = []
         for item in raw:
             d = item.get("date_obj")
-            if d and d > cutoff_end_val:
+            if d is not None:
+                if d < cutoff_start or d > cutoff_end_val:
+                    continue
+            elif cutoff_start != datetime.min:
                 continue
             filtered.append(item)
 
