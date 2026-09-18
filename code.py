@@ -64,7 +64,6 @@ import os as _os
 # Streamlit Cloud runs in UTC. Keep scan boundaries in one explicit business
 # timezone so date inputs and parsed publication dates use the same calendar.
 _CLOUD_TZ_NAME = _os.getenv("GDCI_TIMEZONE", "Asia/Kolkata")
-_CLOUD_MAX_PAGES = max(1, int(_os.getenv("GDCI_MAX_PAGES", "10")))
 
 
 def _cloud_local_now():
@@ -308,6 +307,49 @@ ul[data-baseweb="menu"] {
     border: 1px solid #1e3050 !important;
     color: #d0dff0 !important;
     border-radius: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: .76rem !important;
+}
+
+/* Cloud browsers are often opened in a narrow viewport. Keep the sidebar as
+   an overlay there so the main canvas is not compressed beside it. */
+@media (max-width: 700px) {
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"][aria-expanded="false"] {
+        position: fixed !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: min(300px, 86vw) !important;
+        min-width: min(300px, 86vw) !important;
+        max-width: min(300px, 86vw) !important;
+        z-index: 100000 !important;
+        overflow-y: auto !important;
+    }
+    [data-testid="stSidebar"][aria-expanded="false"] {
+        transform: translateX(-100%) !important;
+    }
+    [data-testid="stSidebar"][aria-expanded="true"] {
+        transform: translateX(0) !important;
+    }
+    [data-testid="stSidebarCollapseButton"] {
+        display: flex !important;
+    }
+    [data-testid="stSidebarCollapsedControl"],
+    div[data-testid="collapsedControl"] {
+        display: flex !important;
+        z-index: 100001 !important;
+    }
+    [data-testid="stAppViewContainer"] .main .block-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stDateInput"] input {
+        font-size: .7rem !important;
+    }
 }
 
 /* ── Main content selects / multiselects ──────────────────────────────────── */
@@ -6354,6 +6396,7 @@ def main():
 
         // ── LAYER 2: Force-click the sidebar open if it appears collapsed ────────
         function forceSidebarOpen() {
+            if (window.innerWidth <= 700) return false;
             var sidebar = document.querySelector('[data-testid="stSidebar"]');
             if (!sidebar) return false;
 
@@ -6449,6 +6492,10 @@ def main():
         function boot() {
             nukeLocalStorage();
             injectFiltersBtn();
+
+            // On narrow Cloud screens the sidebar is an overlay; let the user
+            // control whether it is open instead of reopening it every rerun.
+            if (window.innerWidth <= 700) return;
 
             // Try to force open immediately, then retry a few times
             // (Streamlit renders the DOM progressively so we need retries)
@@ -6627,7 +6674,7 @@ def main():
             unsafe_allow_html=True,
         )
         max_pages = st.slider(
-            "Scrape depth", min_value=1, max_value=_CLOUD_MAX_PAGES, value=min(10, _CLOUD_MAX_PAGES), step=1,
+            "Scrape depth", min_value=1, max_value=100, value=10, step=1,
             label_visibility="collapsed",
             help="Higher = more articles but slower scan. 10 is fast, 50+ is thorough, 100 is maximum.",
         )
@@ -8018,7 +8065,7 @@ def main():
             pbar.progress(min(frac, 1.0), text=f"⚡ GDCI Intelligence Sweep · {label}")
 
         _chosen_news_types = news_type_sel if news_type_sel else [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
-        raw = run_all_scrapers(min(max_pages, _CLOUD_MAX_PAGES), cutoff_start, progress_cb,
+        raw = run_all_scrapers(max_pages, cutoff_start, progress_cb,
                                news_types=_chosen_news_types)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
