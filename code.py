@@ -91,6 +91,46 @@ def _cloud_date_window(time_opt, custom_start=None, custom_end=None, sel_days=No
     boundary = _cloud_local_now().replace(tzinfo=None) - timedelta(days=sel_days)
     return boundary.replace(hour=0, minute=0, second=0, microsecond=0), datetime.max
 
+
+def _cloud_explicit_date_picker(label, default_date, key_prefix, latest_date):
+    """Cloud-stable date control with visible month and day selectors."""
+    month_options = []
+    first_year = latest_date.year - 5
+    for year in range(first_year, latest_date.year + 1):
+        last_month = latest_date.month if year == latest_date.year else 12
+        for month in range(1, last_month + 1):
+            month_options.append(f"{year:04d}-{month:02d}")
+
+    default_month = f"{default_date.year:04d}-{default_date.month:02d}"
+    if default_month not in month_options:
+        default_month = month_options[-1]
+    month_value = st.selectbox(
+        f"{label} month",
+        month_options,
+        index=month_options.index(default_month),
+        key=f"{key_prefix}_month",
+        label_visibility="collapsed",
+    )
+    selected_year, selected_month = (int(part) for part in month_value.split("-"))
+    next_month = (
+        datetime(selected_year + 1, 1, 1)
+        if selected_month == 12
+        else datetime(selected_year, selected_month + 1, 1)
+    )
+    month_last_day = (next_month - timedelta(days=1)).day
+    if selected_year == latest_date.year and selected_month == latest_date.month:
+        month_last_day = latest_date.day
+    day_value = st.number_input(
+        f"{label} day",
+        min_value=1,
+        max_value=month_last_day,
+        value=min(default_date.day, month_last_day),
+        step=1,
+        key=f"{key_prefix}_day",
+        label_visibility="collapsed",
+    )
+    return datetime(selected_year, selected_month, int(day_value)).date()
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -6661,14 +6701,22 @@ def main():
             today = _cloud_local_now().date()
             c1, c2 = st.columns(2)
             with c1:
-                custom_start = st.date_input(
-                    "From", value=today - timedelta(days=30),
-                    max_value=today, format="DD/MM/YYYY", label_visibility="visible",
+                st.markdown(
+                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                    'text-transform:uppercase;margin-bottom:.2rem;">From</div>',
+                    unsafe_allow_html=True,
+                )
+                custom_start = _cloud_explicit_date_picker(
+                    "From", today - timedelta(days=30), "cloud_from", today
                 )
             with c2:
-                custom_end = st.date_input(
-                    "To", value=today,
-                    max_value=today, format="DD/MM/YYYY", label_visibility="visible",
+                st.markdown(
+                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
+                    'text-transform:uppercase;margin-bottom:.2rem;">To</div>',
+                    unsafe_allow_html=True,
+                )
+                custom_end = _cloud_explicit_date_picker(
+                    "To", today, "cloud_to", today
                 )
             if custom_start and custom_end and custom_start > custom_end:
                 st.error("Start date must be before end date.")
