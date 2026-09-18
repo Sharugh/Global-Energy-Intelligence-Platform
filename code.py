@@ -60,77 +60,6 @@ except ImportError:
 from bs4 import BeautifulSoup
 import os as _os
 
-
-# Streamlit Cloud runs in UTC. Keep scan boundaries in one explicit business
-# timezone so date inputs and parsed publication dates use the same calendar.
-_CLOUD_TZ_NAME = _os.getenv("GDCI_TIMEZONE", "Asia/Kolkata")
-
-
-def _cloud_local_now():
-    from zoneinfo import ZoneInfo
-    try:
-        tz = ZoneInfo(_CLOUD_TZ_NAME)
-    except Exception:
-        tz = ZoneInfo("Asia/Kolkata")
-    return datetime.now(tz)
-
-
-def _cloud_date_window(time_opt, custom_start=None, custom_end=None, sel_days=None):
-    """Return naive, inclusive local-time bounds for a scan."""
-    if time_opt == "Custom Range" and custom_start and custom_end:
-        start = custom_start.date() if isinstance(custom_start, datetime) else custom_start
-        end = custom_end.date() if isinstance(custom_end, datetime) else custom_end
-        if start > end:
-            start, end = end, start
-        return (
-            datetime.combine(start, datetime.min.time()),
-            datetime.combine(end, datetime.max.time()),
-        )
-    if sel_days is None:
-        return datetime.min, datetime.max
-    boundary = _cloud_local_now().replace(tzinfo=None) - timedelta(days=sel_days)
-    return boundary.replace(hour=0, minute=0, second=0, microsecond=0), datetime.max
-
-
-def _cloud_explicit_date_picker(label, default_date, key_prefix, latest_date):
-    """Cloud-stable date control with visible month and day selectors."""
-    month_options = []
-    first_year = latest_date.year - 5
-    for year in range(first_year, latest_date.year + 1):
-        last_month = latest_date.month if year == latest_date.year else 12
-        for month in range(1, last_month + 1):
-            month_options.append(f"{year:04d}-{month:02d}")
-
-    default_month = f"{default_date.year:04d}-{default_date.month:02d}"
-    if default_month not in month_options:
-        default_month = month_options[-1]
-    month_value = st.selectbox(
-        f"{label} month",
-        month_options,
-        index=month_options.index(default_month),
-        key=f"{key_prefix}_month",
-        label_visibility="collapsed",
-    )
-    selected_year, selected_month = (int(part) for part in month_value.split("-"))
-    next_month = (
-        datetime(selected_year + 1, 1, 1)
-        if selected_month == 12
-        else datetime(selected_year, selected_month + 1, 1)
-    )
-    month_last_day = (next_month - timedelta(days=1)).day
-    if selected_year == latest_date.year and selected_month == latest_date.month:
-        month_last_day = latest_date.day
-    day_value = st.number_input(
-        f"{label} day",
-        min_value=1,
-        max_value=month_last_day,
-        value=min(default_date.day, month_last_day),
-        step=1,
-        key=f"{key_prefix}_day",
-        label_visibility="collapsed",
-    )
-    return datetime(selected_year, selected_month, int(day_value)).date()
-
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -347,64 +276,6 @@ ul[data-baseweb="menu"] {
     border: 1px solid #1e3050 !important;
     color: #d0dff0 !important;
     border-radius: 8px !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    font-size: .76rem !important;
-}
-
-/* Cloud browsers are often opened in a narrow viewport. Keep the sidebar as
-   an overlay there so the main canvas is not compressed beside it. */
-@media (max-width: 900px) {
-    [data-testid="stSidebar"],
-    [data-testid="stSidebar"][aria-expanded="false"] {
-        position: fixed !important;
-        top: 0 !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        width: min(360px, 92vw) !important;
-        min-width: min(360px, 92vw) !important;
-        max-width: min(360px, 92vw) !important;
-        z-index: 100000 !important;
-        overflow: visible !important;
-    }
-    [data-testid="stSidebar"][aria-expanded="false"] {
-        transform: translateX(-100%) !important;
-    }
-    [data-testid="stSidebar"][aria-expanded="true"] {
-        transform: translateX(0) !important;
-    }
-    [data-testid="stSidebarCollapseButton"] {
-        display: flex !important;
-    }
-    [data-testid="stSidebarCollapsedControl"],
-    div[data-testid="collapsedControl"] {
-        display: flex !important;
-        z-index: 100001 !important;
-    }
-    [data-testid="stAppViewContainer"] .main .block-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stDateInput"] input {
-        font-size: .7rem !important;
-    }
-}
-
-/* BaseWeb renders the date picker in a portal. Keep its full calendar,
-   including month navigation, above the responsive sidebar and app canvas. */
-[data-baseweb="popover"] {
-    z-index: 2147483647 !important;
-}
-[data-baseweb="calendar"] {
-    min-width: 280px !important;
-    background: #0d1a2e !important;
-    color: #b8c8e0 !important;
-    z-index: 2147483647 !important;
-}
-[data-baseweb="calendar"] * {
-    visibility: visible !important;
 }
 
 /* ── Main content selects / multiselects ──────────────────────────────────── */
@@ -6451,7 +6322,6 @@ def main():
 
         // ── LAYER 2: Force-click the sidebar open if it appears collapsed ────────
         function forceSidebarOpen() {
-            if (window.innerWidth <= 900) return false;
             var sidebar = document.querySelector('[data-testid="stSidebar"]');
             if (!sidebar) return false;
 
@@ -6547,10 +6417,6 @@ def main():
         function boot() {
             nukeLocalStorage();
             injectFiltersBtn();
-
-            // On narrow Cloud screens the sidebar is an overlay; let the user
-            // control whether it is open instead of reopening it every rerun.
-            if (window.innerWidth <= 900) return;
 
             // Try to force open immediately, then retry a few times
             // (Streamlit renders the DOM progressively so we need retries)
@@ -6698,25 +6564,17 @@ def main():
         custom_start = None
         custom_end   = None
         if time_opt == "Custom Range":
-            today = _cloud_local_now().date()
+            today = datetime.now().date()
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown(
-                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-                    'text-transform:uppercase;margin-bottom:.2rem;">From</div>',
-                    unsafe_allow_html=True,
-                )
-                custom_start = _cloud_explicit_date_picker(
-                    "From", today - timedelta(days=30), "cloud_from", today
+                custom_start = st.date_input(
+                    "From", value=today - timedelta(days=30),
+                    max_value=today, label_visibility="visible",
                 )
             with c2:
-                st.markdown(
-                    '<div style="font-size:.72rem;color:#3a5480;letter-spacing:.06em;'
-                    'text-transform:uppercase;margin-bottom:.2rem;">To</div>',
-                    unsafe_allow_html=True,
-                )
-                custom_end = _cloud_explicit_date_picker(
-                    "To", today, "cloud_to", today
+                custom_end = st.date_input(
+                    "To", value=today,
+                    max_value=today, label_visibility="visible",
                 )
             if custom_start and custom_end and custom_start > custom_end:
                 st.error("Start date must be before end date.")
@@ -7283,13 +7141,17 @@ def main():
 
         if go_btn:
             if time_opt == "Custom Range" and custom_start and custom_end:
-                re_cutoff_start, re_cutoff_end = _cloud_date_window(
-                    time_opt, custom_start, custom_end, sel_days
-                )
+                re_cutoff_start = datetime.combine(custom_start, datetime.min.time())
+                re_cutoff_end = datetime.combine(custom_end, datetime.max.time())
+                if re_cutoff_end < re_cutoff_start:
+                    re_cutoff_start, re_cutoff_end = re_cutoff_end, re_cutoff_start
+            elif sel_days is None:
+                re_cutoff_start = datetime.min
+                re_cutoff_end = datetime.max
             else:
-                re_cutoff_start, re_cutoff_end = _cloud_date_window(
-                    time_opt, sel_days=sel_days
-                )
+                _re_boundary = datetime.now() - timedelta(days=sel_days)
+                re_cutoff_start = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
+                re_cutoff_end = datetime.max
 
             re_pbar = st.progress(0.0, text="Initialising Renewables scan...")
 
@@ -8111,13 +7973,17 @@ def main():
         }
 
         if time_opt == "Custom Range" and custom_start and custom_end:
-            cutoff_start, cutoff_end = _cloud_date_window(
-                time_opt, custom_start, custom_end, sel_days
-            )
+            cutoff_start = datetime.combine(custom_start, datetime.min.time())
+            cutoff_end = datetime.combine(custom_end, datetime.max.time())
+            if cutoff_end < cutoff_start:
+                cutoff_start, cutoff_end = cutoff_end, cutoff_start
+        elif sel_days is None:
+            cutoff_start = datetime.min
+            cutoff_end = datetime.max
         else:
-            cutoff_start, cutoff_end = _cloud_date_window(
-                time_opt, sel_days=sel_days
-            )
+            _boundary = datetime.now() - timedelta(days=sel_days)
+            cutoff_start = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
+            cutoff_end = datetime.max
 
         st.session_state.cutoff_start = cutoff_start
         st.session_state.cutoff_end = cutoff_end
