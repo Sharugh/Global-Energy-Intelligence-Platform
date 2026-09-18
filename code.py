@@ -314,18 +314,18 @@ ul[data-baseweb="menu"] {
 
 /* Cloud browsers are often opened in a narrow viewport. Keep the sidebar as
    an overlay there so the main canvas is not compressed beside it. */
-@media (max-width: 700px) {
+@media (max-width: 900px) {
     [data-testid="stSidebar"],
     [data-testid="stSidebar"][aria-expanded="false"] {
         position: fixed !important;
         top: 0 !important;
         bottom: 0 !important;
         left: 0 !important;
-        width: min(300px, 86vw) !important;
-        min-width: min(300px, 86vw) !important;
-        max-width: min(300px, 86vw) !important;
+        width: min(360px, 92vw) !important;
+        min-width: min(360px, 92vw) !important;
+        max-width: min(360px, 92vw) !important;
         z-index: 100000 !important;
-        overflow-y: auto !important;
+        overflow: visible !important;
     }
     [data-testid="stSidebar"][aria-expanded="false"] {
         transform: translateX(-100%) !important;
@@ -350,6 +350,21 @@ ul[data-baseweb="menu"] {
     [data-testid="stSidebar"] [data-testid="stDateInput"] input {
         font-size: .7rem !important;
     }
+}
+
+/* BaseWeb renders the date picker in a portal. Keep its full calendar,
+   including month navigation, above the responsive sidebar and app canvas. */
+[data-baseweb="popover"] {
+    z-index: 2147483647 !important;
+}
+[data-baseweb="calendar"] {
+    min-width: 280px !important;
+    background: #0d1a2e !important;
+    color: #b8c8e0 !important;
+    z-index: 2147483647 !important;
+}
+[data-baseweb="calendar"] * {
+    visibility: visible !important;
 }
 
 /* ── Main content selects / multiselects ──────────────────────────────────── */
@@ -6396,7 +6411,7 @@ def main():
 
         // ── LAYER 2: Force-click the sidebar open if it appears collapsed ────────
         function forceSidebarOpen() {
-            if (window.innerWidth <= 700) return false;
+            if (window.innerWidth <= 900) return false;
             var sidebar = document.querySelector('[data-testid="stSidebar"]');
             if (!sidebar) return false;
 
@@ -6495,7 +6510,7 @@ def main():
 
             // On narrow Cloud screens the sidebar is an overlay; let the user
             // control whether it is open instead of reopening it every rerun.
-            if (window.innerWidth <= 700) return;
+            if (window.innerWidth <= 900) return;
 
             // Try to force open immediately, then retry a few times
             // (Streamlit renders the DOM progressively so we need retries)
@@ -6648,12 +6663,12 @@ def main():
             with c1:
                 custom_start = st.date_input(
                     "From", value=today - timedelta(days=30),
-                    max_value=today, label_visibility="visible",
+                    max_value=today, format="DD/MM/YYYY", label_visibility="visible",
                 )
             with c2:
                 custom_end = st.date_input(
                     "To", value=today,
-                    max_value=today, label_visibility="visible",
+                    max_value=today, format="DD/MM/YYYY", label_visibility="visible",
                 )
             if custom_start and custom_end and custom_start > custom_end:
                 st.error("Start date must be before end date.")
