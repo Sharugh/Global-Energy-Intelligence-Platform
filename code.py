@@ -60,6 +60,38 @@ except ImportError:
 from bs4 import BeautifulSoup
 import os as _os
 
+
+# Streamlit Cloud runs in UTC. Keep scan boundaries in one explicit business
+# timezone so date inputs and parsed publication dates use the same calendar.
+_CLOUD_TZ_NAME = _os.getenv("GDCI_TIMEZONE", "Asia/Kolkata")
+_CLOUD_MAX_PAGES = max(1, int(_os.getenv("GDCI_MAX_PAGES", "10")))
+
+
+def _cloud_local_now():
+    from zoneinfo import ZoneInfo
+    try:
+        tz = ZoneInfo(_CLOUD_TZ_NAME)
+    except Exception:
+        tz = ZoneInfo("Asia/Kolkata")
+    return datetime.now(tz)
+
+
+def _cloud_date_window(time_opt, custom_start=None, custom_end=None, sel_days=None):
+    """Return naive, inclusive local-time bounds for a scan."""
+    if time_opt == "Custom Range" and custom_start and custom_end:
+        start = custom_start.date() if isinstance(custom_start, datetime) else custom_start
+        end = custom_end.date() if isinstance(custom_end, datetime) else custom_end
+        if start > end:
+            start, end = end, start
+        return (
+            datetime.combine(start, datetime.min.time()),
+            datetime.combine(end, datetime.max.time()),
+        )
+    if sel_days is None:
+        return datetime.min, datetime.max
+    boundary = _cloud_local_now().replace(tzinfo=None) - timedelta(days=sel_days)
+    return boundary.replace(hour=0, minute=0, second=0, microsecond=0), datetime.max
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -6564,7 +6596,7 @@ def main():
         custom_start = None
         custom_end   = None
         if time_opt == "Custom Range":
-            today = datetime.now().date()
+            today = _cloud_local_now().date()
             c1, c2 = st.columns(2)
             with c1:
                 custom_start = st.date_input(
@@ -6595,7 +6627,7 @@ def main():
             unsafe_allow_html=True,
         )
         max_pages = st.slider(
-            "Scrape depth", min_value=1, max_value=100, value=10, step=1,
+            "Scrape depth", min_value=1, max_value=_CLOUD_MAX_PAGES, value=min(10, _CLOUD_MAX_PAGES), step=1,
             label_visibility="collapsed",
             help="Higher = more articles but slower scan. 10 is fast, 50+ is thorough, 100 is maximum.",
         )
@@ -7141,17 +7173,13 @@ def main():
 
         if go_btn:
             if time_opt == "Custom Range" and custom_start and custom_end:
-                re_cutoff_start = datetime.combine(custom_start, datetime.min.time())
-                re_cutoff_end = datetime.combine(custom_end, datetime.max.time())
-                if re_cutoff_end < re_cutoff_start:
-                    re_cutoff_start, re_cutoff_end = re_cutoff_end, re_cutoff_start
-            elif sel_days is None:
-                re_cutoff_start = datetime.min
-                re_cutoff_end = datetime.max
+                re_cutoff_start, re_cutoff_end = _cloud_date_window(
+                    time_opt, custom_start, custom_end, sel_days
+                )
             else:
-                _re_boundary = datetime.now() - timedelta(days=sel_days)
-                re_cutoff_start = _re_boundary.replace(hour=0, minute=0, second=0, microsecond=0)
-                re_cutoff_end = datetime.max
+                re_cutoff_start, re_cutoff_end = _cloud_date_window(
+                    time_opt, sel_days=sel_days
+                )
 
             re_pbar = st.progress(0.0, text="Initialising Renewables scan...")
 
@@ -7973,17 +8001,13 @@ def main():
         }
 
         if time_opt == "Custom Range" and custom_start and custom_end:
-            cutoff_start = datetime.combine(custom_start, datetime.min.time())
-            cutoff_end = datetime.combine(custom_end, datetime.max.time())
-            if cutoff_end < cutoff_start:
-                cutoff_start, cutoff_end = cutoff_end, cutoff_start
-        elif sel_days is None:
-            cutoff_start = datetime.min
-            cutoff_end = datetime.max
+            cutoff_start, cutoff_end = _cloud_date_window(
+                time_opt, custom_start, custom_end, sel_days
+            )
         else:
-            _boundary = datetime.now() - timedelta(days=sel_days)
-            cutoff_start = _boundary.replace(hour=0, minute=0, second=0, microsecond=0)
-            cutoff_end = datetime.max
+            cutoff_start, cutoff_end = _cloud_date_window(
+                time_opt, sel_days=sel_days
+            )
 
         st.session_state.cutoff_start = cutoff_start
         st.session_state.cutoff_end = cutoff_end
@@ -7994,7 +8018,7 @@ def main():
             pbar.progress(min(frac, 1.0), text=f"⚡ GDCI Intelligence Sweep · {label}")
 
         _chosen_news_types = news_type_sel if news_type_sel else [NEWS_TYPE_CONSTRUCTION, NEWS_TYPE_GENERAL]
-        raw = run_all_scrapers(max_pages, cutoff_start, progress_cb,
+        raw = run_all_scrapers(min(max_pages, _CLOUD_MAX_PAGES), cutoff_start, progress_cb,
                                news_types=_chosen_news_types)
 
         pbar.progress(1.0, text="Enriching and deduplicating...")
